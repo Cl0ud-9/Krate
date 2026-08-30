@@ -1,0 +1,8 @@
+naming:
+  FunctionNaming:
+    # allow PascalCase for @Composable functions, detekt has no annotation-based exemption for this rule
+    functionPattern: '[a-zA-Z][a-zA-Z0-9]*'
+
+style:
+  MagicNumber:
+    ignorePropertyDeclaration: true
