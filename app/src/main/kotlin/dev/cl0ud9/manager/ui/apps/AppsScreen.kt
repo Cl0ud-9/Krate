@@ -1,6 +1,7 @@
 package dev.cl0ud9.manager.ui.apps
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -32,7 +33,9 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
     AnimatedContent(
         targetState = uiState,
         label = "apps-content",
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        transitionSpec = {
+            fadeIn(animationSpec = tween(CONTENT_FADE_MS)) togetherWith fadeOut(animationSpec = tween(CONTENT_FADE_MS))
+        },
     ) { state ->
         when (state) {
             is AppsUiState.Loading -> {
@@ -63,3 +66,5 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
         }
     }
 }
+
+private const val CONTENT_FADE_MS = 220

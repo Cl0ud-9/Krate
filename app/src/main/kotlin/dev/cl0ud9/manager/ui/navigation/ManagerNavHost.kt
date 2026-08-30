@@ -2,6 +2,7 @@ package dev.cl0ud9.manager.ui.navigation
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -31,6 +32,7 @@ import dev.cl0ud9.manager.ui.updates.UpdatesScreen
 
 private const val APP_DETAILS_ROUTE = "apps/{appId}"
 private const val APP_ID_ARG = "appId"
+private const val FADE_DURATION_MS = 180
 
 @Composable
 fun ManagerNavHost(navController: NavHostController = rememberNavController()) {
@@ -77,8 +79,8 @@ private fun ManagerNavGraph(
         navController = navController,
         startDestination = ManagerDestination.HOME.route,
         modifier = modifier,
-        enterTransition = { fadeIn() },
-        exitTransition = { fadeOut() },
+        enterTransition = { fadeIn(animationSpec = tween(FADE_DURATION_MS)) },
+        exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
     ) {
         composable(ManagerDestination.HOME.route) { HomeScreen() }
         composable(ManagerDestination.APPS.route) {
@@ -93,15 +95,25 @@ private fun ManagerNavGraph(
             enterTransition = {
                 slideInHorizontally(
                     initialOffsetX = { fullWidth -> fullWidth },
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                ) + fadeIn()
+                    animationSpec =
+                        spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessLow,
+                        ),
+                ) + fadeIn(animationSpec = tween(FADE_DURATION_MS))
             },
             popExitTransition = {
                 slideOutHorizontally(
                     targetOffsetX = { fullWidth -> fullWidth },
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                ) + fadeOut()
+                    animationSpec =
+                        spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                ) + fadeOut(animationSpec = tween(FADE_DURATION_MS))
             },
+            popEnterTransition = { fadeIn(animationSpec = tween(FADE_DURATION_MS)) },
+            exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
         ) { backStackEntry ->
             val appId = backStackEntry.arguments?.getString(APP_ID_ARG).orEmpty()
             AppDetailsScreen(appId = appId, onBack = { navController.popBackStack() })

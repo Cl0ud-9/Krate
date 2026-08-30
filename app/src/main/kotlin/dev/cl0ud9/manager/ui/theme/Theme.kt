@@ -36,6 +36,7 @@ fun ManagerTheme(
             }
         }
 
+    // MaterialExpressiveTheme/MotionScheme are internal in this resolved material3 version, not usable yet
     MaterialTheme(
         colorScheme = colorScheme,
         content = content,
