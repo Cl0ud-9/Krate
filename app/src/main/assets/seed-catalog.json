@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "apps": [
+    {
+      "id": "example-curated-app",
+      "displayName": "Example Curated App",
+      "packageName": "dev.cl0ud9.example.curated",
+      "supportStatus": "SUPPORTED",
+      "installationMode": "UPDATE",
+      "dependencyIds": [],
+      "latestVersionName": "1.4.0",
+      "releaseNotes": "Placeholder release notes. Real entries arrive with manifest ingestion in phase 2.",
+      "enabled": true
+    },
+    {
+      "id": "sample-utility-app",
+      "displayName": "Sample Utility App",
+      "packageName": "dev.cl0ud9.example.utility",
+      "supportStatus": "BETA",
+      "installationMode": "UPDATE",
+      "dependencyIds": ["example-curated-app"],
+      "latestVersionName": "0.9.2",
+      "releaseNotes": "Placeholder release notes for a beta-status example.",
+      "enabled": true
+    },
+    {
+      "id": "demo-clean-install-app",
+      "displayName": "Demo Clean-Install App",
+      "packageName": "dev.cl0ud9.example.cleaninstall",
+      "supportStatus": "SUPPORTED",
+      "installationMode": "CLEAN_INSTALL",
+      "dependencyIds": [],
+      "latestVersionName": "2.0.1",
+      "releaseNotes": "Placeholder example showing the clean-install installation mode in the UI.",
+      "enabled": true
+    }
+  ]
+}

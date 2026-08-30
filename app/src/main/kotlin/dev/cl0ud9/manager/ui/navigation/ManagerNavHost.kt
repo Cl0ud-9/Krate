@@ -1,11 +1,13 @@
 package dev.cl0ud9.manager.ui.navigation
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -13,62 +15,96 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import dev.cl0ud9.manager.ui.apps.AppsScreen
+import dev.cl0ud9.manager.ui.details.AppDetailsScreen
 import dev.cl0ud9.manager.ui.home.HomeScreen
 import dev.cl0ud9.manager.ui.settings.SettingsScreen
 import dev.cl0ud9.manager.ui.updates.UpdatesScreen
+
+private const val APP_DETAILS_ROUTE = "apps/{appId}"
+private const val APP_ID_ARG = "appId"
 
 @Composable
 fun ManagerNavHost(navController: NavHostController = rememberNavController()) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val showBottomBar = ManagerDestination.entries.any { it.route == currentRoute }
 
     Scaffold(
-        bottomBar = {
-            NavigationBar {
-                ManagerDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = currentRoute == destination.route,
-                        onClick = {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        // placeholder dot, swap for real iconography later
-                        icon = {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.onSurfaceVariant),
-                            )
-                        },
-                        label = { Text(stringResource(destination.labelRes)) },
-                    )
-                }
-            }
-        },
+        bottomBar = { if (showBottomBar) ManagerBottomBar(navController, currentRoute) },
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = ManagerDestination.HOME.route,
-            modifier = Modifier.padding(innerPadding),
-        ) {
-            composable(ManagerDestination.HOME.route) { HomeScreen() }
-            composable(ManagerDestination.APPS.route) { AppsScreen() }
-            composable(ManagerDestination.UPDATES.route) { UpdatesScreen() }
-            composable(ManagerDestination.SETTINGS.route) { SettingsScreen() }
+        ManagerNavGraph(navController, modifier = Modifier.padding(innerPadding))
+    }
+}
+
+@Composable
+private fun ManagerBottomBar(
+    navController: NavHostController,
+    currentRoute: String?,
+) {
+    NavigationBar {
+        ManagerDestination.entries.forEach { destination ->
+            NavigationBarItem(
+                selected = currentRoute == destination.route,
+                onClick = {
+                    navController.navigate(destination.route) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                icon = { Icon(destination.icon, contentDescription = null) },
+                label = { Text(stringResource(destination.labelRes)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ManagerNavGraph(
+    navController: NavHostController,
+    modifier: Modifier = Modifier,
+) {
+    NavHost(
+        navController = navController,
+        startDestination = ManagerDestination.HOME.route,
+        modifier = modifier,
+        enterTransition = { fadeIn() },
+        exitTransition = { fadeOut() },
+    ) {
+        composable(ManagerDestination.HOME.route) { HomeScreen() }
+        composable(ManagerDestination.APPS.route) {
+            AppsScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
+        }
+        composable(ManagerDestination.UPDATES.route) { UpdatesScreen() }
+        composable(ManagerDestination.SETTINGS.route) { SettingsScreen() }
+
+        composable(
+            route = APP_DETAILS_ROUTE,
+            arguments = listOf(navArgument(APP_ID_ARG) { type = NavType.StringType }),
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                ) + fadeIn()
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                ) + fadeOut()
+            },
+        ) { backStackEntry ->
+            val appId = backStackEntry.arguments?.getString(APP_ID_ARG).orEmpty()
+            AppDetailsScreen(appId = appId, onBack = { navController.popBackStack() })
         }
     }
 }
