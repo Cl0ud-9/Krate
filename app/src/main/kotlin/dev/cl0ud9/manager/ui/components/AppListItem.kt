@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 @Composable
 fun AppListItem(
@@ -31,6 +32,7 @@ fun AppListItem(
 ) {
     Card(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = ShapeCache.smooth20,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Row(

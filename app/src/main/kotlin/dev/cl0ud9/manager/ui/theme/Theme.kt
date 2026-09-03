@@ -3,6 +3,7 @@ package dev.cl0ud9.manager.ui.theme
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -12,6 +13,16 @@ import androidx.compose.ui.platform.LocalContext
 
 private val LightColors = lightColorScheme(primary = BrandPrimary)
 private val DarkColors = darkColorScheme(primary = BrandPrimaryDark)
+
+// squircle shapes throughout, for the expressive look
+private val ManagerShapes =
+    Shapes(
+        extraSmall = ShapeCache.smooth8,
+        small = ShapeCache.smooth12,
+        medium = ShapeCache.smooth16,
+        large = ShapeCache.smooth28,
+        extraLarge = ShapeCache.smooth32,
+    )
 
 @Composable
 fun ManagerTheme(
@@ -39,6 +50,7 @@ fun ManagerTheme(
     // MaterialExpressiveTheme/MotionScheme are internal in this resolved material3 version, not usable yet
     MaterialTheme(
         colorScheme = colorScheme,
+        shapes = ManagerShapes,
         content = content,
     )
 }

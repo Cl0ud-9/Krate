@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 // label: sentence case, no trailing colon. value: large semibold figure
 @Composable
@@ -21,6 +22,7 @@ fun StatTile(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
+        shape = ShapeCache.smooth20,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {

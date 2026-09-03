@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.ui.components.SupportStatusBadge
+import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.managerViewModel
 
 @Composable
@@ -130,7 +131,10 @@ private fun DetailSection(
     title: String,
     body: String,
 ) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+    Card(
+        shape = ShapeCache.smooth16,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(text = title, style = MaterialTheme.typography.labelLarge)
             Text(text = body, style = MaterialTheme.typography.bodyMedium)
