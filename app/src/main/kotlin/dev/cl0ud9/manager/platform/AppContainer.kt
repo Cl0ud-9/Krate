@@ -2,6 +2,7 @@ package dev.cl0ud9.manager.platform
 
 import android.content.Context
 import dev.cl0ud9.manager.data.catalog.AssetCatalogRepository
+import dev.cl0ud9.manager.data.catalog.RemoteCatalogRepository
 import dev.cl0ud9.manager.data.settings.DataStoreSettingsRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
@@ -10,6 +11,8 @@ import dev.cl0ud9.manager.domain.repository.SettingsRepository
 class AppContainer(
     context: Context,
 ) {
-    val catalogRepository: CatalogRepository = AssetCatalogRepository(context.applicationContext)
+    private val seedCatalogRepository = AssetCatalogRepository(context.applicationContext)
+    val catalogRepository: CatalogRepository =
+        RemoteCatalogRepository(context.applicationContext, fallback = seedCatalogRepository)
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.applicationContext)
 }

@@ -14,6 +14,8 @@ espresso = "3.7.0"
 kotlinxSerialization = "1.11.0"
 datastore = "1.2.1"
 smoothCornerRect = "v1.0.0"
+tink = "1.18.0"
+okhttp = "4.12.0"
 
 [libraries]
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -33,6 +35,8 @@ navigation-compose = { group = "androidx.navigation", name = "navigation-compose
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 smooth-corner-rect = { group = "com.github.racra", name = "smooth-corner-rect-android-compose", version.ref = "smoothCornerRect" }
+tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tink" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }

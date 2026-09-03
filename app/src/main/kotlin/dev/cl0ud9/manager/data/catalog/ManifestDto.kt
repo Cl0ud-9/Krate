@@ -1,19 +1,20 @@
 package dev.cl0ud9.manager.data.catalog
 
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.SupportStatus
 import kotlinx.serialization.Serializable
 
-// bootstrap-only shape for the bundled seed asset, no artifact data - see ManifestDto for the real schema
+// mirrors the real output of catalog/scripts/generate_manifest.py, section 9 of the spec
 @Serializable
-data class CatalogDto(
+data class ManifestDto(
     val schemaVersion: Int,
-    val apps: List<AppProfileDto>,
+    val apps: List<ManifestAppDto>,
 )
 
 @Serializable
-data class AppProfileDto(
+data class ManifestAppDto(
     val id: String,
     val displayName: String,
     val packageName: String,
@@ -21,11 +22,14 @@ data class AppProfileDto(
     val installationMode: String,
     val dependencyIds: List<String> = emptyList(),
     val latestVersionName: String? = null,
+    val downloadUrl: String,
+    val sha256: String,
+    val certificateSha256: String,
     val releaseNotes: String? = null,
     val enabled: Boolean = true,
 )
 
-fun AppProfileDto.toDomain(): AppProfile =
+fun ManifestAppDto.toDomain(): AppProfile =
     AppProfile(
         id = id,
         displayName = displayName,
@@ -44,5 +48,5 @@ fun AppProfileDto.toDomain(): AppProfile =
         latestVersionName = latestVersionName,
         releaseNotes = releaseNotes,
         enabled = enabled,
-        artifact = null,
+        artifact = ArtifactInfo(downloadUrl = downloadUrl, sha256 = sha256, certificateSha256 = certificateSha256),
     )
