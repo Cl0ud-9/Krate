@@ -59,7 +59,11 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(state.apps, key = { it.id }) { app ->
-                        AppListItem(app = app, onClick = { onAppClick(app.id) })
+                        AppListItem(
+                            app = app,
+                            onClick = { onAppClick(app.id) },
+                            modifier = Modifier.animateItem(),
+                        )
                     }
                 }
             }

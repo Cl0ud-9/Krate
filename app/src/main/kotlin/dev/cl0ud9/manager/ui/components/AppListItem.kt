@@ -1,6 +1,8 @@
 package dev.cl0ud9.manager.ui.components
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,12 +19,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.ui.theme.ShapeCache
+import dev.cl0ud9.manager.ui.util.pressScale
 
 @Composable
 fun AppListItem(
@@ -30,8 +34,18 @@ fun AppListItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Card(
-        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .pressScale(interactionSource)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = LocalIndication.current,
+                    onClick = onClick,
+                ),
         shape = ShapeCache.smooth20,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {

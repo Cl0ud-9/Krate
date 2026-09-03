@@ -8,11 +8,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -25,6 +22,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.cl0ud9.manager.ui.apps.AppsScreen
+import dev.cl0ud9.manager.ui.components.ManagerNavigationBarItem
 import dev.cl0ud9.manager.ui.details.AppDetailsScreen
 import dev.cl0ud9.manager.ui.home.HomeScreen
 import dev.cl0ud9.manager.ui.settings.SettingsScreen
@@ -54,7 +52,7 @@ private fun ManagerBottomBar(
 ) {
     NavigationBar {
         ManagerDestination.entries.forEach { destination ->
-            NavigationBarItem(
+            ManagerNavigationBarItem(
                 selected = currentRoute == destination.route,
                 onClick = {
                     navController.navigate(destination.route) {
@@ -63,8 +61,8 @@ private fun ManagerBottomBar(
                         restoreState = true
                     }
                 },
-                icon = { Icon(destination.icon, contentDescription = null) },
-                label = { Text(stringResource(destination.labelRes)) },
+                icon = destination.icon,
+                label = stringResource(destination.labelRes),
             )
         }
     }

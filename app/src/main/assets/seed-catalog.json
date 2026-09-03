@@ -2,36 +2,47 @@
   "schemaVersion": 1,
   "apps": [
     {
-      "id": "example-curated-app",
-      "displayName": "Example Curated App",
-      "packageName": "dev.cl0ud9.example.curated",
+      "id": "ltecleaner-foss",
+      "displayName": "LTE Cleaner FOSS",
+      "packageName": "io.mdp43140.ltecleaner",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
       "dependencyIds": [],
-      "latestVersionName": "1.4.0",
-      "releaseNotes": "Placeholder release notes. Real entries arrive with manifest ingestion in phase 2.",
+      "latestVersionName": "5.1.0",
+      "releaseNotes": "Seed entry from github.com/MDP43140/LTECleanerFOSS. Real release notes arrive with manifest ingestion in phase 2.",
       "enabled": true
     },
     {
-      "id": "sample-utility-app",
-      "displayName": "Sample Utility App",
-      "packageName": "dev.cl0ud9.example.utility",
-      "supportStatus": "BETA",
+      "id": "app-cache-cleaner",
+      "displayName": "App Cache Cleaner",
+      "packageName": "com.github.bmx666.appcachecleaner",
+      "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
-      "dependencyIds": ["example-curated-app"],
-      "latestVersionName": "0.9.2",
-      "releaseNotes": "Placeholder release notes for a beta-status example.",
+      "dependencyIds": [],
+      "latestVersionName": "2.3.0",
+      "releaseNotes": "Seed entry from github.com/bmx666/android-appcachecleaner. Real release notes arrive with manifest ingestion in phase 2.",
+      "enabled": true
+    },
+    {
+      "id": "microg-re",
+      "displayName": "microG RE",
+      "packageName": "app.patched.android.gms",
+      "supportStatus": "SUPPORTED",
+      "installationMode": "UPDATE",
+      "dependencyIds": [],
+      "latestVersionName": "7.0.0",
+      "releaseNotes": "Seed entry from github.com/MorpheApp/MicroG-RE, pinned to the latest stable (non pre-release) tag. Real release notes arrive with manifest ingestion in phase 2.",
       "enabled": true
     },
     {
       "id": "demo-clean-install-app",
       "displayName": "Demo Clean-Install App",
       "packageName": "dev.cl0ud9.example.cleaninstall",
-      "supportStatus": "SUPPORTED",
+      "supportStatus": "BETA",
       "installationMode": "CLEAN_INSTALL",
       "dependencyIds": [],
       "latestVersionName": "2.0.1",
-      "releaseNotes": "Placeholder example showing the clean-install installation mode in the UI.",
+      "releaseNotes": "Placeholder standing in for Videoapp Patched until its patch source and upstream APK acquisition are settled.",
       "enabled": true
     }
   ]

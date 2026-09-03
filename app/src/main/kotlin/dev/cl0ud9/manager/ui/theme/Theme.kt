@@ -51,6 +51,7 @@ fun ManagerTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         shapes = ManagerShapes,
+        typography = ManagerTypography,
         content = content,
     )
 }
