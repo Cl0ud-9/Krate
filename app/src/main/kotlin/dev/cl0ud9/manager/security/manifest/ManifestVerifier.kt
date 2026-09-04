@@ -11,18 +11,22 @@ const val MANIFEST_PUBLIC_KEY_BASE64 = "ObG/z2CkousiMGFN/EFP4th0eaaVy0KAHnuL7TrU
 class ManifestVerifier(
     publicKeyBase64: String = MANIFEST_PUBLIC_KEY_BASE64,
 ) {
-    private val verifier = Ed25519Verify(Base64.getDecoder().decode(publicKeyBase64))
+    // a malformed compiled-in key must never crash app startup, degrade to "never verifies" instead
+    private val verifier: Ed25519Verify? =
+        runCatching { Ed25519Verify(Base64.getDecoder().decode(publicKeyBase64)) }.getOrNull()
 
     // an invalid signature is the expected negative outcome here, not a bug to report upstream
     @Suppress("SwallowedException")
     fun verify(
         manifestBytes: ByteArray,
         signatureBytes: ByteArray,
-    ): Boolean =
-        try {
-            verifier.verify(signatureBytes, manifestBytes)
+    ): Boolean {
+        val activeVerifier = verifier ?: return false
+        return try {
+            activeVerifier.verify(signatureBytes, manifestBytes)
             true
         } catch (ignored: GeneralSecurityException) {
             false
         }
+    }
 }
