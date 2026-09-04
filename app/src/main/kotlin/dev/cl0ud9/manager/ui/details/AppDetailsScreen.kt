@@ -30,10 +30,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DownloadStatus
+import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.ui.components.SupportStatusBadge
 import dev.cl0ud9.manager.ui.theme.ShapeCache
@@ -46,10 +49,16 @@ fun AppDetailsScreen(
 ) {
     val viewModel =
         managerViewModel { container ->
-            AppDetailsViewModel(container.catalogRepository, container.artifactDownloader, appId)
+            AppDetailsViewModel(
+                container.catalogRepository,
+                container.artifactDownloader,
+                container.installationEngine,
+                appId,
+            )
         }
     val app by viewModel.app.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
+    val installStatus by viewModel.installStatus.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
@@ -65,7 +74,13 @@ fun AppDetailsScreen(
                 CircularProgressIndicator()
             }
         } else {
-            AppDetailsContent(currentApp, downloadStatus, onDownload = viewModel::startDownload)
+            AppDetailsContent(
+                app = currentApp,
+                downloadStatus = downloadStatus,
+                installStatus = installStatus,
+                onDownload = viewModel::startDownload,
+                onInstall = viewModel::startInstall,
+            )
         }
     }
 }
@@ -74,7 +89,9 @@ fun AppDetailsScreen(
 private fun AppDetailsContent(
     app: AppProfile,
     downloadStatus: DownloadStatus,
+    installStatus: InstallStatus,
     onDownload: () -> Unit,
+    onInstall: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -128,7 +145,13 @@ private fun AppDetailsContent(
             body = app.releaseNotes ?: "No release notes available.",
         )
 
-        DownloadSection(app = app, status = downloadStatus, onDownload = onDownload)
+        DownloadSection(
+            app = app,
+            status = downloadStatus,
+            installStatus = installStatus,
+            onDownload = onDownload,
+            onInstall = onInstall,
+        )
     }
 }
 
@@ -136,7 +159,9 @@ private fun AppDetailsContent(
 private fun DownloadSection(
     app: AppProfile,
     status: DownloadStatus,
+    installStatus: InstallStatus,
     onDownload: () -> Unit,
+    onInstall: () -> Unit,
 ) {
     val actionLabel = if (app.installationMode == InstallationMode.CLEAN_INSTALL) "Install" else "Update"
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -169,35 +194,81 @@ private fun DownloadSection(
             }
 
             is DownloadStatus.ReadyToInstall -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        "Verified and ready. $actionLabel lands in the next phase.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+                ReadyToInstallSection(
+                    app = app,
+                    actionLabel = actionLabel,
+                    installStatus = installStatus,
+                    onInstall = onInstall,
+                )
             }
 
             is DownloadStatus.Failed -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(Icons.Filled.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                    Text(status.reason, style = MaterialTheme.typography.bodyMedium)
-                }
+                StatusRow(icon = Icons.Filled.Error, tint = MaterialTheme.colorScheme.error, text = status.reason)
                 Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
                     Text("Retry download")
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReadyToInstallSection(
+    app: AppProfile,
+    actionLabel: String,
+    installStatus: InstallStatus,
+    onInstall: () -> Unit,
+) {
+    // clean install (uninstall + install, e.g. videoapp patched) is phase 5, not wired up yet
+    val canInstall = app.installationMode == InstallationMode.UPDATE
+    when (installStatus) {
+        is InstallStatus.Idle,
+        is InstallStatus.Failed,
+        -> {
+            if (installStatus is InstallStatus.Failed) {
+                StatusRow(
+                    icon = Icons.Filled.Error,
+                    tint = MaterialTheme.colorScheme.error,
+                    text = installStatus.reason,
+                )
+            }
+            Button(onClick = onInstall, enabled = canInstall, modifier = Modifier.fillMaxWidth()) {
+                Text(actionLabel)
+            }
+            if (!canInstall) {
+                HelperText("Verified. $actionLabel lands in a later phase for this app.")
+            }
+        }
+
+        is InstallStatus.Installing -> {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            HelperText("Installing...")
+        }
+
+        is InstallStatus.WaitingForUser -> {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            HelperText("Confirm the installation in the system dialog.")
+        }
+
+        is InstallStatus.Success -> {
+            StatusRow(
+                icon = Icons.Filled.CheckCircle,
+                tint = MaterialTheme.colorScheme.primary,
+                text = "$actionLabel complete.",
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusRow(
+    icon: ImageVector,
+    tint: Color,
+    text: String,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(icon, contentDescription = null, tint = tint)
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

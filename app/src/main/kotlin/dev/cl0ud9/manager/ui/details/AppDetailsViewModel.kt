@@ -3,8 +3,10 @@ package dev.cl0ud9.manager.ui.details
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
+import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DownloadStatus
+import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -12,10 +14,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 
 class AppDetailsViewModel(
     catalogRepository: CatalogRepository,
     private val artifactDownloader: ArtifactDownloader,
+    private val installationEngine: InstallationEngine,
     appId: String,
 ) : ViewModel() {
     val app: StateFlow<AppProfile?> =
@@ -26,6 +30,9 @@ class AppDetailsViewModel(
     private val mutableDownloadStatus = MutableStateFlow<DownloadStatus>(DownloadStatus.Idle)
     val downloadStatus: StateFlow<DownloadStatus> = mutableDownloadStatus.asStateFlow()
 
+    private val mutableInstallStatus = MutableStateFlow<InstallStatus>(InstallStatus.Idle)
+    val installStatus: StateFlow<InstallStatus> = mutableInstallStatus.asStateFlow()
+
     fun startDownload() {
         val currentApp = app.value ?: return
         if (mutableDownloadStatus.value is DownloadStatus.Downloading ||
@@ -35,6 +42,20 @@ class AppDetailsViewModel(
         }
         viewModelScope.launch {
             artifactDownloader.download(currentApp).collect { status -> mutableDownloadStatus.value = status }
+        }
+    }
+
+    fun startInstall() {
+        val currentApp = app.value
+        val readyStatus = mutableDownloadStatus.value as? DownloadStatus.ReadyToInstall
+        val busy =
+            mutableInstallStatus.value is InstallStatus.Installing ||
+                mutableInstallStatus.value is InstallStatus.WaitingForUser
+        if (currentApp == null || readyStatus == null || busy) return
+        viewModelScope.launch {
+            installationEngine.install(currentApp, File(readyStatus.filePath)).collect { status ->
+                mutableInstallStatus.value = status
+            }
         }
     }
 
