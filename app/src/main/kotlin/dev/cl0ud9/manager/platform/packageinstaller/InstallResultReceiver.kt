@@ -8,6 +8,10 @@ import android.content.pm.PackageInstaller
 import android.os.Build
 import android.os.Parcelable
 
+// key we bake into the pending intent ourselves for uninstall requests, which have no session id of
+// their own to correlate on - install requests are keyed off the system's own EXTRA_SESSION_ID instead
+const val EXTRA_REQUEST_KEY = "dev.cl0ud9.manager.EXTRA_REQUEST_KEY"
+
 // manifest-registered so a pending session result still reaches us even if the app process was killed
 // while android showed its own install confirmation ui, section 42.17 of the spec
 class InstallResultReceiver : BroadcastReceiver() {
@@ -16,6 +20,7 @@ class InstallResultReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
+        val requestKey = intent.getStringExtra(EXTRA_REQUEST_KEY) ?: "install:$sessionId"
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
         val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
 
@@ -23,7 +28,7 @@ class InstallResultReceiver : BroadcastReceiver() {
             launchConfirmation(context, intent)
         }
 
-        InstallResultBus.emit(InstallResultEvent(sessionId = sessionId, status = status, message = message))
+        InstallResultBus.emit(InstallResultEvent(requestKey = requestKey, status = status, message = message))
     }
 
     private fun launchConfirmation(

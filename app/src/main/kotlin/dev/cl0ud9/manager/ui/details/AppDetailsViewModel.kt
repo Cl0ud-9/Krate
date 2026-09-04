@@ -3,12 +3,15 @@ package dev.cl0ud9.manager.ui.details
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
+import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
+import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,6 +28,7 @@ class AppDetailsViewModel(
     catalogRepository: CatalogRepository,
     private val artifactDownloader: ArtifactDownloader,
     private val installationEngine: InstallationEngine,
+    private val cleanInstallOrchestrator: CleanInstallOrchestrator,
     private val installedPackageReader: InstalledPackageReader,
     appId: String,
 ) : ViewModel() {
@@ -64,15 +68,45 @@ class AppDetailsViewModel(
         }
     }
 
+    // videoapp patched (CLEAN_INSTALL) always goes through the orchestrator, section 16, 42.12 of the spec.
+    // normal UPDATE apps attempt an in-place install/update first
     fun startInstall() {
         val currentApp = app.value
-        val readyStatus = mutableDownloadStatus.value as? DownloadStatus.ReadyToInstall
-        val busy =
-            mutableInstallStatus.value is InstallStatus.Installing ||
-                mutableInstallStatus.value is InstallStatus.WaitingForUser
-        if (currentApp == null || readyStatus == null || busy) return
+        val readyStatus = readyDownload()
+        if (currentApp == null || readyStatus == null || isBusy()) return
+        val apkFile = File(readyStatus.filePath)
+        val flow =
+            if (currentApp.installationMode == InstallationMode.CLEAN_INSTALL) {
+                cleanInstallOrchestrator.cleanInstall(currentApp, apkFile)
+            } else {
+                installationEngine.install(currentApp, apkFile)
+            }
+        runInstallFlow(flow)
+    }
+
+    // explicit, user-confirmed fallback after a normal update failed, section 17 of the spec
+    fun retryAsCleanInstall() {
+        val currentApp = app.value
+        val readyStatus = readyDownload()
+        if (currentApp == null || readyStatus == null || isBusy()) return
+        runInstallFlow(cleanInstallOrchestrator.cleanInstall(currentApp, File(readyStatus.filePath)))
+    }
+
+    private fun readyDownload(): DownloadStatus.ReadyToInstall? =
+        mutableDownloadStatus.value as? DownloadStatus.ReadyToInstall
+
+    private fun isBusy(): Boolean =
+        when (mutableInstallStatus.value) {
+            InstallStatus.Installing, InstallStatus.WaitingForUser, InstallStatus.PreparingRollback,
+            InstallStatus.Uninstalling, InstallStatus.RollingBack,
+            -> true
+
+            else -> false
+        }
+
+    private fun runInstallFlow(flow: Flow<InstallStatus>) {
         viewModelScope.launch {
-            installationEngine.install(currentApp, File(readyStatus.filePath)).collect { status ->
+            flow.collect { status ->
                 mutableInstallStatus.value = status
                 if (status is InstallStatus.Success) refresh()
             }

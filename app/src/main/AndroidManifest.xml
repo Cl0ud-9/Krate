@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- lets a normal app request an uninstall through PackageInstaller, still shows the system
+         confirmation dialog - section 17, 18 of the spec (clean install) -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- the curated catalog is fetched remotely, so package names to check aren't known at build
          time - a static <queries> allowlist can't cover that; this is the same justification
          F-Droid/Aurora Store use, section 13 of the spec -->

@@ -1,0 +1,209 @@
+package dev.cl0ud9.manager.ui.details
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.model.DownloadStatus
+import dev.cl0ud9.manager.domain.model.InstallStatus
+import dev.cl0ud9.manager.domain.model.InstallationMode
+
+// section 16 of the spec: the ui shows Install or Update based on real device state, not just app metadata
+private fun actionLabelFor(
+    app: AppProfile,
+    installedVersionName: String?,
+): String =
+    when (app.installationMode) {
+        InstallationMode.CLEAN_INSTALL -> "Install"
+        InstallationMode.UPDATE -> if (installedVersionName != null) "Update" else "Install"
+    }
+
+@Composable
+internal fun DownloadSection(
+    state: AppDetailsUiState,
+    onDownload: () -> Unit,
+    onInstall: () -> Unit,
+    onRetryAsCleanInstall: () -> Unit,
+) {
+    val app = state.app
+    val status = state.downloadStatus
+    val installStatus = state.installStatus
+    val actionLabel = actionLabelFor(app, state.installedVersionName)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (status) {
+            is DownloadStatus.Idle -> {
+                Button(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
+                    Text("Download")
+                }
+                if (app.artifact == null) {
+                    HelperText("Not yet available for download.")
+                }
+            }
+
+            is DownloadStatus.Downloading -> {
+                val total = status.totalBytes
+                val fraction = if (total != null && total > 0) status.bytesDownloaded / total.toFloat() else 0f
+                if (total != null) {
+                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(6.dp))
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+                }
+                HelperText(
+                    "Downloading ${formatMb(status.bytesDownloaded)} of ${total?.let { formatMb(it) } ?: "?"} MB",
+                )
+            }
+
+            is DownloadStatus.Verifying -> {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+                HelperText("Verifying checksum and signing certificate...")
+            }
+
+            is DownloadStatus.ReadyToInstall -> {
+                ReadyToInstallSection(
+                    app = app,
+                    actionLabel = actionLabel,
+                    installStatus = installStatus,
+                    onInstall = onInstall,
+                    onRetryAsCleanInstall = onRetryAsCleanInstall,
+                )
+            }
+
+            is DownloadStatus.Failed -> {
+                StatusRow(icon = Icons.Filled.Error, tint = MaterialTheme.colorScheme.error, text = status.reason)
+                Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                    Text("Retry download")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadyToInstallSection(
+    app: AppProfile,
+    actionLabel: String,
+    installStatus: InstallStatus,
+    onInstall: () -> Unit,
+    onRetryAsCleanInstall: () -> Unit,
+) {
+    when (installStatus) {
+        is InstallStatus.Idle -> {
+            Button(onClick = onInstall, modifier = Modifier.fillMaxWidth()) {
+                Text(actionLabel)
+            }
+        }
+
+        is InstallStatus.Failed -> {
+            FailedInstallSection(
+                app = app,
+                actionLabel = actionLabel,
+                failure = installStatus,
+                onInstall = onInstall,
+                onRetryAsCleanInstall = onRetryAsCleanInstall,
+            )
+        }
+
+        is InstallStatus.PreparingRollback -> {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            HelperText("Preserving the current version for rollback...")
+        }
+
+        is InstallStatus.Uninstalling -> {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            HelperText("Uninstalling the current version...")
+        }
+
+        is InstallStatus.Installing -> {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            HelperText("Installing...")
+        }
+
+        is InstallStatus.WaitingForUser -> {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            HelperText("Confirm the installation in the system dialog.")
+        }
+
+        is InstallStatus.RollingBack -> {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            HelperText("Install failed, restoring the previous version...")
+        }
+
+        is InstallStatus.Success -> {
+            StatusRow(
+                icon = Icons.Filled.CheckCircle,
+                tint = MaterialTheme.colorScheme.primary,
+                text = "$actionLabel complete.",
+            )
+        }
+    }
+}
+
+// section 17 of the spec: a normal update failure offers an explicit, user-confirmed clean-install
+// fallback with a data-loss warning. an app that already used clean install (videoapp patched, or a
+// retry after this fallback) has nothing further to escalate to, so it only offers a plain retry
+@Composable
+private fun FailedInstallSection(
+    app: AppProfile,
+    actionLabel: String,
+    failure: InstallStatus.Failed,
+    onInstall: () -> Unit,
+    onRetryAsCleanInstall: () -> Unit,
+) {
+    val reasonText = if (failure.rolledBack) "${failure.reason} The previous version was restored." else failure.reason
+    StatusRow(icon = Icons.Filled.Error, tint = MaterialTheme.colorScheme.error, text = reasonText)
+
+    if (app.installationMode == InstallationMode.CLEAN_INSTALL) {
+        Button(onClick = onInstall, modifier = Modifier.fillMaxWidth()) {
+            Text("Retry")
+        }
+        return
+    }
+
+    Button(onClick = onInstall, modifier = Modifier.fillMaxWidth()) {
+        Text("Retry $actionLabel")
+    }
+    HelperText(
+        "The application could not be updated normally. A clean installation can be attempted. " +
+            "This may remove the app's local data.",
+    )
+    Button(onClick = onRetryAsCleanInstall, modifier = Modifier.fillMaxWidth()) {
+        Text("Try clean install")
+    }
+}
+
+@Composable
+private fun StatusRow(
+    icon: ImageVector,
+    tint: Color,
+    text: String,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(icon, contentDescription = null, tint = tint)
+        Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun HelperText(text: String) {
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+private const val BYTES_PER_MB = 1024 * 1024
+
+private fun formatMb(bytes: Long): String = "%.1f".format(bytes / BYTES_PER_MB.toFloat())

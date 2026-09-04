@@ -6,12 +6,15 @@ import dev.cl0ud9.manager.data.catalog.RemoteCatalogRepository
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
 import dev.cl0ud9.manager.data.downloads.OkHttpArtifactDownloader
 import dev.cl0ud9.manager.data.settings.DataStoreSettingsRepository
+import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.PackageManagerInstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinstaller.PackageInstallerEngine
+import dev.cl0ud9.manager.platform.rollback.FileRollbackStore
+import dev.cl0ud9.manager.platform.rollback.RollbackStore
 import dev.cl0ud9.manager.security.apk.PackageManagerApkArchiveReader
 import java.io.File
 
@@ -31,4 +34,6 @@ class AppContainer(
     val installationEngine: InstallationEngine = PackageInstallerEngine(context.applicationContext)
     val installedPackageReader: InstalledPackageReader =
         PackageManagerInstalledPackageReader(context.applicationContext)
+    val rollbackStore: RollbackStore = FileRollbackStore(context.applicationContext)
+    val cleanInstallOrchestrator: CleanInstallOrchestrator = CleanInstallOrchestrator(installationEngine, rollbackStore)
 }

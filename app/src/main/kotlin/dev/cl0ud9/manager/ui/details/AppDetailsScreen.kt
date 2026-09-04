@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -14,22 +12,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.domain.model.AppProfile
@@ -53,6 +46,7 @@ fun AppDetailsScreen(
                 container.catalogRepository,
                 container.artifactDownloader,
                 container.installationEngine,
+                container.cleanInstallOrchestrator,
                 container.installedPackageReader,
                 appId,
             )
@@ -87,13 +81,14 @@ fun AppDetailsScreen(
                     ),
                 onDownload = viewModel::startDownload,
                 onInstall = viewModel::startInstall,
+                onRetryAsCleanInstall = viewModel::retryAsCleanInstall,
             )
         }
     }
 }
 
 // bundles the screen's state so the composables below stay under the parameter-count limit
-private data class AppDetailsUiState(
+internal data class AppDetailsUiState(
     val app: AppProfile,
     val installedVersionName: String?,
     val downloadStatus: DownloadStatus,
@@ -105,6 +100,7 @@ private fun AppDetailsContent(
     state: AppDetailsUiState,
     onDownload: () -> Unit,
     onInstall: () -> Unit,
+    onRetryAsCleanInstall: () -> Unit,
 ) {
     val app = state.app
     val installedVersionName = state.installedVersionName
@@ -162,6 +158,7 @@ private fun AppDetailsContent(
             state = state,
             onDownload = onDownload,
             onInstall = onInstall,
+            onRetryAsCleanInstall = onRetryAsCleanInstall,
         )
     }
 }
@@ -170,9 +167,7 @@ private fun AppDetailsContent(
 private fun InstalledStatusRow(installedVersionName: String?) {
     val text = installedVersionName?.let { "Installed - version $it" } ?: "Not installed on this device"
     val tint =
-        if (installedVersionName !=
-            null
-        ) {
+        if (installedVersionName != null) {
             MaterialTheme.colorScheme.tertiary
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
@@ -185,143 +180,6 @@ private fun InstalledStatusRow(installedVersionName: String?) {
         Text(text = text, style = MaterialTheme.typography.bodySmall, color = tint)
     }
 }
-
-// section 16 of the spec: the ui shows Install or Update based on real device state, not just app metadata
-private fun actionLabelFor(
-    app: AppProfile,
-    installedVersionName: String?,
-): String =
-    when (app.installationMode) {
-        InstallationMode.CLEAN_INSTALL -> "Install"
-        InstallationMode.UPDATE -> if (installedVersionName != null) "Update" else "Install"
-    }
-
-@Composable
-private fun DownloadSection(
-    state: AppDetailsUiState,
-    onDownload: () -> Unit,
-    onInstall: () -> Unit,
-) {
-    val app = state.app
-    val status = state.downloadStatus
-    val installStatus = state.installStatus
-    val actionLabel = actionLabelFor(app, state.installedVersionName)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        when (status) {
-            is DownloadStatus.Idle -> {
-                Button(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
-                    Text("Download")
-                }
-                if (app.artifact == null) {
-                    HelperText("Not yet available for download.")
-                }
-            }
-
-            is DownloadStatus.Downloading -> {
-                val total = status.totalBytes
-                val fraction = if (total != null && total > 0) status.bytesDownloaded / total.toFloat() else 0f
-                if (total != null) {
-                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(6.dp))
-                } else {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
-                }
-                HelperText(
-                    "Downloading ${formatMb(status.bytesDownloaded)} of ${total?.let { formatMb(it) } ?: "?"} MB",
-                )
-            }
-
-            is DownloadStatus.Verifying -> {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
-                HelperText("Verifying checksum and signing certificate...")
-            }
-
-            is DownloadStatus.ReadyToInstall -> {
-                ReadyToInstallSection(
-                    app = app,
-                    actionLabel = actionLabel,
-                    installStatus = installStatus,
-                    onInstall = onInstall,
-                )
-            }
-
-            is DownloadStatus.Failed -> {
-                StatusRow(icon = Icons.Filled.Error, tint = MaterialTheme.colorScheme.error, text = status.reason)
-                Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-                    Text("Retry download")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReadyToInstallSection(
-    app: AppProfile,
-    actionLabel: String,
-    installStatus: InstallStatus,
-    onInstall: () -> Unit,
-) {
-    // clean install (uninstall + install, e.g. videoapp patched) is phase 5, not wired up yet
-    val canInstall = app.installationMode == InstallationMode.UPDATE
-    when (installStatus) {
-        is InstallStatus.Idle,
-        is InstallStatus.Failed,
-        -> {
-            if (installStatus is InstallStatus.Failed) {
-                StatusRow(
-                    icon = Icons.Filled.Error,
-                    tint = MaterialTheme.colorScheme.error,
-                    text = installStatus.reason,
-                )
-            }
-            Button(onClick = onInstall, enabled = canInstall, modifier = Modifier.fillMaxWidth()) {
-                Text(actionLabel)
-            }
-            if (!canInstall) {
-                HelperText("Verified. $actionLabel lands in a later phase for this app.")
-            }
-        }
-
-        is InstallStatus.Installing -> {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
-            HelperText("Installing...")
-        }
-
-        is InstallStatus.WaitingForUser -> {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
-            HelperText("Confirm the installation in the system dialog.")
-        }
-
-        is InstallStatus.Success -> {
-            StatusRow(
-                icon = Icons.Filled.CheckCircle,
-                tint = MaterialTheme.colorScheme.primary,
-                text = "$actionLabel complete.",
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatusRow(
-    icon: ImageVector,
-    tint: Color,
-    text: String,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(icon, contentDescription = null, tint = tint)
-        Text(text, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun HelperText(text: String) {
-    Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-private const val BYTES_PER_MB = 1024 * 1024
-
-private fun formatMb(bytes: Long): String = "%.1f".format(bytes / BYTES_PER_MB.toFloat())
 
 @Composable
 private fun DetailSection(

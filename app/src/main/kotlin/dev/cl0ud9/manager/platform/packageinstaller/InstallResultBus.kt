@@ -5,13 +5,14 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 data class InstallResultEvent(
-    val sessionId: Int,
+    // "install:<sessionId>" for an install session, "uninstall:<packageName>" for an uninstall request
+    val requestKey: String,
     val status: Int,
     val message: String?,
 )
 
 // relays PackageInstaller broadcast results from InstallResultReceiver to whichever engine flow is
-// waiting on that session, since the broadcast arrives out of band from the install call itself
+// waiting on that request, since the broadcast arrives out of band from the install/uninstall call itself
 object InstallResultBus {
     private val mutableEvents = MutableSharedFlow<InstallResultEvent>(extraBufferCapacity = BUFFER_CAPACITY)
     val events: SharedFlow<InstallResultEvent> = mutableEvents.asSharedFlow()
