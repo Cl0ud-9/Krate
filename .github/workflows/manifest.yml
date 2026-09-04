@@ -1,10 +1,9 @@
 name: manifest
 
-# schedule trigger intentionally left out until MANIFEST_SIGNING_KEY exists (see SETUP.md) -
-# add it back once that's done so this runs on the section 10 ~15 minute cadence:
-#   schedule:
-#     - cron: "*/15 * * * *"
 on:
+  schedule:
+    # section 10's ~15 minute release-detection cadence
+    - cron: "*/15 * * * *"
   workflow_dispatch:
   push:
     branches: [main]
