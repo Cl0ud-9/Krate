@@ -9,6 +9,8 @@ import dev.cl0ud9.manager.data.settings.DataStoreSettingsRepository
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
+import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
+import dev.cl0ud9.manager.platform.packageinfo.PackageManagerInstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinstaller.PackageInstallerEngine
 import dev.cl0ud9.manager.security.apk.PackageManagerApkArchiveReader
 import java.io.File
@@ -27,4 +29,6 @@ class AppContainer(
             archiveReader = PackageManagerApkArchiveReader(context.applicationContext),
         )
     val installationEngine: InstallationEngine = PackageInstallerEngine(context.applicationContext)
+    val installedPackageReader: InstalledPackageReader =
+        PackageManagerInstalledPackageReader(context.applicationContext)
 }

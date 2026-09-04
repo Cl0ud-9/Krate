@@ -5,6 +5,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
@@ -31,6 +32,7 @@ import dev.cl0ud9.manager.ui.updates.UpdatesScreen
 private const val APP_DETAILS_ROUTE = "apps/{appId}"
 private const val APP_ID_ARG = "appId"
 private const val FADE_DURATION_MS = 180
+private const val TAB_ENTER_INITIAL_SCALE = 0.94f
 
 @Composable
 fun ManagerNavHost(navController: NavHostController = rememberNavController()) {
@@ -77,14 +79,20 @@ private fun ManagerNavGraph(
         navController = navController,
         startDestination = ManagerDestination.HOME.route,
         modifier = modifier,
-        enterTransition = { fadeIn(animationSpec = tween(FADE_DURATION_MS)) },
+        // material "fade through": the incoming tab fades and grows in while the outgoing one just fades
+        enterTransition = {
+            fadeIn(animationSpec = tween(FADE_DURATION_MS)) +
+                scaleIn(initialScale = TAB_ENTER_INITIAL_SCALE, animationSpec = tween(FADE_DURATION_MS))
+        },
         exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
     ) {
         composable(ManagerDestination.HOME.route) { HomeScreen() }
         composable(ManagerDestination.APPS.route) {
             AppsScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
         }
-        composable(ManagerDestination.UPDATES.route) { UpdatesScreen() }
+        composable(ManagerDestination.UPDATES.route) {
+            UpdatesScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
+        }
         composable(ManagerDestination.SETTINGS.route) { SettingsScreen() }
 
         composable(

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -24,7 +23,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,8 +36,10 @@ import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.ui.components.AppIconAvatar
 import dev.cl0ud9.manager.ui.components.SupportStatusBadge
 import dev.cl0ud9.manager.ui.theme.ShapeCache
+import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.managerViewModel
 
 @Composable
@@ -53,10 +53,13 @@ fun AppDetailsScreen(
                 container.catalogRepository,
                 container.artifactDownloader,
                 container.installationEngine,
+                container.installedPackageReader,
                 appId,
             )
         }
+    RefreshOnResume(viewModel::refresh)
     val app by viewModel.app.collectAsStateWithLifecycle()
+    val installedVersionName by viewModel.installedVersionName.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
     val installStatus by viewModel.installStatus.collectAsStateWithLifecycle()
 
@@ -75,9 +78,13 @@ fun AppDetailsScreen(
             }
         } else {
             AppDetailsContent(
-                app = currentApp,
-                downloadStatus = downloadStatus,
-                installStatus = installStatus,
+                state =
+                    AppDetailsUiState(
+                        app = currentApp,
+                        installedVersionName = installedVersionName,
+                        downloadStatus = downloadStatus,
+                        installStatus = installStatus,
+                    ),
                 onDownload = viewModel::startDownload,
                 onInstall = viewModel::startInstall,
             )
@@ -85,24 +92,28 @@ fun AppDetailsScreen(
     }
 }
 
+// bundles the screen's state so the composables below stay under the parameter-count limit
+private data class AppDetailsUiState(
+    val app: AppProfile,
+    val installedVersionName: String?,
+    val downloadStatus: DownloadStatus,
+    val installStatus: InstallStatus,
+)
+
 @Composable
 private fun AppDetailsContent(
-    app: AppProfile,
-    downloadStatus: DownloadStatus,
-    installStatus: InstallStatus,
+    state: AppDetailsUiState,
     onDownload: () -> Unit,
     onInstall: () -> Unit,
 ) {
+    val app = state.app
+    val installedVersionName = state.installedVersionName
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Surface(
-                modifier = Modifier.size(56.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-            ) {}
+            AppIconAvatar(displayName = app.displayName, seed = app.id, size = 56.dp)
             Column {
                 Text(text = app.displayName, style = MaterialTheme.typography.headlineSmall)
                 Text(
@@ -116,10 +127,12 @@ private fun AppDetailsContent(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             SupportStatusBadge(status = app.supportStatus)
             Text(
-                text = app.latestVersionName?.let { "Version $it" } ?: "Version unknown",
+                text = app.latestVersionName?.let { "Latest $it" } ?: "Latest version unknown",
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+
+        InstalledStatusRow(installedVersionName = installedVersionName)
 
         DetailSection(
             title = "Installation",
@@ -146,9 +159,7 @@ private fun AppDetailsContent(
         )
 
         DownloadSection(
-            app = app,
-            status = downloadStatus,
-            installStatus = installStatus,
+            state = state,
             onDownload = onDownload,
             onInstall = onInstall,
         )
@@ -156,14 +167,45 @@ private fun AppDetailsContent(
 }
 
 @Composable
-private fun DownloadSection(
+private fun InstalledStatusRow(installedVersionName: String?) {
+    val text = installedVersionName?.let { "Installed - version $it" } ?: "Not installed on this device"
+    val tint =
+        if (installedVersionName !=
+            null
+        ) {
+            MaterialTheme.colorScheme.tertiary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    val icon = if (installedVersionName != null) Icons.Filled.CheckCircle else null
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+        }
+        Text(text = text, style = MaterialTheme.typography.bodySmall, color = tint)
+    }
+}
+
+// section 16 of the spec: the ui shows Install or Update based on real device state, not just app metadata
+private fun actionLabelFor(
     app: AppProfile,
-    status: DownloadStatus,
-    installStatus: InstallStatus,
+    installedVersionName: String?,
+): String =
+    when (app.installationMode) {
+        InstallationMode.CLEAN_INSTALL -> "Install"
+        InstallationMode.UPDATE -> if (installedVersionName != null) "Update" else "Install"
+    }
+
+@Composable
+private fun DownloadSection(
+    state: AppDetailsUiState,
     onDownload: () -> Unit,
     onInstall: () -> Unit,
 ) {
-    val actionLabel = if (app.installationMode == InstallationMode.CLEAN_INSTALL) "Install" else "Update"
+    val app = state.app
+    val status = state.downloadStatus
+    val installStatus = state.installStatus
+    val actionLabel = actionLabelFor(app, state.installedVersionName)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when (status) {
             is DownloadStatus.Idle -> {

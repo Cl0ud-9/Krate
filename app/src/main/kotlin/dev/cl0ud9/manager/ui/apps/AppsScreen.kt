@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.CircularProgressIndicator
@@ -22,13 +22,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.ui.components.AppListItem
 import dev.cl0ud9.manager.ui.components.EmptyState
+import dev.cl0ud9.manager.ui.util.RefreshOnResume
+import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
 
 // curated application catalog, section 30 of the spec
 @Composable
 fun AppsScreen(onAppClick: (String) -> Unit) {
-    val viewModel = managerViewModel { container -> AppsViewModel(container.catalogRepository) }
+    val viewModel =
+        managerViewModel { container -> AppsViewModel(container.catalogRepository, container.installedPackageReader) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    RefreshOnResume(viewModel::refresh)
 
     AnimatedContent(
         targetState = uiState,
@@ -58,12 +62,14 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(state.apps, key = { it.id }) { app ->
-                        AppListItem(
-                            app = app,
-                            onClick = { onAppClick(app.id) },
-                            modifier = Modifier.animateItem(),
-                        )
+                    itemsIndexed(state.apps, key = { _, app -> app.id }) { index, app ->
+                        StaggeredAppear(index = index, modifier = Modifier.animateItem()) {
+                            AppListItem(
+                                app = app,
+                                installed = app.packageName in state.installedPackageNames,
+                                onClick = { onAppClick(app.id) },
+                            )
+                        }
                     }
                 }
             }
