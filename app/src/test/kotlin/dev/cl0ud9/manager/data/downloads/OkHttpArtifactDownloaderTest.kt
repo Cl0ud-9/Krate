@@ -108,9 +108,10 @@ class OkHttpArtifactDownloaderTest {
             assertTrue(statuses.single() is DownloadStatus.Failed)
         }
 
-    // the downloader issues a HEAD request for storage preflight before the real GET, so queue both
+    // the downloader issues a HEAD request for storage preflight before the real GET, so queue both;
+    // the HEAD response must carry no body bytes on the wire or MockWebServer corrupts the reused connection
     private fun enqueuePayloadTwice() {
-        server.enqueue(MockResponse().setBody(Buffer().write(payload)))
+        server.enqueue(MockResponse().setHeader("Content-Length", payload.size.toString()))
         server.enqueue(MockResponse().setBody(Buffer().write(payload)))
     }
 
