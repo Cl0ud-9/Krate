@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -63,11 +62,13 @@ fun RowScope.ManagerNavigationBarItem(
         label = "navItemColor",
     )
 
+    // NavigationBar's row only enforces a *minimum* height (defaultMinSize), so fillMaxHeight() here would
+    // resolve against an unbounded constraint and blow the bar up to the full screen - wrap-content instead
+    // and let the row's verticalAlignment center it, matching real M3 NavigationBarItem sizing behavior
     Column(
         modifier =
             modifier
                 .weight(1f)
-                .fillMaxHeight()
                 .clickable(onClick = onClick, role = Role.Tab),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
