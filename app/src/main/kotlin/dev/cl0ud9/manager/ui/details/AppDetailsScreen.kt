@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -13,12 +14,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.ui.components.SupportStatusBadge
 import dev.cl0ud9.manager.ui.theme.ShapeCache
@@ -39,8 +44,12 @@ fun AppDetailsScreen(
     appId: String,
     onBack: () -> Unit,
 ) {
-    val viewModel = managerViewModel { container -> AppDetailsViewModel(container.catalogRepository, appId) }
+    val viewModel =
+        managerViewModel { container ->
+            AppDetailsViewModel(container.catalogRepository, container.artifactDownloader, appId)
+        }
     val app by viewModel.app.collectAsStateWithLifecycle()
+    val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
@@ -56,13 +65,17 @@ fun AppDetailsScreen(
                 CircularProgressIndicator()
             }
         } else {
-            AppDetailsContent(currentApp)
+            AppDetailsContent(currentApp, downloadStatus, onDownload = viewModel::startDownload)
         }
     }
 }
 
 @Composable
-private fun AppDetailsContent(app: AppProfile) {
+private fun AppDetailsContent(
+    app: AppProfile,
+    downloadStatus: DownloadStatus,
+    onDownload: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -115,16 +128,87 @@ private fun AppDetailsContent(app: AppProfile) {
             body = app.releaseNotes ?: "No release notes available.",
         )
 
-        Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-            Text(if (app.installationMode == InstallationMode.CLEAN_INSTALL) "Install" else "Update")
-        }
-        Text(
-            text = "Available once the download and install engine ships in a later phase.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        DownloadSection(app = app, status = downloadStatus, onDownload = onDownload)
     }
 }
+
+@Composable
+private fun DownloadSection(
+    app: AppProfile,
+    status: DownloadStatus,
+    onDownload: () -> Unit,
+) {
+    val actionLabel = if (app.installationMode == InstallationMode.CLEAN_INSTALL) "Install" else "Update"
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (status) {
+            is DownloadStatus.Idle -> {
+                Button(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
+                    Text("Download")
+                }
+                if (app.artifact == null) {
+                    HelperText("Not yet available for download.")
+                }
+            }
+
+            is DownloadStatus.Downloading -> {
+                val total = status.totalBytes
+                val fraction = if (total != null && total > 0) status.bytesDownloaded / total.toFloat() else 0f
+                if (total != null) {
+                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(6.dp))
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+                }
+                HelperText(
+                    "Downloading ${formatMb(status.bytesDownloaded)} of ${total?.let { formatMb(it) } ?: "?"} MB",
+                )
+            }
+
+            is DownloadStatus.Verifying -> {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+                HelperText("Verifying checksum and signing certificate...")
+            }
+
+            is DownloadStatus.ReadyToInstall -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        "Verified and ready. $actionLabel lands in the next phase.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            is DownloadStatus.Failed -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Filled.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    Text(status.reason, style = MaterialTheme.typography.bodyMedium)
+                }
+                Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                    Text("Retry download")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HelperText(text: String) {
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+private const val BYTES_PER_MB = 1024 * 1024
+
+private fun formatMb(bytes: Long): String = "%.1f".format(bytes / BYTES_PER_MB.toFloat())
 
 @Composable
 private fun DetailSection(
