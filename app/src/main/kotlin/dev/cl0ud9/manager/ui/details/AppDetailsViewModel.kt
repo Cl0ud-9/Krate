@@ -3,6 +3,7 @@ package dev.cl0ud9.manager.ui.details
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
+import dev.cl0ud9.manager.domain.dependency.DependencyGraph
 import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.model.AppProfile
@@ -24,8 +25,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
+data class DependencyInfo(
+    val app: AppProfile,
+    val installed: Boolean,
+)
+
 class AppDetailsViewModel(
-    catalogRepository: CatalogRepository,
+    private val catalogRepository: CatalogRepository,
     private val artifactDownloader: ArtifactDownloader,
     private val installationEngine: InstallationEngine,
     private val cleanInstallOrchestrator: CleanInstallOrchestrator,
@@ -45,6 +51,13 @@ class AppDetailsViewModel(
         combine(app, refreshTrigger.onStart { emit(Unit) }) { profile, _ -> profile }
             .map { profile -> profile?.let { installedPackageReader.installedVersion(it.packageName)?.versionName } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    // direct dependencies with real install state, section 14 + 42.11 of the spec - most apps have none
+    val dependencies: StateFlow<List<DependencyInfo>> =
+        combine(app, catalogRepository.observeApps(), refreshTrigger.onStart { emit(Unit) }) { profile, catalog, _ ->
+            profile to catalog
+        }.map { (profile, catalog) -> profile?.let { resolveDependencies(it, catalog) } ?: emptyList() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     private val mutableDownloadStatus = MutableStateFlow<DownloadStatus>(DownloadStatus.Idle)
     val downloadStatus: StateFlow<DownloadStatus> = mutableDownloadStatus.asStateFlow()
@@ -91,6 +104,14 @@ class AppDetailsViewModel(
         if (currentApp == null || readyStatus == null || isBusy()) return
         runInstallFlow(cleanInstallOrchestrator.cleanInstall(currentApp, File(readyStatus.filePath)))
     }
+
+    private fun resolveDependencies(
+        profile: AppProfile,
+        catalog: List<AppProfile>,
+    ): List<DependencyInfo> =
+        DependencyGraph.directDependencies(profile, catalog).map { dependency ->
+            DependencyInfo(dependency, installedPackageReader.installedVersion(dependency.packageName) != null)
+        }
 
     private fun readyDownload(): DownloadStatus.ReadyToInstall? =
         mutableDownloadStatus.value as? DownloadStatus.ReadyToInstall

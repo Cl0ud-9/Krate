@@ -122,7 +122,11 @@ private fun ManagerNavGraph(
             exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
         ) { backStackEntry ->
             val appId = backStackEntry.arguments?.getString(APP_ID_ARG).orEmpty()
-            AppDetailsScreen(appId = appId, onBack = { navController.popBackStack() })
+            AppDetailsScreen(
+                appId = appId,
+                onBack = { navController.popBackStack() },
+                onNavigateToApp = { dependencyId -> navController.navigate("apps/$dependencyId") },
+            )
         }
     }
 }

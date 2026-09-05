@@ -39,6 +39,7 @@ import dev.cl0ud9.manager.ui.util.managerViewModel
 fun AppDetailsScreen(
     appId: String,
     onBack: () -> Unit,
+    onNavigateToApp: (String) -> Unit,
 ) {
     val viewModel =
         managerViewModel { container ->
@@ -54,6 +55,7 @@ fun AppDetailsScreen(
     RefreshOnResume(viewModel::refresh)
     val app by viewModel.app.collectAsStateWithLifecycle()
     val installedVersionName by viewModel.installedVersionName.collectAsStateWithLifecycle()
+    val dependencies by viewModel.dependencies.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
     val installStatus by viewModel.installStatus.collectAsStateWithLifecycle()
 
@@ -76,12 +78,14 @@ fun AppDetailsScreen(
                     AppDetailsUiState(
                         app = currentApp,
                         installedVersionName = installedVersionName,
+                        dependencies = dependencies,
                         downloadStatus = downloadStatus,
                         installStatus = installStatus,
                     ),
                 onDownload = viewModel::startDownload,
                 onInstall = viewModel::startInstall,
                 onRetryAsCleanInstall = viewModel::retryAsCleanInstall,
+                onNavigateToApp = onNavigateToApp,
             )
         }
     }
@@ -91,6 +95,7 @@ fun AppDetailsScreen(
 internal data class AppDetailsUiState(
     val app: AppProfile,
     val installedVersionName: String?,
+    val dependencies: List<DependencyInfo>,
     val downloadStatus: DownloadStatus,
     val installStatus: InstallStatus,
 )
@@ -101,6 +106,7 @@ private fun AppDetailsContent(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
+    onNavigateToApp: (String) -> Unit,
 ) {
     val app = state.app
     val installedVersionName = state.installedVersionName
@@ -144,10 +150,7 @@ private fun AppDetailsContent(
                 },
         )
 
-        DetailSection(
-            title = "Dependencies",
-            body = if (app.dependencyIds.isEmpty()) "No dependencies." else app.dependencyIds.joinToString(", "),
-        )
+        DependenciesSection(dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
 
         DetailSection(
             title = "Release notes",

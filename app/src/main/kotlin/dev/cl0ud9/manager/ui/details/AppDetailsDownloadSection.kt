@@ -76,9 +76,8 @@ internal fun DownloadSection(
 
             is DownloadStatus.ReadyToInstall -> {
                 ReadyToInstallSection(
-                    app = app,
+                    state = state,
                     actionLabel = actionLabel,
-                    installStatus = installStatus,
                     onInstall = onInstall,
                     onRetryAsCleanInstall = onRetryAsCleanInstall,
                 )
@@ -96,16 +95,25 @@ internal fun DownloadSection(
 
 @Composable
 private fun ReadyToInstallSection(
-    app: AppProfile,
+    state: AppDetailsUiState,
     actionLabel: String,
-    installStatus: InstallStatus,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
 ) {
-    when (installStatus) {
+    val app = state.app
+    when (val installStatus = state.installStatus) {
         is InstallStatus.Idle -> {
-            Button(onClick = onInstall, modifier = Modifier.fillMaxWidth()) {
+            val unmetDependencies = state.dependencies.filter { !it.installed }
+            Button(
+                onClick = onInstall,
+                enabled = unmetDependencies.isEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(actionLabel)
+            }
+            if (unmetDependencies.isNotEmpty()) {
+                val names = unmetDependencies.joinToString(", ") { it.app.displayName }
+                HelperText("Install required dependencies first: $names.")
             }
         }
 
