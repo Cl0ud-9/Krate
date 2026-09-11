@@ -10,13 +10,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,7 +36,6 @@ import dev.cl0ud9.manager.ui.util.managerViewModel
 @Composable
 fun AppDetailsScreen(
     appId: String,
-    onBack: () -> Unit,
     onNavigateToApp: (String) -> Unit,
 ) {
     val viewModel =
@@ -59,35 +56,26 @@ fun AppDetailsScreen(
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
     val installStatus by viewModel.installStatus.collectAsStateWithLifecycle()
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
-            Text("App Details", style = MaterialTheme.typography.titleLarge)
+    val currentApp = app
+    if (currentApp == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
         }
-
-        val currentApp = app
-        if (currentApp == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            AppDetailsContent(
-                state =
-                    AppDetailsUiState(
-                        app = currentApp,
-                        installedVersionName = installedVersionName,
-                        dependencies = dependencies,
-                        downloadStatus = downloadStatus,
-                        installStatus = installStatus,
-                    ),
-                onDownload = viewModel::startDownload,
-                onInstall = viewModel::startInstall,
-                onRetryAsCleanInstall = viewModel::retryAsCleanInstall,
-                onNavigateToApp = onNavigateToApp,
-            )
-        }
+    } else {
+        AppDetailsContent(
+            state =
+                AppDetailsUiState(
+                    app = currentApp,
+                    installedVersionName = installedVersionName,
+                    dependencies = dependencies,
+                    downloadStatus = downloadStatus,
+                    installStatus = installStatus,
+                ),
+            onDownload = viewModel::startDownload,
+            onInstall = viewModel::startInstall,
+            onRetryAsCleanInstall = viewModel::retryAsCleanInstall,
+            onNavigateToApp = onNavigateToApp,
+        )
     }
 }
 

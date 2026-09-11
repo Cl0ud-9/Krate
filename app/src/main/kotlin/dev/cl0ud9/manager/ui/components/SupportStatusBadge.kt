@@ -1,7 +1,6 @@
 package dev.cl0ud9.manager.ui.components
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -52,7 +51,9 @@ fun SupportStatusBadge(
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(FULLY_ROUNDED_PERCENT),
+        // pill shape from the shared token set (extraLarge), not a one-off RoundedCornerShape -
+        // keeps this badge on the same shape scale as every other component
+        shape = MaterialTheme.shapes.extraLarge,
         color = containerColor,
         contentColor = contentColor,
     ) {
@@ -63,5 +64,3 @@ fun SupportStatusBadge(
         )
     }
 }
-
-private const val FULLY_ROUNDED_PERCENT = 50

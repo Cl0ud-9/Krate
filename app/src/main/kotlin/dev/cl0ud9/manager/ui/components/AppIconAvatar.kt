@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,12 @@ fun AppIconAvatar(
     size: Dp = DEFAULT_AVATAR_SIZE,
 ) {
     val color = remember(seed) { AvatarPalette[seed.hashCode().mod(AvatarPalette.size)] }
+    // every palette swatch is dark/saturated enough for white today, but derive it from luminance
+    // rather than hardcoding white so this stays correct if the palette or a contrast mode changes it
+    val labelColor =
+        remember(color) {
+            if (color.luminance() > CONTRAST_LUMINANCE_THRESHOLD) Color.Black else Color.White
+        }
     val initial =
         remember(displayName) {
             displayName
@@ -55,9 +62,11 @@ fun AppIconAvatar(
     ) {
         Text(
             text = initial,
-            color = Color.White,
+            color = labelColor,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
         )
     }
 }
+
+private const val CONTRAST_LUMINANCE_THRESHOLD = 0.5f

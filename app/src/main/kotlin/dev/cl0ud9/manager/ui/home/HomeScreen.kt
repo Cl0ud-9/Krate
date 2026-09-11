@@ -14,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.ui.components.EmptyState
@@ -32,8 +31,6 @@ fun HomeScreen() {
     RefreshOnResume(viewModel::refresh)
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text(text = "App Manager", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             StatTile(
                 label = "Apps in catalog",

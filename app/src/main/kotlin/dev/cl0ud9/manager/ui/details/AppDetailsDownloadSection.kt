@@ -5,13 +5,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,6 +27,7 @@ import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 // section 16 of the spec: the ui shows Install or Update based on real device state, not just app metadata
 private fun actionLabelFor(
@@ -43,53 +48,65 @@ internal fun DownloadSection(
 ) {
     val app = state.app
     val status = state.downloadStatus
-    val installStatus = state.installStatus
     val actionLabel = actionLabelFor(app, state.installedVersionName)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        when (status) {
-            is DownloadStatus.Idle -> {
-                Button(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
-                    Text("Download")
+    // boxed in a card like every other detail section, instead of sitting bare on the screen background
+    Card(
+        shape = ShapeCache.smooth16,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            when (status) {
+                is DownloadStatus.Idle -> {
+                    Button(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
+                        Text("Download")
+                    }
+                    if (app.artifact == null) {
+                        HelperText("Not yet available for download.")
+                    }
                 }
-                if (app.artifact == null) {
-                    HelperText("Not yet available for download.")
+
+                is DownloadStatus.Downloading -> {
+                    val total = status.totalBytes
+                    val fraction = if (total != null && total > 0) status.bytesDownloaded / total.toFloat() else 0f
+                    ManagerLinearProgress(progress = if (total != null) fraction else null)
+                    HelperText(
+                        "Downloading ${formatMb(status.bytesDownloaded)} of ${total?.let { formatMb(it) } ?: "?"} MB",
+                    )
                 }
-            }
 
-            is DownloadStatus.Downloading -> {
-                val total = status.totalBytes
-                val fraction = if (total != null && total > 0) status.bytesDownloaded / total.toFloat() else 0f
-                if (total != null) {
-                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth().height(6.dp))
-                } else {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+                is DownloadStatus.Verifying -> {
+                    ManagerLinearProgress(progress = null)
+                    HelperText("Verifying checksum and signing certificate...")
                 }
-                HelperText(
-                    "Downloading ${formatMb(status.bytesDownloaded)} of ${total?.let { formatMb(it) } ?: "?"} MB",
-                )
-            }
 
-            is DownloadStatus.Verifying -> {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
-                HelperText("Verifying checksum and signing certificate...")
-            }
+                is DownloadStatus.ReadyToInstall -> {
+                    ReadyToInstallSection(
+                        state = state,
+                        actionLabel = actionLabel,
+                        onInstall = onInstall,
+                        onRetryAsCleanInstall = onRetryAsCleanInstall,
+                    )
+                }
 
-            is DownloadStatus.ReadyToInstall -> {
-                ReadyToInstallSection(
-                    state = state,
-                    actionLabel = actionLabel,
-                    onInstall = onInstall,
-                    onRetryAsCleanInstall = onRetryAsCleanInstall,
-                )
-            }
-
-            is DownloadStatus.Failed -> {
-                StatusRow(icon = Icons.Filled.Error, tint = MaterialTheme.colorScheme.error, text = status.reason)
-                Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-                    Text("Retry download")
+                is DownloadStatus.Failed -> {
+                    StatusRow(icon = Icons.Filled.Error, tint = MaterialTheme.colorScheme.error, text = status.reason)
+                    Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                        Text("Retry download")
+                    }
                 }
             }
         }
+    }
+}
+
+// every in-progress state below shares this exact indicator - one definition instead of six copies
+@Composable
+private fun ManagerLinearProgress(progress: Float?) {
+    val modifier = Modifier.fillMaxWidth().height(6.dp)
+    if (progress != null) {
+        LinearProgressIndicator(progress = { progress }, modifier = modifier)
+    } else {
+        LinearProgressIndicator(modifier = modifier)
     }
 }
 
@@ -128,27 +145,27 @@ private fun ReadyToInstallSection(
         }
 
         is InstallStatus.PreparingRollback -> {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            ManagerLinearProgress(progress = null)
             HelperText("Preserving the current version for rollback...")
         }
 
         is InstallStatus.Uninstalling -> {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            ManagerLinearProgress(progress = null)
             HelperText("Uninstalling the current version...")
         }
 
         is InstallStatus.Installing -> {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            ManagerLinearProgress(progress = null)
             HelperText("Installing...")
         }
 
         is InstallStatus.WaitingForUser -> {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            ManagerLinearProgress(progress = null)
             HelperText("Confirm the installation in the system dialog.")
         }
 
         is InstallStatus.RollingBack -> {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+            ManagerLinearProgress(progress = null)
             HelperText("Install failed, restoring the previous version...")
         }
 
@@ -190,7 +207,9 @@ private fun FailedInstallSection(
         "The application could not be updated normally. A clean installation can be attempted. " +
             "This may remove the app's local data.",
     )
-    Button(onClick = onRetryAsCleanInstall, modifier = Modifier.fillMaxWidth()) {
+    // outlined, not filled - this is a lossy fallback the user should have to notice is different
+    // from the safe retry above, not a same-weight alternative
+    OutlinedButton(onClick = onRetryAsCleanInstall, modifier = Modifier.fillMaxWidth()) {
         Text("Try clean install")
     }
 }

@@ -13,10 +13,11 @@ import dev.cl0ud9.manager.R
 enum class ManagerDestination(
     val route: String,
     @StringRes val labelRes: Int,
+    @StringRes val titleRes: Int,
     val icon: ImageVector,
 ) {
-    HOME("home", R.string.nav_home, Icons.Filled.Home),
-    APPS("apps", R.string.nav_apps, Icons.Filled.Apps),
-    UPDATES("updates", R.string.nav_updates, Icons.Filled.Update),
-    SETTINGS("settings", R.string.nav_settings, Icons.Filled.Settings),
+    HOME("home", R.string.nav_home, R.string.app_name, Icons.Filled.Home),
+    APPS("apps", R.string.nav_apps, R.string.nav_apps, Icons.Filled.Apps),
+    UPDATES("updates", R.string.nav_updates, R.string.nav_updates, Icons.Filled.Update),
+    SETTINGS("settings", R.string.nav_settings, R.string.nav_settings, Icons.Filled.Settings),
 }
