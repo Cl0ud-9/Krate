@@ -12,6 +12,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,6 +64,13 @@ fun RowScope.ManagerNavigationBarItem(
         label = "navItemColor",
     )
 
+    // no ripple at all, by design - a generic ripple either flashes as an unclipped square across the
+    // whole tab (unbounded) or, bounded to the small pill, reads as a slow, deliberate scale because
+    // its animation duration is fixed regardless of target size. The pill fade+scale-in and icon bounce
+    // below already give this item its own tuned press/selection feedback; a ripple on top is redundant
+    // at best and fights those animations at worst
+    val interactionSource = remember { MutableInteractionSource() }
+
     // NavigationBar's row only enforces a *minimum* height (defaultMinSize), so fillMaxHeight() here would
     // resolve against an unbounded constraint and blow the bar up to the full screen - wrap-content instead
     // and let the row's verticalAlignment center it, matching real M3 NavigationBarItem sizing behavior
@@ -69,7 +78,12 @@ fun RowScope.ManagerNavigationBarItem(
         modifier =
             modifier
                 .weight(1f)
-                .clickable(onClick = onClick, role = Role.Tab),
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                    role = Role.Tab,
+                ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

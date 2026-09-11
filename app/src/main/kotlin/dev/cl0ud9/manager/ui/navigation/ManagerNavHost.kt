@@ -8,14 +8,17 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -66,12 +69,14 @@ private fun ManagerTopBar(
     val destination = ManagerDestination.entries.firstOrNull { it.route == currentRoute }
     when {
         destination != null -> {
-            TopAppBar(title = { Text(stringResource(destination.titleRes)) })
+            TopAppBar(
+                title = { Text(stringResource(destination.titleRes), style = MaterialTheme.typography.headlineSmall) },
+            )
         }
 
         currentRoute == APP_DETAILS_ROUTE -> {
             TopAppBar(
-                title = { Text("App Details") },
+                title = { Text("App Details", style = MaterialTheme.typography.headlineSmall) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -89,8 +94,9 @@ private fun ManagerBottomBar(
 ) {
     NavigationBar {
         ManagerDestination.entries.forEach { destination ->
+            val selected = currentRoute == destination.route
             ManagerNavigationBarItem(
-                selected = currentRoute == destination.route,
+                selected = selected,
                 onClick = {
                     navController.navigate(destination.route) {
                         popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -98,7 +104,7 @@ private fun ManagerBottomBar(
                         restoreState = true
                     }
                 },
-                icon = destination.icon,
+                icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
                 label = stringResource(destination.labelRes),
             )
         }
@@ -121,14 +127,14 @@ private fun ManagerNavGraph(
         },
         exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
     ) {
-        composable(ManagerDestination.HOME.route) { HomeScreen() }
+        composable(ManagerDestination.HOME.route) { OpaqueScreen { HomeScreen() } }
         composable(ManagerDestination.APPS.route) {
-            AppsScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
+            OpaqueScreen { AppsScreen(onAppClick = { appId -> navController.navigate("apps/$appId") }) }
         }
         composable(ManagerDestination.UPDATES.route) {
-            UpdatesScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
+            OpaqueScreen { UpdatesScreen(onAppClick = { appId -> navController.navigate("apps/$appId") }) }
         }
-        composable(ManagerDestination.SETTINGS.route) { SettingsScreen() }
+        composable(ManagerDestination.SETTINGS.route) { OpaqueScreen { SettingsScreen() } }
 
         composable(
             route = APP_DETAILS_ROUTE,
@@ -157,10 +163,22 @@ private fun ManagerNavGraph(
             exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
         ) { backStackEntry ->
             val appId = backStackEntry.arguments?.getString(APP_ID_ARG).orEmpty()
-            AppDetailsScreen(
-                appId = appId,
-                onNavigateToApp = { dependencyId -> navController.navigate("apps/$dependencyId") },
-            )
+            OpaqueScreen {
+                AppDetailsScreen(
+                    appId = appId,
+                    onNavigateToApp = { dependencyId -> navController.navigate("apps/$dependencyId") },
+                )
+            }
         }
+    }
+}
+
+// every destination's content sits on its own opaque backdrop - without this, a fade-based transition
+// (used by every route above) blends the outgoing screen's text with the incoming screen's, since
+// both would otherwise draw straight onto the single shared background behind the whole NavHost
+@Composable
+private fun OpaqueScreen(content: @Composable () -> Unit) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+        content()
     }
 }
