@@ -2,7 +2,9 @@ package dev.cl0ud9.manager.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -126,6 +128,10 @@ private val ManagerShapes =
         extraLarge = ShapeCache.smooth32,
     )
 
+// requires material3 1.5.0-alpha (see gradle/libs.versions.toml) - MaterialExpressiveTheme and
+// MotionScheme are Kotlin `internal` on the 1.4.x stable line this project used until now, so this
+// wasn't reachable at all until that pin landed, not merely gated behind the opt-in below
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ManagerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -149,9 +155,12 @@ fun ManagerTheme(
             }
         }
 
-    // MaterialExpressiveTheme/MotionScheme are internal in this resolved material3 version, not usable yet
-    MaterialTheme(
+    // expressive() over standard() - springier, more energetic defaults for stock M3 components'
+    // own built-in animations (Switch, dialogs, etc.), matching the hand-rolled spring motion already
+    // used for the nav bar and screen transitions rather than fighting it with calmer stock timing
+    MaterialExpressiveTheme(
         colorScheme = colorScheme,
+        motionScheme = MotionScheme.expressive(),
         shapes = ManagerShapes,
         typography = ManagerTypography,
         content = content,
