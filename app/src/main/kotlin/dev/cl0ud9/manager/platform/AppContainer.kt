@@ -10,6 +10,7 @@ import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
+import dev.cl0ud9.manager.domain.updateall.UpdateAllEngine
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.PackageManagerInstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinstaller.PackageInstallerEngine
@@ -36,4 +37,6 @@ class AppContainer(
         PackageManagerInstalledPackageReader(context.applicationContext)
     val rollbackStore: RollbackStore = FileRollbackStore(context.applicationContext)
     val cleanInstallOrchestrator: CleanInstallOrchestrator = CleanInstallOrchestrator(installationEngine, rollbackStore)
+    val updateAllEngine: UpdateAllEngine =
+        UpdateAllEngine(artifactDownloader, installationEngine, cleanInstallOrchestrator)
 }

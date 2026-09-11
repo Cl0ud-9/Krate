@@ -26,14 +26,15 @@ import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
 
-// pending updates with individual actions, section 30 of the spec - Update All lands in a later phase
+// pending updates with individual actions plus Update All, section 30 + 23/42.21 of the spec
 @Composable
 fun UpdatesScreen(onAppClick: (String) -> Unit) {
     val viewModel =
         managerViewModel { container ->
-            UpdatesViewModel(container.catalogRepository, container.installedPackageReader)
+            UpdatesViewModel(container.catalogRepository, container.installedPackageReader, container.updateAllEngine)
         }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val updateAllState by viewModel.updateAllState.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
 
     AnimatedContent(
@@ -64,6 +65,15 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    item(key = "update-all") {
+                        UpdateAllBar(
+                            state = updateAllState,
+                            pendingCount = state.apps.size,
+                            onStart = viewModel::startUpdateAll,
+                            onDismissResult = viewModel::dismissUpdateAllResult,
+                        )
+                    }
+
                     itemsIndexed(state.apps, key = { _, app -> app.id }) { index, app ->
                         StaggeredAppear(index = index, modifier = Modifier.animateItem()) {
                             AppListItem(
