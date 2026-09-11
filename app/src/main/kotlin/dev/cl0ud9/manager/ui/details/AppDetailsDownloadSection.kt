@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -27,6 +28,7 @@ import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 // section 16 of the spec: the ui shows Install or Update based on real device state, not just app metadata
@@ -51,19 +53,14 @@ internal fun DownloadSection(
     val actionLabel = actionLabelFor(app, state.installedVersionName)
     // boxed in a card like every other detail section, instead of sitting bare on the screen background
     Card(
+        modifier = Modifier.fillMaxWidth(),
         shape = ShapeCache.smooth16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(title = "Get this app", icon = Icons.Filled.Download)
             when (status) {
-                is DownloadStatus.Idle -> {
-                    Button(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
-                        Text("Download")
-                    }
-                    if (app.artifact == null) {
-                        HelperText("Not yet available for download.")
-                    }
-                }
+                is DownloadStatus.Idle -> IdleContent(state = state, onDownload = onDownload)
 
                 is DownloadStatus.Downloading -> {
                     val total = status.totalBytes
@@ -95,6 +92,31 @@ internal fun DownloadSection(
                     }
                 }
             }
+        }
+    }
+}
+
+// installedVersionName already matching the catalog's latest means there is nothing pending - a
+// prominent "Download" button here would wrongly suggest otherwise. Redownloading (e.g. to repair a
+// corrupted install) is still possible, just de-emphasized instead of being the primary action.
+@Composable
+private fun IdleContent(
+    state: AppDetailsUiState,
+    onDownload: () -> Unit,
+) {
+    val app = state.app
+    val upToDate = state.installedVersionName != null && state.installedVersionName == app.latestVersionName
+    if (upToDate) {
+        StatusRow(icon = Icons.Filled.CheckCircle, tint = MaterialTheme.colorScheme.tertiary, text = "Up to date.")
+        OutlinedButton(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
+            Text("Redownload")
+        }
+    } else {
+        Button(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
+            Text("Download")
+        }
+        if (app.artifact == null) {
+            HelperText("Not yet available for download.")
         }
     }
 }

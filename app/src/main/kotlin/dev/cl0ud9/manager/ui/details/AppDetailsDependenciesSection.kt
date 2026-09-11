@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -19,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 // section 14 + 42.11 of the spec: dependencies are generic and shown with real install state,
@@ -29,13 +31,35 @@ internal fun DependenciesSection(
     onNavigateToApp: (String) -> Unit,
 ) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         shape = ShapeCache.smooth16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = "Dependencies", style = MaterialTheme.typography.labelLarge)
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionHeader(
+                title = "Dependencies",
+                icon = Icons.Filled.AccountTree,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
             if (dependencies.isEmpty()) {
-                Text(text = "No dependencies.", style = MaterialTheme.typography.bodyMedium)
+                // matches the icon+text weight of the sibling cards instead of a single bare line,
+                // which read as an unfinished stub next to Installation/Release notes/Get this app
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = "This app has no dependencies to install first.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             } else {
                 Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     dependencies.forEach { dependency ->
