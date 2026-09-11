@@ -6,6 +6,7 @@ manifest - section 34 of the spec: never silently claim success.
 """
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -23,7 +24,13 @@ GITHUB_API = "https://api.github.com"
 
 
 def gh_get(path):
-    req = urllib.request.Request(GITHUB_API + path, headers={"Accept": "application/vnd.github+json"})
+    # Authenticated requests get 1000 req/hour instead of the 60 req/hour anonymous limit -
+    # this runs on a 15-minute schedule (section 10), so staying anonymous risks 403s under load.
+    headers = {"Accept": "application/vnd.github+json"}
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(GITHUB_API + path, headers=headers)
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp)
 

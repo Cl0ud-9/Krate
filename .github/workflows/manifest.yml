@@ -25,9 +25,32 @@ jobs:
           java-version: "21"
 
       - name: Generate manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: python3 catalog/scripts/generate_manifest.py
 
+      - name: Check for changes
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Skip signing/publishing when nothing actually changed - the schedule trigger fires
+          # every ~15 minutes (section 10) regardless of whether any tracked app released
+          # something new, so most runs should be a no-op rather than a fresh sign+publish.
+          if gh release download manifest-latest -p manifest.json -O manifest.json.previous --clobber 2>/dev/null; then
+            if diff -q manifest.json manifest.json.previous >/dev/null 2>&1; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "Manifest is unchanged since the last publish, skipping sign/publish."
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "No previous manifest-latest release found, publishing for the first time."
+          fi
+
       - name: Sign manifest
+        if: steps.check.outputs.changed == 'true'
         env:
           MANIFEST_SIGNING_KEY: ${{ secrets.MANIFEST_SIGNING_KEY }}
         run: |
@@ -41,6 +64,7 @@ jobs:
           rm -f /tmp/manifest-signing-key.pem
 
       - name: Publish manifest release
+        if: steps.check.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
