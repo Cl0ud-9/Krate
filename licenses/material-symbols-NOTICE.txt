@@ -1,0 +1,21 @@
+Material Symbols (Rounded)
+Source: https://github.com/google/material-design-icons
+License: Apache License, Version 2.0
+         https://www.apache.org/licenses/LICENSE-2.0
+
+The following files in app/src/main/res/drawable were downloaded directly
+from Google's public material-design-icons repository (path
+symbols/android/<name>/materialsymbolsrounded/) and are unmodified except
+for the filename:
+
+  ic_nav_home_outline.xml     <- home/materialsymbolsrounded/home_24px.xml
+  ic_nav_home_filled.xml      <- home/materialsymbolsrounded/home_fill1_24px.xml
+  ic_nav_apps_outline.xml     <- apps/materialsymbolsrounded/apps_24px.xml
+  ic_nav_apps_filled.xml      <- apps/materialsymbolsrounded/apps_fill1_24px.xml
+  ic_nav_update_outline.xml   <- update/materialsymbolsrounded/update_24px.xml
+  ic_nav_update_filled.xml    <- update/materialsymbolsrounded/update_fill1_24px.xml
+  ic_nav_settings_outline.xml <- settings/materialsymbolsrounded/settings_24px.xml
+  ic_nav_settings_filled.xml  <- settings/materialsymbolsrounded/settings_fill1_24px.xml
+
+Used for the bottom navigation bar's icon set (dev.cl0ud9.manager.ui.navigation.NavIcon /
+ManagerDestination), for a consistent Material Symbols Rounded icon style.

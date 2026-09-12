@@ -64,6 +64,7 @@ import dev.cl0ud9.manager.ui.updates.UpdatesScreen
 private const val APP_DETAILS_ROUTE = "apps/{appId}"
 private const val APP_ID_ARG = "appId"
 private const val FADE_DURATION_MS = 180
+private val FULL_WIDTH_ICON_SIZE = 24.dp
 private const val TAB_ENTER_INITIAL_SCALE = 0.94f
 
 // only the bottom bar lives at this shared level now - it doesn't transition per-route, it just
@@ -182,9 +183,10 @@ private fun FullWidthBottomBar(
                 selected = selected,
                 onClick = { navController.navigateToTab(destination.route) },
                 icon = {
-                    Icon(
-                        imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                    NavIcon(
+                        icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
                         contentDescription = stringResource(destination.labelRes),
+                        size = FULL_WIDTH_ICON_SIZE,
                     )
                 },
                 label = { Text(stringResource(destination.labelRes)) },

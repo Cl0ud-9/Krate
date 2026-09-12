@@ -20,22 +20,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.manager.ui.navigation.NavIcon
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 private val NAV_ICON_SIZE = 24.dp
@@ -50,7 +46,7 @@ private const val COLOR_FADE_MS = 150
 fun RowScope.ManagerNavigationBarItem(
     selected: Boolean,
     onClick: () -> Unit,
-    icon: ImageVector,
+    icon: NavIcon,
     label: String,
     modifier: Modifier = Modifier,
 ) {
@@ -125,7 +121,7 @@ private fun BoxScope.NavItemPill(selected: Boolean) {
 
 @Composable
 private fun NavItemContent(
-    icon: ImageVector,
+    icon: NavIcon,
     label: String,
     visualState: NavItemVisualState,
     interactionSource: MutableInteractionSource,
@@ -144,17 +140,17 @@ private fun NavItemContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        CompositionLocalProvider(LocalContentColor provides contentColor) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier =
-                    Modifier.size(NAV_ICON_SIZE).graphicsLayer {
-                        scaleX = iconScale
-                        scaleY = iconScale
-                    },
-            )
-        }
+        NavIcon(
+            icon = icon,
+            contentDescription = label,
+            size = NAV_ICON_SIZE,
+            tint = contentColor,
+            modifier =
+                Modifier.graphicsLayer {
+                    scaleX = iconScale
+                    scaleY = iconScale
+                },
+        )
         Text(text = label, style = MaterialTheme.typography.labelMedium.copy(color = contentColor))
     }
 }
