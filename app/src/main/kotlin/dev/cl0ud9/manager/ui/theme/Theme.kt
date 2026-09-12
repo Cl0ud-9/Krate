@@ -12,6 +12,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import dev.cl0ud9.manager.domain.model.ThemeMode
 
 // full brand-seeded tonal palettes - every role, not just primary - see the generation note in Color.kt
 private val LightColors =
@@ -134,10 +135,17 @@ private val ManagerShapes =
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ManagerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val darkTheme =
+        when (themeMode) {
+            ThemeMode.LIGHT -> false
+            ThemeMode.DARK -> true
+            ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        }
+
     // dynamic color needs Android 12+, minSdk is 30 so fall back below that
     val colorScheme =
         when {

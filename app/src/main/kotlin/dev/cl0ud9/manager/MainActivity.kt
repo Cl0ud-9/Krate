@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.cl0ud9.manager.domain.model.ThemeMode
 import dev.cl0ud9.manager.platform.appContainer
 import dev.cl0ud9.manager.ui.navigation.ManagerNavHost
 import dev.cl0ud9.manager.ui.onboarding.OnboardingScreen
@@ -22,7 +23,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ManagerTheme {
+            val context = LocalContext.current
+            val settingsRepository = remember { context.appContainer().settingsRepository }
+            val themeMode by
+                settingsRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
+
+            ManagerTheme(themeMode = themeMode) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppRoot()
                 }

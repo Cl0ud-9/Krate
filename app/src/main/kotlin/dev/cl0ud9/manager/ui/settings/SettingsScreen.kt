@@ -62,6 +62,8 @@ fun SettingsScreen() {
             )
         }
     val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val navBarStyle by viewModel.navBarStyle.collectAsStateWithLifecycle()
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     val managerUpdateState by viewModel.managerUpdateState.collectAsStateWithLifecycle()
     val versionName = rememberVersionName()
@@ -70,6 +72,12 @@ fun SettingsScreen() {
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        AppearanceRow(
+            themeMode = themeMode,
+            onThemeModeChange = viewModel::setThemeMode,
+            navBarStyle = navBarStyle,
+            onNavBarStyleChange = viewModel::setNavBarStyle,
+        )
         AutomaticDownloadsRow(checked = automaticDownloads, onCheckedChange = viewModel::setAutomaticDownloads)
         StorageRow(cacheClearedMessage = cacheClearedMessage, onClearCache = viewModel::clearCache)
         AboutRow(

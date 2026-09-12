@@ -3,6 +3,8 @@ package dev.cl0ud9.manager.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
+import dev.cl0ud9.manager.domain.model.NavBarStyle
+import dev.cl0ud9.manager.domain.model.ThemeMode
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
@@ -35,6 +37,16 @@ class SettingsViewModel(
             .observeAutomaticDownloads()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
 
+    val themeMode: StateFlow<ThemeMode> =
+        settingsRepository
+            .observeThemeMode()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ThemeMode.SYSTEM)
+
+    val navBarStyle: StateFlow<NavBarStyle> =
+        settingsRepository
+            .observeNavBarStyle()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), NavBarStyle.FLOATING_PILL)
+
     private val mutableCacheClearedMessage = MutableStateFlow<String?>(null)
     val cacheClearedMessage: StateFlow<String?> = mutableCacheClearedMessage.asStateFlow()
 
@@ -43,6 +55,14 @@ class SettingsViewModel(
 
     fun setAutomaticDownloads(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setAutomaticDownloads(enabled) }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { settingsRepository.setThemeMode(mode) }
+    }
+
+    fun setNavBarStyle(style: NavBarStyle) {
+        viewModelScope.launch { settingsRepository.setNavBarStyle(style) }
     }
 
     // amendment 44.2 of the spec: a manual, user-initiated check against the manager's own GitHub

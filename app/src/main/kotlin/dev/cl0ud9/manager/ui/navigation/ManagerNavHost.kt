@@ -21,6 +21,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,8 +37,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -44,6 +49,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dev.cl0ud9.manager.domain.model.NavBarStyle
+import dev.cl0ud9.manager.platform.appContainer
 import dev.cl0ud9.manager.ui.apps.AppsScreen
 import dev.cl0ud9.manager.ui.components.ChangelogDialog
 import dev.cl0ud9.manager.ui.components.ManagerChangelog
@@ -74,12 +81,22 @@ fun ManagerNavHost(navController: NavHostController = rememberNavController()) {
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = ManagerDestination.entries.any { it.route == currentRoute }
 
+    // Settings > Appearance's nav-bar-style toggle - read directly here rather than through a
+    // ManagerNavHost-specific ViewModel, matching the same lightweight pattern AppRoot already uses
+    // for the onboarding-completed flag in MainActivity.kt
+    val context = LocalContext.current
+    val settingsRepository = remember(context) { context.appContainer().settingsRepository }
+    val navBarStyle by
+        settingsRepository.observeNavBarStyle().collectAsStateWithLifecycle(initialValue = NavBarStyle.FLOATING_PILL)
+
     // contentWindowInsets defaults to WindowInsets.systemBars, which would reserve the status bar's
     // top inset here AND again inside every TabScreen/DetailScreen's own TopAppBar (that's the
     // default inset every M3 TopAppBar carries) - zeroing it out here leaves exactly one place
     // (each screen's own top bar) consuming it, instead of double-padding every screen's title down
     Scaffold(
-        bottomBar = { if (showBottomBar) ManagerBottomBar(navController, currentRoute) },
+        bottomBar = {
+            if (showBottomBar) ManagerBottomBar(navController, currentRoute, navBarStyle)
+        },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { innerPadding ->
         ManagerNavGraph(navController, modifier = Modifier.padding(innerPadding))
@@ -96,12 +113,26 @@ private fun NavHostController.navigateToTab(route: String) {
     }
 }
 
-// a floating pill instead of an edge-to-edge bar - the single most recognizable piece of the
-// app's shell. Scaffold's default bottomBar (NavigationBar) carries its own navigationBars
-// inset padding automatically; a bare Surface doesn't, so windowInsetsPadding is applied explicitly
-// before the floating margin, otherwise the pill would sit under the gesture nav area on some devices
+// Settings > Appearance's nav-bar-style toggle picks between these two - the floating pill is the
+// default look; full width is the conventional Material bar for anyone who prefers it
 @Composable
 private fun ManagerBottomBar(
+    navController: NavHostController,
+    currentRoute: String?,
+    style: NavBarStyle,
+) {
+    when (style) {
+        NavBarStyle.FLOATING_PILL -> FloatingPillBottomBar(navController, currentRoute)
+        NavBarStyle.FULL_WIDTH -> FullWidthBottomBar(navController, currentRoute)
+    }
+}
+
+// the single most recognizable piece of the app's shell. Scaffold's default bottomBar
+// (NavigationBar) carries its own navigationBars inset padding automatically; a bare Surface doesn't,
+// so windowInsetsPadding is applied explicitly before the floating margin, otherwise the pill would
+// sit under the gesture nav area on some devices
+@Composable
+private fun FloatingPillBottomBar(
     navController: NavHostController,
     currentRoute: String?,
 ) {
@@ -133,6 +164,32 @@ private fun ManagerBottomBar(
                     label = stringResource(destination.labelRes),
                 )
             }
+        }
+    }
+}
+
+// the conventional edge-to-edge Material bar - stock NavigationBar/NavigationBarItem handle their
+// own insets and indicator, unlike the hand-rolled pill above
+@Composable
+private fun FullWidthBottomBar(
+    navController: NavHostController,
+    currentRoute: String?,
+) {
+    NavigationBar {
+        ManagerDestination.entries.forEach { destination ->
+            val selected = currentRoute == destination.route
+            NavigationBarItem(
+                selected = selected,
+                onClick = { navController.navigateToTab(destination.route) },
+                icon = {
+                    Icon(
+                        imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                        contentDescription = stringResource(destination.labelRes),
+                    )
+                },
+                label = { Text(stringResource(destination.labelRes)) },
+                colors = NavigationBarItemDefaults.colors(),
+            )
         }
     }
 }
