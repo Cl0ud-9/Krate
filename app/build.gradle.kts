@@ -64,6 +64,7 @@ dependencies {
     implementation(libs.smooth.corner.rect)
     implementation(libs.tink.android)
     implementation(libs.okhttp)
+    implementation(libs.work.runtime.ktx)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
