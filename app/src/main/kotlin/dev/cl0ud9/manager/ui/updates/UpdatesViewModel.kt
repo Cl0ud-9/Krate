@@ -2,7 +2,10 @@ package dev.cl0ud9.manager.ui.updates
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.cl0ud9.manager.domain.model.ActivityAction
+import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.updateall.UpdateAllEngine
 import dev.cl0ud9.manager.domain.updateall.UpdateAllOutcome
@@ -10,6 +13,7 @@ import dev.cl0ud9.manager.domain.updateall.UpdateAllPlanner
 import dev.cl0ud9.manager.domain.updateall.UpdateAllProgress
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.isUpdateAvailable
+import dev.cl0ud9.manager.ui.util.withMinimumDuration
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +24,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 sealed interface UpdatesUiState {
     data object Loading : UpdatesUiState
@@ -52,6 +57,7 @@ class UpdatesViewModel(
     private val catalogRepository: CatalogRepository,
     private val installedPackageReader: InstalledPackageReader,
     private val updateAllEngine: UpdateAllEngine,
+    private val activityLogRepository: ActivityLogRepository,
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -82,7 +88,7 @@ class UpdatesViewModel(
         if (mutableIsRefreshing.value) return
         viewModelScope.launch {
             mutableIsRefreshing.value = true
-            runCatching { catalogRepository.refresh() }
+            withMinimumDuration { runCatching { catalogRepository.refresh() } }
             mutableIsRefreshing.value = false
         }
     }
@@ -106,10 +112,29 @@ class UpdatesViewModel(
                                 statusLabel = progress.statusLabel,
                             )
 
-                        is UpdateAllProgress.Finished -> UpdateAllUiState.Done(progress.outcomes)
+                        is UpdateAllProgress.Finished -> {
+                            recordActivity(progress.outcomes)
+                            UpdateAllUiState.Done(progress.outcomes)
+                        }
                     }
             }
             refresh()
+        }
+    }
+
+    // Update All only ever targets apps that already have a pending update (see toUiState below),
+    // so every successful outcome here is genuinely an UPDATED event, never a fresh install
+    private suspend fun recordActivity(outcomes: List<UpdateAllOutcome>) {
+        outcomes.filter { it.succeeded }.forEach { outcome ->
+            activityLogRepository.record(
+                ActivityEntry(
+                    id = UUID.randomUUID().toString(),
+                    appId = outcome.app.id,
+                    appName = outcome.app.displayName,
+                    action = ActivityAction.UPDATED,
+                    timestampMillis = System.currentTimeMillis(),
+                ),
+            )
         }
     }
 

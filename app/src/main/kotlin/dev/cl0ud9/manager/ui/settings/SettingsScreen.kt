@@ -1,5 +1,11 @@
 package dev.cl0ud9.manager.ui.settings
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,10 +37,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
@@ -102,37 +110,76 @@ fun SettingsScreen() {
         ) {
             AppVersionRow()
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text(
+                text = "Manager updates",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             ManagerUpdateSection(state = managerUpdateState, onCheck = viewModel::checkForManagerUpdate)
         }
     }
 }
 
+private const val STATE_FADE_MS = 220
+
+// every state gets the same icon-badge treatment used for Home's activity rows and every card's
+// SectionHeader, instead of a bare tinted Icon floating in a Row - that inconsistency (plain icon
+// here, badged everywhere else) was the concrete thing making this block read as bolted-on rather
+// than a designed part of the screen. AnimatedContent smooths the Idle/Checking/Result swap instead
+// of an abrupt layout jump each time the state changes
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ManagerUpdateSection(
     state: ManagerUpdateUiState,
     onCheck: () -> Unit,
 ) {
-    when (state) {
-        is ManagerUpdateUiState.Idle -> {
-            Text(
-                text = "Check GitHub for a newer release of the manager itself.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth()) {
-                Text("Check for updates")
+    AnimatedContent(
+        targetState = state,
+        label = "manager-update",
+        transitionSpec = {
+            fadeIn(tween(STATE_FADE_MS)) togetherWith fadeOut(tween(STATE_FADE_MS))
+        },
+    ) { animatedState ->
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            when (animatedState) {
+                is ManagerUpdateUiState.Idle -> {
+                    ManagerUpdateStatusRow(
+                        icon = Icons.Filled.SystemUpdateAlt,
+                        badgeColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = "Check GitHub for a newer release of the manager itself.",
+                    )
+                    OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth()) {
+                        Text("Check for updates")
+                    }
+                }
+
+                is ManagerUpdateUiState.Checking -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(36.dp)
+                                    .clip(ShapeCache.smooth12)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(modifier = Modifier.size(18.dp)) { LoadingIndicator() }
+                        }
+                        Text(text = "Checking for updates...", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                is ManagerUpdateUiState.Result ->
+                    ManagerUpdateResultContent(
+                        status = animatedState.status,
+                        onCheck = onCheck,
+                    )
             }
         }
-
-        is ManagerUpdateUiState.Checking -> {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(modifier = Modifier.size(20.dp)) { LoadingIndicator() }
-                Text(text = "Checking for updates...", style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-
-        is ManagerUpdateUiState.Result -> ManagerUpdateResultContent(status = state.status, onCheck = onCheck)
     }
 }
 
@@ -146,7 +193,8 @@ private fun ManagerUpdateResultContent(
         is ManagerUpdateStatus.UpToDate -> {
             ManagerUpdateStatusRow(
                 icon = Icons.Filled.CheckCircle,
-                tint = MaterialTheme.colorScheme.tertiary,
+                badgeColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 text = "You're on the latest version.",
             )
             OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth()) {
@@ -157,8 +205,10 @@ private fun ManagerUpdateResultContent(
         is ManagerUpdateStatus.UpdateAvailable -> {
             ManagerUpdateStatusRow(
                 icon = Icons.Filled.SystemUpdateAlt,
-                tint = MaterialTheme.colorScheme.primary,
+                badgeColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 text = "Version ${status.latestVersion} is available.",
+                emphasize = true,
             )
             Button(onClick = { uriHandler.openUri(status.releaseUrl) }, modifier = Modifier.fillMaxWidth()) {
                 Text("View release on GitHub")
@@ -168,7 +218,8 @@ private fun ManagerUpdateResultContent(
         is ManagerUpdateStatus.NoReleasePublished -> {
             ManagerUpdateStatusRow(
                 icon = Icons.Filled.Info,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                badgeColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 text = "No manager releases have been published yet.",
             )
             OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth()) {
@@ -179,7 +230,8 @@ private fun ManagerUpdateResultContent(
         is ManagerUpdateStatus.Failed -> {
             ManagerUpdateStatusRow(
                 icon = Icons.Filled.Error,
-                tint = MaterialTheme.colorScheme.error,
+                badgeColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 text = status.reason,
             )
             OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth()) {
@@ -192,12 +244,23 @@ private fun ManagerUpdateResultContent(
 @Composable
 private fun ManagerUpdateStatusRow(
     icon: ImageVector,
-    tint: Color,
+    badgeColor: Color,
+    contentColor: Color,
     text: String,
+    emphasize: Boolean = false,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(icon, contentDescription = null, tint = tint)
-        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(
+            modifier = Modifier.size(36.dp).clip(ShapeCache.smooth12).background(badgeColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))
+        }
+        Text(
+            text = text,
+            style = if (emphasize) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+            fontWeight = if (emphasize) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 

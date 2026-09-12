@@ -64,6 +64,7 @@ fun AppDetailsScreen(
                 container.installationEngine,
                 container.cleanInstallOrchestrator,
                 container.installedPackageReader,
+                container.activityLogRepository,
                 appId,
             )
         }

@@ -18,11 +18,14 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.cl0ud9.manager.platform.workers.UpdateNotifier
 import dev.cl0ud9.manager.ui.components.AppListItem
 import dev.cl0ud9.manager.ui.components.EmptyState
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
@@ -35,12 +38,28 @@ import dev.cl0ud9.manager.ui.util.managerViewModel
 fun UpdatesScreen(onAppClick: (String) -> Unit) {
     val viewModel =
         managerViewModel { container ->
-            UpdatesViewModel(container.catalogRepository, container.installedPackageReader, container.updateAllEngine)
+            UpdatesViewModel(
+                container.catalogRepository,
+                container.installedPackageReader,
+                container.updateAllEngine,
+                container.activityLogRepository,
+            )
         }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val updateAllState by viewModel.updateAllState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
+
+    // Update All can take a while across several apps - if the user backgrounds the app partway
+    // through, this is the one place a notification adds real value instead of just repeating
+    // feedback already visible on screen (see UpdateNotifier.notifyUpdateAllResult)
+    val context = LocalContext.current
+    LaunchedEffect(updateAllState) {
+        val finished = updateAllState as? UpdateAllUiState.Done ?: return@LaunchedEffect
+        val succeeded = finished.outcomes.count { it.succeeded }
+        val failed = finished.outcomes.size - succeeded
+        UpdateNotifier.notifyUpdateAllResult(context, succeeded, failed)
+    }
 
     // pending updates are the most time-sensitive data in the app - a stale manifest here directly
     // means a missed update, so this is the highest-value place for pull-to-refresh

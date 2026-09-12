@@ -6,12 +6,16 @@ import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
 import dev.cl0ud9.manager.domain.dependency.DependencyGraph
 import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
+import dev.cl0ud9.manager.domain.model.ActivityAction
+import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
+import dev.cl0ud9.manager.ui.util.withMinimumDuration
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,18 +28,24 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.UUID
 
 data class DependencyInfo(
     val app: AppProfile,
     val installed: Boolean,
 )
 
+// six collaborators plus the screen's own appId argument - each one is a distinct, already-shared
+// singleton from AppContainer (not something to bundle into an artificial "dependencies" wrapper
+// purely to dodge this count), so the added activityLogRepository param is a justified exception
+@Suppress("LongParameterList")
 class AppDetailsViewModel(
     private val catalogRepository: CatalogRepository,
     private val artifactDownloader: ArtifactDownloader,
     private val installationEngine: InstallationEngine,
     private val cleanInstallOrchestrator: CleanInstallOrchestrator,
     private val installedPackageReader: InstalledPackageReader,
+    private val activityLogRepository: ActivityLogRepository,
     appId: String,
 ) : ViewModel() {
     val app: StateFlow<AppProfile?> =
@@ -81,8 +91,10 @@ class AppDetailsViewModel(
         if (mutableIsRefreshing.value) return
         viewModelScope.launch {
             mutableIsRefreshing.value = true
-            runCatching { catalogRepository.refresh() }
-            refresh()
+            withMinimumDuration {
+                runCatching { catalogRepository.refresh() }
+                refresh()
+            }
             mutableIsRefreshing.value = false
         }
     }
@@ -112,7 +124,7 @@ class AppDetailsViewModel(
             } else {
                 installationEngine.install(currentApp, apkFile)
             }
-        runInstallFlow(flow)
+        runInstallFlow(flow, currentApp)
     }
 
     // explicit, user-confirmed fallback after a normal update failed, section 17 of the spec
@@ -120,7 +132,7 @@ class AppDetailsViewModel(
         val currentApp = app.value
         val readyStatus = readyDownload()
         if (currentApp == null || readyStatus == null || isBusy()) return
-        runInstallFlow(cleanInstallOrchestrator.cleanInstall(currentApp, File(readyStatus.filePath)))
+        runInstallFlow(cleanInstallOrchestrator.cleanInstall(currentApp, File(readyStatus.filePath)), currentApp)
     }
 
     private fun resolveDependencies(
@@ -144,7 +156,13 @@ class AppDetailsViewModel(
             else -> false
         }
 
-    private fun runInstallFlow(flow: Flow<InstallStatus>) {
+    private fun runInstallFlow(
+        flow: Flow<InstallStatus>,
+        targetApp: AppProfile,
+    ) {
+        // captured before the flow runs, not after: installedVersionName reflects the OLD device
+        // state right now, which is exactly what decides whether this is an install or an update
+        val wasInstalled = installedVersionName.value != null
         viewModelScope.launch {
             flow.collect { status ->
                 mutableInstallStatus.value = status
@@ -152,10 +170,26 @@ class AppDetailsViewModel(
                     // the downloaded apk is redundant once PackageInstaller has actually committed it -
                     // not deleted on failure, since a retry reuses this same file instead of re-downloading
                     readyDownload()?.let { artifactDownloader.deleteDownloadedFile(it.filePath) }
+                    recordActivity(targetApp, wasInstalled)
                     refresh()
                 }
             }
         }
+    }
+
+    private suspend fun recordActivity(
+        targetApp: AppProfile,
+        wasInstalled: Boolean,
+    ) {
+        activityLogRepository.record(
+            ActivityEntry(
+                id = UUID.randomUUID().toString(),
+                appId = targetApp.id,
+                appName = targetApp.displayName,
+                action = if (wasInstalled) ActivityAction.UPDATED else ActivityAction.INSTALLED,
+                timestampMillis = System.currentTimeMillis(),
+            ),
+        )
     }
 
     private companion object {
