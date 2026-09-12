@@ -118,8 +118,9 @@ class AppDetailsViewModel(
 
     private fun isBusy(): Boolean =
         when (mutableInstallStatus.value) {
-            InstallStatus.Installing, InstallStatus.WaitingForUser, InstallStatus.PreparingRollback,
+            InstallStatus.Installing, InstallStatus.PreparingRollback,
             InstallStatus.Uninstalling, InstallStatus.RollingBack,
+            is InstallStatus.WaitingForUser,
             -> true
 
             else -> false

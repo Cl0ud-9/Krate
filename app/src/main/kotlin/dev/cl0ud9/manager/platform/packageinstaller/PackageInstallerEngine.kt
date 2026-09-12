@@ -7,6 +7,7 @@ import android.content.pm.PackageInstaller
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.InstallStatus
+import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -35,7 +36,7 @@ class PackageInstallerEngine(
                 close()
                 return@callbackFlow
             }
-            awaitResult(requestKey)
+            awaitResult(requestKey, WaitingForUserStep.INSTALL_CONFIRM)
         }
 
     override fun uninstall(packageName: String): Flow<InstallStatus> =
@@ -52,18 +53,21 @@ class PackageInstallerEngine(
                 close()
                 return@callbackFlow
             }
-            awaitResult(requestKey)
+            awaitResult(requestKey, WaitingForUserStep.UNINSTALL_CONFIRM)
         }
 
     // collects broadcast results for the given request key onto this producer until a terminal state arrives -
     // callbackFlow requires awaitClose to be the block's last suspending call, so this must stay suspend
-    private suspend fun ProducerScope<InstallStatus>.awaitResult(requestKey: String) {
+    private suspend fun ProducerScope<InstallStatus>.awaitResult(
+        requestKey: String,
+        waitingForUserStep: WaitingForUserStep,
+    ) {
         val job =
             launch {
                 InstallResultBus.events
                     .filter { it.requestKey == requestKey }
                     .collect { event ->
-                        val status = interpretInstallResult(event.status, event.message)
+                        val status = interpretInstallResult(event.status, event.message, waitingForUserStep)
                         send(status)
                         if (status is InstallStatus.Success || status is InstallStatus.Failed) {
                             close()

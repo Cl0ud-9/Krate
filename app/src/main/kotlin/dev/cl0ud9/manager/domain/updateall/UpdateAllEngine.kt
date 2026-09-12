@@ -7,6 +7,7 @@ import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.io.File
@@ -90,7 +91,11 @@ class UpdateAllEngine(
             InstallStatus.PreparingRollback -> "Preserving the current version for rollback"
             InstallStatus.Uninstalling -> "Uninstalling the current version"
             InstallStatus.Installing -> "Installing"
-            InstallStatus.WaitingForUser -> "Confirm in the system dialog"
+            is InstallStatus.WaitingForUser ->
+                when (status.step) {
+                    WaitingForUserStep.UNINSTALL_CONFIRM -> "Confirm the uninstall in the system dialog"
+                    WaitingForUserStep.INSTALL_CONFIRM -> "Confirm the install in the system dialog"
+                }
             InstallStatus.RollingBack -> "Install failed, restoring the previous version"
             InstallStatus.Success -> "Installed"
             InstallStatus.Idle -> "Preparing"

@@ -28,6 +28,7 @@ import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
@@ -132,6 +133,12 @@ private fun ManagerLinearProgress(progress: Float?) {
     }
 }
 
+private fun waitingForUserMessage(step: WaitingForUserStep): String =
+    when (step) {
+        WaitingForUserStep.UNINSTALL_CONFIRM -> "Confirm the uninstall in the system dialog."
+        WaitingForUserStep.INSTALL_CONFIRM -> "Confirm the installation in the system dialog."
+    }
+
 @Composable
 private fun ReadyToInstallSection(
     state: AppDetailsUiState,
@@ -183,7 +190,7 @@ private fun ReadyToInstallSection(
 
         is InstallStatus.WaitingForUser -> {
             ManagerLinearProgress(progress = null)
-            HelperText("Confirm the installation in the system dialog.")
+            HelperText(waitingForUserMessage(installStatus.step))
         }
 
         is InstallStatus.RollingBack -> {
