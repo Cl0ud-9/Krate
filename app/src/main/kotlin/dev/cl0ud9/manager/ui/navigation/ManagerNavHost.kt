@@ -1,31 +1,36 @@
 package dev.cl0ud9.manager.ui.navigation
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -39,6 +44,7 @@ import dev.cl0ud9.manager.ui.components.ManagerNavigationBarItem
 import dev.cl0ud9.manager.ui.details.AppDetailsScreen
 import dev.cl0ud9.manager.ui.home.HomeScreen
 import dev.cl0ud9.manager.ui.settings.SettingsScreen
+import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.updates.UpdatesScreen
 
 private const val APP_DETAILS_ROUTE = "apps/{appId}"
@@ -83,20 +89,39 @@ private fun NavHostController.navigateToTab(route: String) {
     }
 }
 
+// a floating pill instead of an edge-to-edge bar - the single most recognizable piece of the
+// app's shell. Scaffold's default bottomBar (NavigationBar) carries its own navigationBars
+// inset padding automatically; a bare Surface doesn't, so windowInsetsPadding is applied explicitly
+// before the floating margin, otherwise the pill would sit under the gesture nav area on some devices
 @Composable
 private fun ManagerBottomBar(
     navController: NavHostController,
     currentRoute: String?,
 ) {
-    NavigationBar {
-        ManagerDestination.entries.forEach { destination ->
-            val selected = currentRoute == destination.route
-            ManagerNavigationBarItem(
-                selected = selected,
-                onClick = { navController.navigateToTab(destination.route) },
-                icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                label = stringResource(destination.labelRes),
-            )
+    Surface(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+        shape = ShapeCache.smoothPill,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        shadowElevation = 6.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ManagerDestination.entries.forEach { destination ->
+                val selected = currentRoute == destination.route
+                ManagerNavigationBarItem(
+                    selected = selected,
+                    onClick = { navController.navigateToTab(destination.route) },
+                    icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                    label = stringResource(destination.labelRes),
+                )
+            }
         }
     }
 }
@@ -146,20 +171,10 @@ private fun NavGraphBuilder.appDetailsDestination(navController: NavHostControll
     composable(
         route = APP_DETAILS_ROUTE,
         arguments = listOf(navArgument(APP_ID_ARG) { type = NavType.StringType }),
-        enterTransition = {
-            slideInHorizontally(
-                initialOffsetX = { fullWidth -> fullWidth },
-                animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
-            ) + fadeIn(animationSpec = tween(FADE_DURATION_MS))
-        },
-        popExitTransition = {
-            slideOutHorizontally(
-                targetOffsetX = { fullWidth -> fullWidth },
-                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
-            ) + fadeOut(animationSpec = tween(FADE_DURATION_MS))
-        },
-        popEnterTransition = { fadeIn(animationSpec = tween(FADE_DURATION_MS)) },
-        exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
+        enterTransition = { detailsEnterTransition() },
+        exitTransition = { detailsExitTransition() },
+        popEnterTransition = { detailsPopEnterTransition() },
+        popExitTransition = { detailsPopExitTransition() },
     ) { backStackEntry ->
         val appId = backStackEntry.arguments?.getString(APP_ID_ARG).orEmpty()
         DetailScreen(title = "App Details", onBack = { navController.popBackStack() }) {
@@ -173,7 +188,9 @@ private fun NavGraphBuilder.appDetailsDestination(navController: NavHostControll
 
 // a tab destination's own top bar + opaque content, now composed as one subtree INSIDE NavHost so
 // it rides the exact same enter/exit transition (and the same live predictive-back progress) as the
-// content below it, instead of being hoisted out where no transition could ever reach it
+// content below it, instead of being hoisted out where no transition could ever reach it.
+// transparent instead of a tonal-elevated bar - no boxed top chrome at all,
+// just text/icons floating directly on the background, which reads as lighter than a filled app bar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TabScreen(
@@ -181,7 +198,13 @@ private fun TabScreen(
     content: @Composable () -> Unit,
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text(title, style = MaterialTheme.typography.headlineSmall) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            )
+        },
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         Surface(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -192,7 +215,9 @@ private fun TabScreen(
     }
 }
 
-// same reasoning as TabScreen, with a back affordance instead of a static title
+// same reasoning as TabScreen, with a back affordance instead of a static title - styled as its own
+// floating circular surface (matching the app's other circular icon buttons) instead of a plain
+// borderless IconButton, so it reads as a control sitting on the page rather than part of a bar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DetailScreen(
@@ -205,12 +230,22 @@ private fun DetailScreen(
             TopAppBar(
                 title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.padding(start = 4.dp).size(40.dp),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         Surface(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
