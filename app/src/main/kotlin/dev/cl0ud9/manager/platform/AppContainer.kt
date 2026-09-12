@@ -16,6 +16,7 @@ import dev.cl0ud9.manager.platform.packageinfo.PackageManagerInstalledPackageRea
 import dev.cl0ud9.manager.platform.packageinstaller.PackageInstallerEngine
 import dev.cl0ud9.manager.platform.rollback.FileRollbackStore
 import dev.cl0ud9.manager.platform.rollback.RollbackStore
+import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
 import dev.cl0ud9.manager.security.apk.PackageManagerApkArchiveReader
 import java.io.File
 
@@ -39,4 +40,5 @@ class AppContainer(
     val cleanInstallOrchestrator: CleanInstallOrchestrator = CleanInstallOrchestrator(installationEngine, rollbackStore)
     val updateAllEngine: UpdateAllEngine =
         UpdateAllEngine(artifactDownloader, installationEngine, cleanInstallOrchestrator)
+    val managerUpdateChecker = ManagerUpdateChecker(context.applicationContext)
 }

@@ -29,9 +29,10 @@ import dev.cl0ud9.manager.ui.theme.ShapeCache
 internal fun DependenciesSection(
     dependencies: List<DependencyInfo>,
     onNavigateToApp: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = ShapeCache.smooth16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {

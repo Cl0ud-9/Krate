@@ -55,6 +55,9 @@ class UpdatesViewModel(
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
+    private val mutableIsRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = mutableIsRefreshing.asStateFlow()
+
     private val catalog: StateFlow<List<AppProfile>> =
         catalogRepository
             .observeApps()
@@ -70,6 +73,18 @@ class UpdatesViewModel(
 
     fun refresh() {
         refreshTrigger.tryEmit(Unit)
+    }
+
+    // pull-to-refresh: the one path that actually re-fetches the manifest over the network (see
+    // RemoteCatalogRepository) - guarded so a second pull while one is already in flight is a no-op
+    // rather than a duplicate request
+    fun refreshFromNetwork() {
+        if (mutableIsRefreshing.value) return
+        viewModelScope.launch {
+            mutableIsRefreshing.value = true
+            runCatching { catalogRepository.refresh() }
+            mutableIsRefreshing.value = false
+        }
     }
 
     // section 23 + 42.21 of the spec: dependency-ordered sequential deployment across every pending

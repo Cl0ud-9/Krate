@@ -13,7 +13,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -27,6 +30,7 @@ import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
 
 // pending updates with individual actions plus Update All, section 30 + 23/42.21 of the spec
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UpdatesScreen(onAppClick: (String) -> Unit) {
     val viewModel =
@@ -35,19 +39,45 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
         }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val updateAllState by viewModel.updateAllState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
 
+    // pending updates are the most time-sensitive data in the app - a stale manifest here directly
+    // means a missed update, so this is the highest-value place for pull-to-refresh
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = viewModel::refreshFromNetwork,
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        UpdatesContent(
+            uiState = uiState,
+            updateAllState = updateAllState,
+            viewModel = viewModel,
+            onAppClick = onAppClick,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun UpdatesContent(
+    uiState: UpdatesUiState,
+    updateAllState: UpdateAllUiState,
+    viewModel: UpdatesViewModel,
+    onAppClick: (String) -> Unit,
+) {
     AnimatedContent(
         targetState = uiState,
         label = "updates-content",
         transitionSpec = {
-            fadeIn(animationSpec = tween(CONTENT_FADE_MS)) togetherWith fadeOut(animationSpec = tween(CONTENT_FADE_MS))
+            fadeIn(animationSpec = tween(CONTENT_FADE_MS)) togetherWith
+                fadeOut(animationSpec = tween(CONTENT_FADE_MS))
         },
     ) { state ->
         when (state) {
             is UpdatesUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularWavyProgressIndicator()
+                    LoadingIndicator()
                 }
             }
 

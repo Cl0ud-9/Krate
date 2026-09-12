@@ -16,6 +16,11 @@ class ManifestCheckWorker(
     override suspend fun doWork(): Result {
         val container = applicationContext.appContainer()
         return runCatching {
+            // explicit refresh(), not observeApps().first() - the repository now caches its last
+            // result for the app's whole process lifetime (shared across every screen), so a plain
+            // .first() would just replay a possibly hours-old cached value forever instead of a real
+            // background check
+            container.catalogRepository.refresh()
             val apps = container.catalogRepository.observeApps().first()
             pendingUpdateCount(apps, container.installedPackageReader)
         }.fold(

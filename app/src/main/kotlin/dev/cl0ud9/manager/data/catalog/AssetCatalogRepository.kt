@@ -20,6 +20,9 @@ class AssetCatalogRepository(
 
     override fun observeApp(id: String): Flow<AppProfile?> = observeApps().map { apps -> apps.find { it.id == id } }
 
+    // the bundled seed asset never changes at runtime - nothing to actually refresh
+    override suspend fun refresh() = Unit
+
     private suspend fun loadCatalog(): List<AppProfile> =
         withContext(Dispatchers.IO) {
             val text =

@@ -1,6 +1,7 @@
 package dev.cl0ud9.manager.ui.details
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,8 +13,10 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -122,15 +125,22 @@ private fun IdleContent(
 }
 
 // every in-progress state below shares this exact indicator - one definition instead of six copies.
-// the wavy variant needs its own vertical space for the wave amplitude, not the old straight bar's
-// fixed 6dp track height, so this leaves height unconstrained rather than carrying that over
+// determinate progress (real download bytes) keeps the wavy linear bar, since a filled fraction is
+// genuinely informative there. indeterminate states (installing, uninstalling, waiting for the user)
+// used to reuse the same indeterminate wavy bar, but that animates as two independently-phased wavy
+// segments chasing each other - readable as an actual progress bar when it's genuinely determinate,
+// but noisy and easy to misread as "two bars" when there is no real progress fraction behind it. the
+// expressive LoadingIndicator (a single morphing shape) is Material's own component for exactly this
+// indeterminate case, so it replaces the wavy bar rather than reusing it just because it's already wired up
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ManagerLinearProgress(progress: Float?) {
-    val modifier = Modifier.fillMaxWidth()
     if (progress != null) {
-        LinearWavyProgressIndicator(progress = { progress }, modifier = modifier)
+        LinearWavyProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
     } else {
-        LinearWavyProgressIndicator(modifier = modifier)
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            LoadingIndicator()
+        }
     }
 }
 

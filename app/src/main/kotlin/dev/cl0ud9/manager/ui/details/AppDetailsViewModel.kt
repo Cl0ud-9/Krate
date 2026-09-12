@@ -65,8 +65,26 @@ class AppDetailsViewModel(
     private val mutableInstallStatus = MutableStateFlow<InstallStatus>(InstallStatus.Idle)
     val installStatus: StateFlow<InstallStatus> = mutableInstallStatus.asStateFlow()
 
+    private val mutableIsRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = mutableIsRefreshing.asStateFlow()
+
     fun refresh() {
         refreshTrigger.tryEmit(Unit)
+    }
+
+    // pull-to-refresh: the one path that actually re-fetches the manifest over the network (see
+    // RemoteCatalogRepository) - guarded so a second pull while one is already in flight is a no-op
+    // rather than a duplicate request. also re-checks device-local installed state via refresh()
+    // once the network fetch lands, since app/dependencies/installedVersionName are all derived
+    // from the same refreshTrigger + catalogRepository combination
+    fun refreshFromNetwork() {
+        if (mutableIsRefreshing.value) return
+        viewModelScope.launch {
+            mutableIsRefreshing.value = true
+            runCatching { catalogRepository.refresh() }
+            refresh()
+            mutableIsRefreshing.value = false
+        }
     }
 
     fun startDownload() {
