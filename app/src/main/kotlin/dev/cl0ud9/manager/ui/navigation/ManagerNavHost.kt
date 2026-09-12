@@ -1,6 +1,5 @@
 package dev.cl0ud9.manager.ui.navigation
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -9,7 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -46,84 +45,31 @@ private const val APP_DETAILS_ROUTE = "apps/{appId}"
 private const val APP_ID_ARG = "appId"
 private const val FADE_DURATION_MS = 180
 private const val TAB_ENTER_INITIAL_SCALE = 0.94f
-private const val TOPBAR_SLIDE_DIVISOR = 4
 
+// only the bottom bar lives at this shared level now - it doesn't transition per-route, it just
+// shows/hides, so it has no reason to sit inside NavHost's animated content. the top bar used to
+// live here too, but that was the actual bug behind "the header doesn't move with the back swipe":
+// Navigation Compose 2.9's NavHost drives its enter/exit transitions from the live predictive-back
+// gesture progress (the screen follows your finger in real time on Android 14+), and that progress
+// is only ever wired up to composables INSIDE NavHost. A top bar hoisted out here never saw that
+// progress at all, so it just sat frozen for the whole drag and snapped once the gesture settled -
+// no transitionSpec on the outside could fix that, because the problem was never which animation
+// played, it was that the header wasn't part of the animated subtree in the first place
 @Composable
 fun ManagerNavHost(navController: NavHostController = rememberNavController()) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = ManagerDestination.entries.any { it.route == currentRoute }
 
+    // contentWindowInsets defaults to WindowInsets.systemBars, which would reserve the status bar's
+    // top inset here AND again inside every TabScreen/DetailScreen's own TopAppBar (that's the
+    // default inset every M3 TopAppBar carries) - zeroing it out here leaves exactly one place
+    // (each screen's own top bar) consuming it, instead of double-padding every screen's title down
     Scaffold(
-        topBar = { ManagerTopBar(navController, currentRoute) },
         bottomBar = { if (showBottomBar) ManagerBottomBar(navController, currentRoute) },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { innerPadding ->
         ManagerNavGraph(navController, modifier = Modifier.padding(innerPadding))
-    }
-}
-
-// every screen gets a real M3 top app bar instead of ad-hoc per-screen headers/titles -
-// tab destinations show their title, the app-details route gets a back affordance.
-//
-// the top bar lives outside NavHost (it's hoisted at the Scaffold level, shared across every
-// destination), so without this AnimatedContent it would hard-cut between titles the instant the
-// route changes while the NavHost content underneath plays its own slide transition - the two
-// visually disagreeing is exactly what read as "the header doesn't slide with it" on a back swipe.
-// this mirrors the content's slide direction (in from the left when returning from details, out to
-// the right when opening it) so the title moves together with the body instead of snapping
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ManagerTopBar(
-    navController: NavHostController,
-    currentRoute: String?,
-) {
-    AnimatedContent(
-        targetState = currentRoute,
-        label = "topbar",
-        transitionSpec = {
-            val enteringDetails = targetState == APP_DETAILS_ROUTE
-            val exitingDetails = initialState == APP_DETAILS_ROUTE
-            when {
-                enteringDetails ->
-                    slideInHorizontally(initialOffsetX = { it / TOPBAR_SLIDE_DIVISOR }) +
-                        fadeIn(tween(FADE_DURATION_MS)) togetherWith
-                        slideOutHorizontally(targetOffsetX = { -it / TOPBAR_SLIDE_DIVISOR }) +
-                        fadeOut(tween(FADE_DURATION_MS))
-
-                exitingDetails ->
-                    slideInHorizontally(initialOffsetX = { -it / TOPBAR_SLIDE_DIVISOR }) +
-                        fadeIn(tween(FADE_DURATION_MS)) togetherWith
-                        slideOutHorizontally(targetOffsetX = { it / TOPBAR_SLIDE_DIVISOR }) +
-                        fadeOut(tween(FADE_DURATION_MS))
-
-                else -> fadeIn(tween(FADE_DURATION_MS)) togetherWith fadeOut(tween(FADE_DURATION_MS))
-            }
-        },
-    ) { route ->
-        val destination = ManagerDestination.entries.firstOrNull { it.route == route }
-        when {
-            destination != null -> {
-                TopAppBar(
-                    title = {
-                        Text(
-                            stringResource(destination.titleRes),
-                            style = MaterialTheme.typography.headlineSmall,
-                        )
-                    },
-                )
-            }
-
-            route == APP_DETAILS_ROUTE -> {
-                TopAppBar(
-                    title = { Text("App Details", style = MaterialTheme.typography.headlineSmall) },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                )
-            }
-        }
     }
 }
 
@@ -172,19 +118,25 @@ private fun ManagerNavGraph(
         exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
     ) {
         composable(ManagerDestination.HOME.route) {
-            OpaqueScreen {
-                HomeScreen(
-                    onNavigateToUpdates = { navController.navigateToTab(ManagerDestination.UPDATES.route) },
-                )
+            TabScreen(title = stringResource(ManagerDestination.HOME.titleRes)) {
+                HomeScreen(onNavigateToUpdates = { navController.navigateToTab(ManagerDestination.UPDATES.route) })
             }
         }
         composable(ManagerDestination.APPS.route) {
-            OpaqueScreen { AppsScreen(onAppClick = { appId -> navController.navigate("apps/$appId") }) }
+            TabScreen(title = stringResource(ManagerDestination.APPS.titleRes)) {
+                AppsScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
+            }
         }
         composable(ManagerDestination.UPDATES.route) {
-            OpaqueScreen { UpdatesScreen(onAppClick = { appId -> navController.navigate("apps/$appId") }) }
+            TabScreen(title = stringResource(ManagerDestination.UPDATES.titleRes)) {
+                UpdatesScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
+            }
         }
-        composable(ManagerDestination.SETTINGS.route) { OpaqueScreen { SettingsScreen() } }
+        composable(ManagerDestination.SETTINGS.route) {
+            TabScreen(title = stringResource(ManagerDestination.SETTINGS.titleRes)) {
+                SettingsScreen()
+            }
+        }
 
         appDetailsDestination(navController)
     }
@@ -210,7 +162,7 @@ private fun NavGraphBuilder.appDetailsDestination(navController: NavHostControll
         exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
     ) { backStackEntry ->
         val appId = backStackEntry.arguments?.getString(APP_ID_ARG).orEmpty()
-        OpaqueScreen {
+        DetailScreen(title = "App Details", onBack = { navController.popBackStack() }) {
             AppDetailsScreen(
                 appId = appId,
                 onNavigateToApp = { dependencyId -> navController.navigate("apps/$dependencyId") },
@@ -219,12 +171,52 @@ private fun NavGraphBuilder.appDetailsDestination(navController: NavHostControll
     }
 }
 
-// every destination's content sits on its own opaque backdrop - without this, a fade-based transition
-// (used by every route above) blends the outgoing screen's text with the incoming screen's, since
-// both would otherwise draw straight onto the single shared background behind the whole NavHost
+// a tab destination's own top bar + opaque content, now composed as one subtree INSIDE NavHost so
+// it rides the exact same enter/exit transition (and the same live predictive-back progress) as the
+// content below it, instead of being hoisted out where no transition could ever reach it
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OpaqueScreen(content: @Composable () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-        content()
+private fun TabScreen(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Scaffold(
+        topBar = { TopAppBar(title = { Text(title, style = MaterialTheme.typography.headlineSmall) }) },
+    ) { innerPadding ->
+        Surface(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            content()
+        }
+    }
+}
+
+// same reasoning as TabScreen, with a back affordance instead of a static title
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DetailScreen(
+    title: String,
+    onBack: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        Surface(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            content()
+        }
     }
 }
