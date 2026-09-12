@@ -1,9 +1,12 @@
 package dev.cl0ud9.manager.ui.navigation
 
+import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -37,10 +40,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -201,6 +206,19 @@ private fun ManagerNavGraph(
     navController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
+    // NavController.visibleEntries stays populated with BOTH the outgoing and incoming entry for the
+    // full duration of a transition (that's the entire point of the API), regardless of whether it's
+    // a push or a pop - so "the entry currently furthest back in that list that isn't the last one"
+    // reliably identifies "behind the front-most screen" symmetrically in both directions, without
+    // needing to special-case push vs pop or reach for previousBackStackEntry (which updates the
+    // instant a pop commits, well before that pop's own exit animation finishes playing)
+    val visibleEntries by navController.visibleEntries.collectAsStateWithLifecycle(initialValue = emptyList())
+    val frontEntryId = visibleEntries.lastOrNull()?.id
+    val isBehindFront = { entry: NavBackStackEntry ->
+        visibleEntries.any { it.id == entry.id } &&
+            entry.id != frontEntryId
+    }
+
     NavHost(
         navController = navController,
         startDestination = ManagerDestination.HOME.route,
@@ -212,35 +230,48 @@ private fun ManagerNavGraph(
         },
         exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
     ) {
-        composable(ManagerDestination.HOME.route) {
+        composable(ManagerDestination.HOME.route) { entry ->
             TabScreen(
                 title = stringResource(ManagerDestination.HOME.titleRes),
+                depthActive = isBehindFront(entry),
                 actions = { HomeChangelogAction() },
             ) {
                 HomeScreen(onNavigateToUpdates = { navController.navigateToTab(ManagerDestination.UPDATES.route) })
             }
         }
-        composable(ManagerDestination.APPS.route) {
-            TabScreen(title = stringResource(ManagerDestination.APPS.titleRes)) {
+        composable(ManagerDestination.APPS.route) { entry ->
+            TabScreen(
+                title = stringResource(ManagerDestination.APPS.titleRes),
+                depthActive = isBehindFront(entry),
+            ) {
                 AppsScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
             }
         }
-        composable(ManagerDestination.UPDATES.route) {
-            TabScreen(title = stringResource(ManagerDestination.UPDATES.titleRes)) {
+        composable(ManagerDestination.UPDATES.route) { entry ->
+            TabScreen(
+                title = stringResource(ManagerDestination.UPDATES.titleRes),
+                depthActive = isBehindFront(entry),
+            ) {
                 UpdatesScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
             }
         }
-        composable(ManagerDestination.SETTINGS.route) {
-            TabScreen(title = stringResource(ManagerDestination.SETTINGS.titleRes)) {
+        composable(ManagerDestination.SETTINGS.route) { entry ->
+            TabScreen(
+                title = stringResource(ManagerDestination.SETTINGS.titleRes),
+                depthActive = isBehindFront(entry),
+            ) {
                 SettingsScreen()
             }
         }
 
-        appDetailsDestination(navController)
+        appDetailsDestination(navController, isBehindFront)
     }
 }
 
-private fun NavGraphBuilder.appDetailsDestination(navController: NavHostController) {
+private fun NavGraphBuilder.appDetailsDestination(
+    navController: NavHostController,
+    isBehindFront: (NavBackStackEntry) -> Boolean,
+) {
     composable(
         route = APP_DETAILS_ROUTE,
         arguments = listOf(navArgument(APP_ID_ARG) { type = NavType.StringType }),
@@ -250,7 +281,11 @@ private fun NavGraphBuilder.appDetailsDestination(navController: NavHostControll
         popExitTransition = { detailsPopExitTransition() },
     ) { backStackEntry ->
         val appId = backStackEntry.arguments?.getString(APP_ID_ARG).orEmpty()
-        DetailScreen(title = "App Details", onBack = { navController.popBackStack() }) {
+        DetailScreen(
+            title = "App Details",
+            depthActive = isBehindFront(backStackEntry),
+            onBack = { navController.popBackStack() },
+        ) {
             AppDetailsScreen(
                 appId = appId,
                 onNavigateToApp = { dependencyId -> navController.navigate("apps/$dependencyId") },
@@ -266,11 +301,13 @@ private fun NavGraphBuilder.appDetailsDestination(navController: NavHostControll
 // just text/icons floating directly on the background, which reads as lighter than a filled app bar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TabScreen(
+private fun AnimatedContentScope.TabScreen(
     title: String,
+    depthActive: Boolean,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
 ) {
+    val depth = rememberDepthEffect(active = depthActive)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -281,11 +318,17 @@ private fun TabScreen(
         },
         containerColor = Color.Transparent,
     ) { innerPadding ->
-        Surface(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            color = MaterialTheme.colorScheme.surface,
-        ) {
-            content()
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding).then(depth.contentModifier)) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+                content()
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = depth.dimAlpha }
+                        .background(Color.Black),
+            )
         }
     }
 }
@@ -308,11 +351,13 @@ private fun HomeChangelogAction() {
 // borderless IconButton, so it reads as a control sitting on the page rather than part of a bar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DetailScreen(
+private fun AnimatedContentScope.DetailScreen(
     title: String,
+    depthActive: Boolean,
     onBack: () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    val depth = rememberDepthEffect(active = depthActive)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -335,11 +380,17 @@ private fun DetailScreen(
         },
         containerColor = Color.Transparent,
     ) { innerPadding ->
-        Surface(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            color = MaterialTheme.colorScheme.surface,
-        ) {
-            content()
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding).then(depth.contentModifier)) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+                content()
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = depth.dimAlpha }
+                        .background(Color.Black),
+            )
         }
     }
 }
