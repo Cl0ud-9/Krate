@@ -118,8 +118,10 @@ private fun ManagerBottomBar(
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
     ) {
+        // each ManagerNavigationBarItem now carries its own internal padding around the pill it
+        // draws behind icon+label, so this row only needs a small amount of its own on top of that
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ManagerDestination.entries.forEach { destination ->
