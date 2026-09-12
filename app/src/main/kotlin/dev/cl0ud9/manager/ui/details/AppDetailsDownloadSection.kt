@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -14,7 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -122,14 +121,16 @@ private fun IdleContent(
     }
 }
 
-// every in-progress state below shares this exact indicator - one definition instead of six copies
+// every in-progress state below shares this exact indicator - one definition instead of six copies.
+// the wavy variant needs its own vertical space for the wave amplitude, not the old straight bar's
+// fixed 6dp track height, so this leaves height unconstrained rather than carrying that over
 @Composable
 private fun ManagerLinearProgress(progress: Float?) {
-    val modifier = Modifier.fillMaxWidth().height(6.dp)
+    val modifier = Modifier.fillMaxWidth()
     if (progress != null) {
-        LinearProgressIndicator(progress = { progress }, modifier = modifier)
+        LinearWavyProgressIndicator(progress = { progress }, modifier = modifier)
     } else {
-        LinearProgressIndicator(modifier = modifier)
+        LinearWavyProgressIndicator(modifier = modifier)
     }
 }
 

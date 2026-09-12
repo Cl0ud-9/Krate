@@ -14,7 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -94,9 +94,9 @@ private fun RunningContent(state: UpdateAllUiState.Running) {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    LinearProgressIndicator(
+    LinearWavyProgressIndicator(
         progress = { state.currentIndex / state.total.toFloat() },
-        modifier = Modifier.fillMaxWidth().height(6.dp),
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
