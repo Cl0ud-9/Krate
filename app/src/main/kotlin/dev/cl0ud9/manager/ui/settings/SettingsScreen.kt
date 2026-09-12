@@ -22,10 +22,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -46,12 +43,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
-import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.managerViewModel
 
-// update-check prefs, notifications, storage, diagnostics - section 30 of the spec
-// notification prefs, storage management and diagnostics land alongside the phases that need them
+// a flowing list of icon-badged category rows (badge + title + subtitle, expanding into the row's
+// own controls) instead of plain text blocks inside flat cards, so settings feel
+// considered rather than default-Material-boilerplate. our settings surface is small (three groupings),
+// so this keeps that honest scale rather than inventing categories we don't have
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen() {
@@ -66,67 +64,123 @@ fun SettingsScreen() {
     val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     val managerUpdateState by viewModel.managerUpdateState.collectAsStateWithLifecycle()
+    val versionName = rememberVersionName()
 
-    // grouped into cards rather than bare dividers, matching the card language every other screen uses
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SettingsSection(title = "Updates", icon = Icons.Filled.Update) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Automatic downloads", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        text = "Download updates in the background. Installing always needs your confirmation.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = automaticDownloads, onCheckedChange = viewModel::setAutomaticDownloads)
-            }
-        }
+        AutomaticDownloadsRow(checked = automaticDownloads, onCheckedChange = viewModel::setAutomaticDownloads)
+        StorageRow(cacheClearedMessage = cacheClearedMessage, onClearCache = viewModel::clearCache)
+        AboutRow(
+            versionName = versionName,
+            managerUpdateState = managerUpdateState,
+            onCheck = viewModel::checkForManagerUpdate,
+        )
+    }
+}
 
-        SettingsSection(
-            title = "Storage",
-            icon = Icons.Filled.DeleteSweep,
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        ) {
-            StorageSectionContent(cacheClearedMessage = cacheClearedMessage, onClearCache = viewModel::clearCache)
-        }
+@Composable
+private fun AutomaticDownloadsRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    SettingsRow(
+        header =
+            SettingsRowHeader(
+                icon = Icons.Filled.Update,
+                title = "Automatic downloads",
+                subtitle = "Download updates in the background. Installing always needs your confirmation.",
+                colors = defaultSettingsRowColors(),
+            ),
+        trailing = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
+    )
+}
 
-        // "About" already told the user their installed version - it's the natural home for whether
-        // that version is current, rather than a bare standalone "check for update" button floating
-        // on its own. "Updates" above governs catalog-app download behavior, a separate concern
-        SettingsSection(
-            title = "About",
-            icon = Icons.Filled.Info,
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        ) {
-            AppVersionRow()
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Text(
-                text = "Manager updates",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ManagerUpdateSection(state = managerUpdateState, onCheck = viewModel::checkForManagerUpdate)
-        }
+@Composable
+private fun StorageRow(
+    cacheClearedMessage: String?,
+    onClearCache: () -> Unit,
+) {
+    SettingsRow(
+        header =
+            SettingsRowHeader(
+                icon = Icons.Filled.DeleteSweep,
+                title = "Storage",
+                subtitle = "Downloaded apks are removed right after a successful install.",
+                colors =
+                    SettingsRowColors(
+                        MaterialTheme.colorScheme.tertiaryContainer,
+                        MaterialTheme.colorScheme.onTertiaryContainer,
+                    ),
+            ),
+    ) {
+        StorageRowContent(cacheClearedMessage = cacheClearedMessage, onClearCache = onClearCache)
+    }
+}
+
+// "About" already told the user their installed version - it's the natural home for whether
+// that version is current, rather than a bare standalone "check for update" button floating on
+// its own. "Automatic downloads" above governs catalog-app download behavior, a separate concern
+@Composable
+private fun AboutRow(
+    versionName: String,
+    managerUpdateState: ManagerUpdateUiState,
+    onCheck: () -> Unit,
+) {
+    SettingsRow(
+        header =
+            SettingsRowHeader(
+                icon = Icons.Filled.Info,
+                title = "About",
+                subtitle = "Version $versionName",
+                colors =
+                    SettingsRowColors(
+                        MaterialTheme.colorScheme.secondaryContainer,
+                        MaterialTheme.colorScheme.onSecondaryContainer,
+                    ),
+            ),
+    ) {
+        Text(
+            text = "Manager updates",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ManagerUpdateSection(state = managerUpdateState, onCheck = onCheck)
+    }
+}
+
+@Composable
+private fun rememberVersionName(): String {
+    val context = LocalContext.current
+    return remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+            .getOrNull() ?: "unknown"
+    }
+}
+
+@Composable
+private fun StorageRowContent(
+    cacheClearedMessage: String?,
+    onClearCache: () -> Unit,
+) {
+    OutlinedButton(onClick = onClearCache, modifier = Modifier.fillMaxWidth()) {
+        Text("Clear download cache")
+    }
+    if (cacheClearedMessage != null) {
+        Text(
+            text = cacheClearedMessage,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
     }
 }
 
 private const val STATE_FADE_MS = 220
 
-// every state gets the same icon-badge treatment used for Home's activity rows and every card's
-// SectionHeader, instead of a bare tinted Icon floating in a Row - that inconsistency (plain icon
-// here, badged everywhere else) was the concrete thing making this block read as bolted-on rather
-// than a designed part of the screen. AnimatedContent smooths the Idle/Checking/Result swap instead
-// of an abrupt layout jump each time the state changes
+// every state gets the same icon-badge treatment used for Home's activity rows and every SettingsRow,
+// instead of a bare tinted Icon floating in a Row. AnimatedContent smooths the Idle/Checking/Result
+// swap instead of an abrupt layout jump each time the state changes
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ManagerUpdateSection(
@@ -261,64 +315,5 @@ private fun ManagerUpdateStatusRow(
             style = if (emphasize) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
             fontWeight = if (emphasize) FontWeight.SemiBold else FontWeight.Normal,
         )
-    }
-}
-
-@Composable
-private fun SettingsSection(
-    title: String,
-    icon: ImageVector,
-    containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
-    contentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
-    content: @Composable () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth16,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionHeader(title = title, icon = icon, containerColor = containerColor, contentColor = contentColor)
-            content()
-        }
-    }
-}
-
-@Composable
-private fun StorageSectionContent(
-    cacheClearedMessage: String?,
-    onClearCache: () -> Unit,
-) {
-    Text(
-        text =
-            "Downloaded apks are removed right after a successful install. This clears " +
-                "anything left over from an interrupted or abandoned download.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    OutlinedButton(onClick = onClearCache, modifier = Modifier.fillMaxWidth()) {
-        Text("Clear download cache")
-    }
-    if (cacheClearedMessage != null) {
-        Text(
-            text = cacheClearedMessage,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.tertiary,
-        )
-    }
-}
-
-@Composable
-private fun AppVersionRow() {
-    val context = LocalContext.current
-    val versionName =
-        remember {
-            runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
-                .getOrNull() ?: "unknown"
-        }
-
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(text = "Version", style = MaterialTheme.typography.bodyLarge)
-        Text(text = versionName, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
