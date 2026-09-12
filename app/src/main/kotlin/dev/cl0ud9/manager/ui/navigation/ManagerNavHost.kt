@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +28,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,6 +45,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.cl0ud9.manager.ui.apps.AppsScreen
+import dev.cl0ud9.manager.ui.components.ChangelogDialog
+import dev.cl0ud9.manager.ui.components.ManagerChangelog
 import dev.cl0ud9.manager.ui.components.ManagerNavigationBarItem
 import dev.cl0ud9.manager.ui.details.AppDetailsScreen
 import dev.cl0ud9.manager.ui.home.HomeScreen
@@ -98,19 +105,21 @@ private fun ManagerBottomBar(
     navController: NavHostController,
     currentRoute: String?,
 ) {
+    // wider (less side margin) and taller (more internal padding) than the first pass - the
+    // floating bar should read as a substantial, deliberate shape, not a thin strip
     Surface(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 24.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         shape = ShapeCache.smoothPill,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ManagerDestination.entries.forEach { destination ->
@@ -143,7 +152,10 @@ private fun ManagerNavGraph(
         exitTransition = { fadeOut(animationSpec = tween(FADE_DURATION_MS)) },
     ) {
         composable(ManagerDestination.HOME.route) {
-            TabScreen(title = stringResource(ManagerDestination.HOME.titleRes)) {
+            TabScreen(
+                title = stringResource(ManagerDestination.HOME.titleRes),
+                actions = { HomeChangelogAction() },
+            ) {
                 HomeScreen(onNavigateToUpdates = { navController.navigateToTab(ManagerDestination.UPDATES.route) })
             }
         }
@@ -195,12 +207,14 @@ private fun NavGraphBuilder.appDetailsDestination(navController: NavHostControll
 @Composable
 private fun TabScreen(
     title: String,
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
+                actions = actions,
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
@@ -212,6 +226,19 @@ private fun TabScreen(
         ) {
             content()
         }
+    }
+}
+
+// a real "what's new" for this build, not a placeholder - a small
+// top-right icon, since this app only needs one: history
+@Composable
+private fun HomeChangelogAction() {
+    var showChangelog by remember { mutableStateOf(false) }
+    IconButton(onClick = { showChangelog = true }) {
+        Icon(Icons.Filled.History, contentDescription = "What's new")
+    }
+    if (showChangelog) {
+        ChangelogDialog(entries = ManagerChangelog, onDismiss = { showChangelog = false })
     }
 }
 

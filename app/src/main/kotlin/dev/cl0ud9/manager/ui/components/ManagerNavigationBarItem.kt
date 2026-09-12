@@ -41,7 +41,8 @@ private val IndicatorWidth = 64.dp
 private val IndicatorHeight = 32.dp
 private val IndicatorInset = 4.dp
 private val IconWidth = 48.dp
-private val IconHeight = 24.dp
+private val IconHeight = 26.dp
+private val NAV_ICON_SIZE = 26.dp
 private val IndicatorShape = RoundedCornerShape(16.dp)
 private const val ICON_SCALE_SELECTED = 1.1f
 private const val FAST_FADE_MS = 120
@@ -144,7 +145,7 @@ private fun NavIconWithIndicator(
                     },
         ) {
             CompositionLocalProvider(LocalContentColor provides tint) {
-                Icon(imageVector = icon, contentDescription = label)
+                Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(NAV_ICON_SIZE))
             }
         }
     }
