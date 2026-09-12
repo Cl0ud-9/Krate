@@ -7,6 +7,8 @@ import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.isUpdateAvailable
+import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
+import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import dev.cl0ud9.manager.ui.util.withMinimumDuration
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,11 +25,15 @@ class HomeViewModel(
     private val catalogRepository: CatalogRepository,
     private val installedPackageReader: InstalledPackageReader,
     activityLogRepository: ActivityLogRepository,
+    private val managerUpdateChecker: ManagerUpdateChecker,
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     private val mutableIsRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = mutableIsRefreshing.asStateFlow()
+
+    private val mutableUpdateAnnouncement = MutableStateFlow<ManagerUpdateStatus.UpdateAvailable?>(null)
+    val updateAnnouncement: StateFlow<ManagerUpdateStatus.UpdateAvailable?> = mutableUpdateAnnouncement.asStateFlow()
 
     private val refreshedApps =
         combine(catalogRepository.observeApps(), refreshTrigger.onStart { emit(Unit) }) { apps, _ -> apps }
@@ -55,6 +61,24 @@ class HomeViewModel(
         activityLogRepository
             .observeRecent()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    init {
+        // a proactive "here's what's new" check instead of one tucked away in Settings the user has
+        // to remember to open - runs once per ViewModel lifetime (this app's tab ViewModels survive
+        // tab switches via Navigation's saveState/restoreState), not on every Home recomposition, so
+        // it never spams GitHub's API. Silently does nothing for UpToDate/NoReleasePublished/Failed -
+        // this is only for the genuinely actionable case
+        viewModelScope.launch {
+            val status = runCatching { managerUpdateChecker.check() }.getOrNull()
+            if (status is ManagerUpdateStatus.UpdateAvailable) {
+                mutableUpdateAnnouncement.value = status
+            }
+        }
+    }
+
+    fun dismissUpdateAnnouncement() {
+        mutableUpdateAnnouncement.value = null
+    }
 
     fun refresh() {
         refreshTrigger.tryEmit(Unit)
