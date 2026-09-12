@@ -40,6 +40,28 @@ class InstallResultMappingTest {
     }
 
     @Test
+    fun `user cancelling an install shows a clean cancellation message, not the raw system text`() {
+        val status =
+            interpretInstallResult(
+                PackageInstaller.STATUS_FAILURE_ABORTED,
+                "INSTALL_FAILED_ABORTED: User rejected permission",
+                WaitingForUserStep.INSTALL_CONFIRM,
+            )
+        assertEquals(InstallStatus.Failed("Installation cancelled."), status)
+    }
+
+    @Test
+    fun `user cancelling an uninstall shows a clean, step-specific cancellation message`() {
+        val status =
+            interpretInstallResult(
+                PackageInstaller.STATUS_FAILURE_ABORTED,
+                "DELETE_FAILED_ABORTED: User rejected permission",
+                WaitingForUserStep.UNINSTALL_CONFIRM,
+            )
+        assertEquals(InstallStatus.Failed("Uninstall cancelled."), status)
+    }
+
+    @Test
     fun `failure status maps to Failed with the system message`() {
         val status =
             interpretInstallResult(

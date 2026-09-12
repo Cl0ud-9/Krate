@@ -17,5 +17,16 @@ fun interpretInstallResult(
     when (status) {
         PackageInstaller.STATUS_SUCCESS -> InstallStatus.Success
         PackageInstaller.STATUS_PENDING_USER_ACTION -> InstallStatus.WaitingForUser(waitingForUserStep)
+        // the user declining the system confirmation dialog is an expected outcome, not a technical
+        // failure - PackageInstaller's own EXTRA_STATUS_MESSAGE for this case is raw internal text
+        // (e.g. "INSTALL_FAILED_ABORTED: User rejected permission"), never fit to show verbatim
+        PackageInstaller.STATUS_FAILURE_ABORTED ->
+            InstallStatus.Failed(
+                when (waitingForUserStep) {
+                    WaitingForUserStep.UNINSTALL_CONFIRM -> "Uninstall cancelled."
+                    WaitingForUserStep.INSTALL_CONFIRM -> "Installation cancelled."
+                },
+            )
+
         else -> InstallStatus.Failed(message ?: "Installation failed.")
     }

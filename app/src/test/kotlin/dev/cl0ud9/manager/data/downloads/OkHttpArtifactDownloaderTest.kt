@@ -108,6 +108,41 @@ class OkHttpArtifactDownloaderTest {
             assertTrue(statuses.single() is DownloadStatus.Failed)
         }
 
+    @Test
+    fun `deleteDownloadedFile removes only the given file`() {
+        val dir = tempFolder.newFolder()
+        val target = File(dir, "target.apk").apply { writeText("bytes") }
+        val other = File(dir, "other.apk").apply { writeText("bytes") }
+        val downloader = OkHttpArtifactDownloader(downloadsDir = dir, archiveReader = FakeArchiveReader("x", "y"))
+
+        downloader.deleteDownloadedFile(target.absolutePath)
+
+        assertTrue(!target.exists())
+        assertTrue(other.exists())
+    }
+
+    @Test
+    fun `clearCache deletes every file in the downloads dir and reports bytes freed`() {
+        val dir = tempFolder.newFolder()
+        val first = File(dir, "first.apk").apply { writeBytes(ByteArray(10)) }
+        val second = File(dir, "second.apk").apply { writeBytes(ByteArray(20)) }
+        val downloader = OkHttpArtifactDownloader(downloadsDir = dir, archiveReader = FakeArchiveReader("x", "y"))
+
+        val bytesFreed = downloader.clearCache()
+
+        assertEquals(30L, bytesFreed)
+        assertTrue(!first.exists())
+        assertTrue(!second.exists())
+    }
+
+    @Test
+    fun `clearCache on an empty or missing downloads dir frees nothing`() {
+        val dir = File(tempFolder.newFolder(), "never-created")
+        val downloader = OkHttpArtifactDownloader(downloadsDir = dir, archiveReader = FakeArchiveReader("x", "y"))
+
+        assertEquals(0L, downloader.clearCache())
+    }
+
     // the downloader issues a HEAD request for storage preflight before the real GET, so queue both;
     // the HEAD response must carry no body bytes on the wire or MockWebServer corrupts the reused connection
     private fun enqueuePayloadTwice() {

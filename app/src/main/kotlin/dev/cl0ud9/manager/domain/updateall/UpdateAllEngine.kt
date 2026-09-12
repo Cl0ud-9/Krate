@@ -64,6 +64,9 @@ class UpdateAllEngine(
         }
 
         return if (succeeded) {
+            // same reasoning as AppDetailsViewModel: redundant once actually installed, not deleted on
+            // failure since the caller may retry against this same downloaded file
+            artifactDownloader.deleteDownloadedFile(downloaded.filePath)
             UpdateAllOutcome(app, succeeded = true)
         } else {
             UpdateAllOutcome(app, succeeded = false, reason = failure?.reason ?: "Installation did not complete")

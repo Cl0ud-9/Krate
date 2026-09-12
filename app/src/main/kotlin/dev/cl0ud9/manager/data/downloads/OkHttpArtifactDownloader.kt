@@ -30,6 +30,10 @@ private const val DEFAULT_MIN_FREE_BYTES = 50L * BYTES_PER_MB
 
 // streams the artifact to a resumable .part file, then verifies hash + certificate + package name before
 // handing back a ready-to-install path, section 19, 42.5, 42.6, 42.9 of the spec
+// one cohesive responsibility (managing downloaded artifacts end to end: download, verify, and now
+// also clean up), just with more than detekt's default function-count threshold of small, single-
+// purpose steps - splitting it up would fragment that cohesion rather than clarify it
+@Suppress("TooManyFunctions")
 class OkHttpArtifactDownloader(
     private val downloadsDir: File,
     private val archiveReader: ApkArchiveReader,
@@ -71,6 +75,15 @@ class OkHttpArtifactDownloader(
             partFile.delete()
             emit(DownloadStatus.ReadyToInstall(readyFile.absolutePath))
         }.flowOn(Dispatchers.IO)
+
+    override fun deleteDownloadedFile(filePath: String) {
+        File(filePath).delete()
+    }
+
+    override fun clearCache(): Long {
+        val files = downloadsDir.listFiles() ?: return 0L
+        return files.sumOf { file -> file.length().also { file.delete() } }
+    }
 
     // returns a user-facing failure message, or null on success
     private suspend fun runDownload(

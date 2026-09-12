@@ -130,7 +130,12 @@ class AppDetailsViewModel(
         viewModelScope.launch {
             flow.collect { status ->
                 mutableInstallStatus.value = status
-                if (status is InstallStatus.Success) refresh()
+                if (status is InstallStatus.Success) {
+                    // the downloaded apk is redundant once PackageInstaller has actually committed it -
+                    // not deleted on failure, since a retry reuses this same file instead of re-downloading
+                    readyDownload()?.let { artifactDownloader.deleteDownloadedFile(it.filePath) }
+                    refresh()
+                }
             }
         }
     }
