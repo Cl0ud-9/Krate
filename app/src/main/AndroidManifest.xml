@@ -12,6 +12,8 @@
          time - a static <queries> allowlist can't cover that; this is the same justification
          F-Droid/Aurora Store use, section 13 of the spec -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+    <!-- requested during first-run onboarding on Android 13+, amendment 44.4 of the spec -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".ManagerApplication"

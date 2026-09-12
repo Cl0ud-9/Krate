@@ -20,8 +20,16 @@ class DataStoreSettingsRepository(
         context.settingsDataStore.edit { prefs -> prefs[AUTOMATIC_DOWNLOADS] = enabled }
     }
 
+    override fun observeOnboardingCompleted(): Flow<Boolean> =
+        context.settingsDataStore.data.map { prefs -> prefs[ONBOARDING_COMPLETED] ?: false }
+
+    override suspend fun setOnboardingCompleted() {
+        context.settingsDataStore.edit { prefs -> prefs[ONBOARDING_COMPLETED] = true }
+    }
+
     private companion object {
         // default ON per section 42.4 of the spec
         val AUTOMATIC_DOWNLOADS = booleanPreferencesKey("automatic_downloads")
+        val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     }
 }
