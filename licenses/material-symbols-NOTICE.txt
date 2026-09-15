@@ -10,12 +10,21 @@ for the filename:
 
   ic_nav_home_outline.xml     <- home/materialsymbolsrounded/home_24px.xml
   ic_nav_home_filled.xml      <- home/materialsymbolsrounded/home_fill1_24px.xml
-  ic_nav_apps_outline.xml     <- apps/materialsymbolsrounded/apps_24px.xml
-  ic_nav_apps_filled.xml      <- apps/materialsymbolsrounded/apps_fill1_24px.xml
-  ic_nav_update_outline.xml   <- update/materialsymbolsrounded/update_24px.xml
-  ic_nav_update_filled.xml    <- update/materialsymbolsrounded/update_fill1_24px.xml
+  ic_nav_apps_outline.xml     <- grid_view/materialsymbolsrounded/grid_view_24px.xml
+  ic_nav_apps_filled.xml      <- grid_view/materialsymbolsrounded/grid_view_fill1_24px.xml
+  ic_nav_update_outline.xml   <- download_for_offline/materialsymbolsrounded/download_for_offline_24px.xml
+  ic_nav_update_filled.xml    <- download_for_offline/materialsymbolsrounded/download_for_offline_fill1_24px.xml
   ic_nav_settings_outline.xml <- settings/materialsymbolsrounded/settings_24px.xml
   ic_nav_settings_filled.xml  <- settings/materialsymbolsrounded/settings_fill1_24px.xml
+  ic_refresh_rounded.xml      <- refresh/materialsymbolsrounded/refresh_24px.xml
+  ic_newspaper_rounded.xml    <- newspaper/materialsymbolsrounded/newspaper_24px.xml
+
+Note: apps_24px/apps_fill1_24px were used for ic_nav_apps_* and update_24px/update_fill1_24px
+for ic_nav_update_* originally, but Google's own outline/fill1 variants of those two glyphs are
+byte-identical at the source (their FILL axis has no visual effect on a dot-grid or clock-arrow
+shape), so the selected/unselected nav states never looked different for those two tabs. Swapped
+to grid_view, then to download_for_offline for the Updates tab specifically (system_update was
+tried in between but read as cluttered at 24dp) - both have distinct outline/fill1 art.
 
 Used for the bottom navigation bar's icon set (dev.cl0ud9.manager.ui.navigation.NavIcon /
 ManagerDestination), for a consistent Material Symbols Rounded icon style.

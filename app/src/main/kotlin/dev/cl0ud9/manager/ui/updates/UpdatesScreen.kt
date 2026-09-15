@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,9 +27,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.platform.workers.UpdateNotifier
 import dev.cl0ud9.manager.ui.components.AppListItem
 import dev.cl0ud9.manager.ui.components.EmptyState
+import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
+import dev.cl0ud9.manager.ui.util.rememberDebouncedOnClick
 
 // pending updates with individual actions plus Update All, section 30 + 23/42.21 of the spec
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -63,7 +64,7 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
 
     // pending updates are the most time-sensitive data in the app - a stale manifest here directly
     // means a missed update, so this is the highest-value place for pull-to-refresh
-    PullToRefreshBox(
+    ManagerPullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = viewModel::refreshFromNetwork,
         modifier = Modifier.fillMaxSize(),
@@ -118,7 +119,7 @@ private fun UpdatesContent(
                         UpdateAllBar(
                             state = updateAllState,
                             pendingCount = state.apps.size,
-                            onStart = viewModel::startUpdateAll,
+                            onStart = rememberDebouncedOnClick(onClick = viewModel::startUpdateAll),
                             onDismissResult = viewModel::dismissUpdateAllResult,
                         )
                     }

@@ -1,6 +1,5 @@
 package dev.cl0ud9.manager.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -18,30 +17,47 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.cl0ud9.manager.ui.navigation.NavIcon
-import dev.cl0ud9.manager.ui.theme.ShapeCache
 
-private val NAV_ICON_SIZE = 24.dp
-private const val ICON_SCALE_SELECTED = 1.1f
-private const val FAST_FADE_MS = 120
+// the selection pill only ever bounds the icon; the label sits below it, unpilled, animating its own color/weight
+private val IndicatorWidth = 64.dp
+private val IndicatorHeight = 32.dp
+private val IconWidth = 48.dp
+private val IconHeight = 24.dp
+private val IndicatorShape = RoundedCornerShape(16.dp)
+private val IconShape = RoundedCornerShape(12.dp)
 private const val COLOR_FADE_MS = 150
+private const val PILL_ENTER_FADE_MS = 100
+private const val PILL_EXIT_MS = 100
+private const val ICON_SCALE_SELECTED = 1.1f
 
-// the selected indicator now wraps icon AND label together as one capsule, not just the icon with
-// a bare label floating below it - so the
-// selected tab is a single rounded shape around the whole icon+label group
+@Suppress("LongParameterList")
 @Composable
 fun RowScope.ManagerNavigationBarItem(
     selected: Boolean,
@@ -49,58 +65,89 @@ fun RowScope.ManagerNavigationBarItem(
     icon: NavIcon,
     label: String,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
-    val selectedColor = MaterialTheme.colorScheme.onSecondaryContainer
+    val selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer
+    val selectedTextColor = MaterialTheme.colorScheme.onSurface
     val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) selectedColor else unselectedColor,
+    val iconColor by animateColorAsState(
+        targetValue = if (selected) selectedIconColor else unselectedColor,
         animationSpec = tween(COLOR_FADE_MS),
-        label = "navItemColor",
+        label = "iconColor",
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (selected) selectedTextColor else unselectedColor,
+        animationSpec = tween(COLOR_FADE_MS),
+        label = "textColor",
     )
     val iconScale by animateFloatAsState(
         targetValue = if (selected) ICON_SCALE_SELECTED else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "navIconScale",
+        label = "iconScale",
     )
 
-    // no ripple at all, by design - a generic ripple either flashes as an unclipped square across the
-    // whole tab (unbounded) or, bounded to the pill, reads as a slow, deliberate scale because its
-    // animation duration is fixed regardless of target size. The pill fade+scale-in and icon bounce
-    // below already give this item its own tuned press/selection feedback; a ripple on top is redundant
-    // at best and fights those animations at worst
+    // no ripple - the pill fade+scale-in and icon bounce already carry the press/selection feedback
     val interactionSource = remember { MutableInteractionSource() }
 
-    Box(
-        modifier = modifier.weight(1f).padding(horizontal = 4.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center,
+    Column(
+        modifier =
+            modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clickable(
+                    onClick = onClick,
+                    role = Role.Tab,
+                    interactionSource = interactionSource,
+                    indication = null,
+                ).semantics { contentDescription = label },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        NavItemPill(selected = selected)
-        NavItemContent(
-            icon = icon,
-            label = label,
-            visualState = NavItemVisualState(contentColor, iconScale),
-            interactionSource = interactionSource,
-            onClick = onClick,
-        )
+        NavItemIcon(selected = selected, icon = icon, iconColor = iconColor, iconScale = iconScale)
+        if (!compact) {
+            Spacer(modifier = Modifier.height(4.dp))
+            NavItemLabel(label = label, textColor = textColor, selected = selected)
+        }
     }
 }
 
-// bundles the two animated visual values NavItemContent needs, purely to keep that function's
-// parameter list short - not a meaningful domain concept on its own
-private data class NavItemVisualState(
-    val contentColor: Color,
-    val iconScale: Float,
-)
+// icon + its indicator pill, boxed to a fixed size so the pill never grows to match the label below it
+@Composable
+private fun NavItemIcon(
+    selected: Boolean,
+    icon: NavIcon,
+    iconColor: Color,
+    iconScale: Float,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(IndicatorWidth, IndicatorHeight),
+    ) {
+        NavItemPill(selected = selected)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier =
+                Modifier
+                    .size(IconWidth, IconHeight)
+                    .clip(IconShape)
+                    .graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                    },
+        ) {
+            CompositionLocalProvider(LocalContentColor provides iconColor) {
+                NavIcon(icon = icon, contentDescription = null, size = IconHeight)
+            }
+        }
+    }
+}
 
-// the capsule behind icon+label, fading and springing in/out as selection changes - matchParentSize
-// makes it fill exactly whatever size NavItemContent's own padding settles on, so the two never drift
 @Composable
 private fun BoxScope.NavItemPill(selected: Boolean) {
-    AnimatedVisibility(
+    androidx.compose.animation.AnimatedVisibility(
         visible = selected,
-        modifier = Modifier.matchParentSize(),
         enter =
-            fadeIn(animationSpec = tween(FAST_FADE_MS)) +
+            fadeIn(animationSpec = tween(PILL_ENTER_FADE_MS)) +
                 scaleIn(
                     animationSpec =
                         spring(
@@ -108,49 +155,38 @@ private fun BoxScope.NavItemPill(selected: Boolean) {
                             stiffness = Spring.StiffnessLow,
                         ),
                 ),
-        exit = fadeOut(animationSpec = tween(FAST_FADE_MS)) + scaleOut(animationSpec = tween(FAST_FADE_MS)),
+        exit = fadeOut(animationSpec = tween(PILL_EXIT_MS)) + scaleOut(animationSpec = tween(PILL_EXIT_MS)),
     ) {
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(color = MaterialTheme.colorScheme.secondaryContainer, shape = ShapeCache.smooth20),
+                    .padding(horizontal = 4.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = IndicatorShape,
+                    ),
         )
     }
 }
 
+// always shown - color/weight just animate with selection, like the icon does
 @Composable
-private fun NavItemContent(
-    icon: NavIcon,
+private fun NavItemLabel(
     label: String,
-    visualState: NavItemVisualState,
-    interactionSource: MutableInteractionSource,
-    onClick: () -> Unit,
+    textColor: Color,
+    selected: Boolean,
 ) {
-    val (contentColor, iconScale) = visualState
-    Column(
-        modifier =
-            Modifier
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = onClick,
-                    role = Role.Tab,
-                ).padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        NavIcon(
-            icon = icon,
-            contentDescription = label,
-            size = NAV_ICON_SIZE,
-            tint = contentColor,
-            modifier =
-                Modifier.graphicsLayer {
-                    scaleX = iconScale
-                    scaleY = iconScale
-                },
-        )
-        Text(text = label, style = MaterialTheme.typography.labelMedium.copy(color = contentColor))
+    Box(modifier = Modifier.padding(top = 4.dp)) {
+        ProvideTextStyle(
+            value =
+                MaterialTheme.typography.labelMedium.copy(
+                    color = textColor,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                ),
+        ) {
+            Text(label)
+        }
     }
 }

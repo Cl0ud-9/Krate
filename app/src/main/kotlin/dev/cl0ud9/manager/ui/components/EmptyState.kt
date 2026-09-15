@@ -1,6 +1,7 @@
 package dev.cl0ud9.manager.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -21,6 +22,7 @@ fun EmptyState(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null,
 ) {
     Column(
         modifier = modifier.fillMaxSize().padding(32.dp),
@@ -46,5 +48,8 @@ fun EmptyState(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 4.dp),
         )
+        if (action != null) {
+            Box(modifier = Modifier.padding(top = 20.dp)) { action() }
+        }
     }
 }

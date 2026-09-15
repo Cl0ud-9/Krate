@@ -26,7 +26,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -41,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
+import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
 import dev.cl0ud9.manager.ui.components.ManagerUpdateAnnouncementDialog
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.StatTile
@@ -80,7 +80,7 @@ fun HomeScreen(onNavigateToUpdates: () -> Unit) {
     // the counts on this screen are derived from the same catalog data Apps/Updates show, so a stale
     // manifest shows up here first - refreshFromNetwork() shares its result with every other screen
     // via the catalog repository's cache, so this pull is never wasted even if the user never leaves Home
-    PullToRefreshBox(
+    ManagerPullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = viewModel::refreshFromNetwork,
         modifier = Modifier.fillMaxSize(),
