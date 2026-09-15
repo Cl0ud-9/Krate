@@ -1,6 +1,7 @@
 package dev.cl0ud9.manager.ui.details
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
@@ -26,7 +26,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.domain.model.AppProfile
@@ -45,16 +45,20 @@ import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.ui.components.AppIconAvatar
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.SupportStatusBadge
+import dev.cl0ud9.manager.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.formatMarkdownLite
 import dev.cl0ud9.manager.ui.util.managerViewModel
+import dev.cl0ud9.manager.ui.util.rememberDebouncedOnClick
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppDetailsScreen(
     appId: String,
     onNavigateToApp: (String) -> Unit,
+    scrollState: ScrollState,
+    topContentPadding: Dp,
 ) {
     val viewModel =
         managerViewModel { container ->
@@ -74,21 +78,18 @@ fun AppDetailsScreen(
     val dependencies by viewModel.dependencies.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
     val installStatus by viewModel.installStatus.collectAsStateWithLifecycle()
-    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
-
     val currentApp = app
-    // a single-app manifest entry can also change server-side (new version, updated release notes),
-    // so this screen shares the same pull-to-refresh path as the catalog list screens
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = viewModel::refreshFromNetwork,
-        modifier = Modifier.fillMaxSize(),
-    ) {
+    // no pull-to-refresh here - RefreshOnResume above already re-checks this one app whenever the
+    // screen comes back into view, so a swipe gesture on top of that was a redundant second trigger
+    Box(modifier = Modifier.fillMaxSize()) {
         if (currentApp == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 LoadingIndicator()
             }
         } else {
+            // each is already idempotent in the ViewModel (isBusy()/status guards a second call
+            // while one is running) - this debounce just stops a fast double-tap from reaching that
+            // guard's race window at all
             AppDetailsContent(
                 state =
                     AppDetailsUiState(
@@ -98,10 +99,12 @@ fun AppDetailsScreen(
                         downloadStatus = downloadStatus,
                         installStatus = installStatus,
                     ),
-                onDownload = viewModel::startDownload,
-                onInstall = viewModel::startInstall,
-                onRetryAsCleanInstall = viewModel::retryAsCleanInstall,
+                onDownload = rememberDebouncedOnClick(onClick = viewModel::startDownload),
+                onInstall = rememberDebouncedOnClick(onClick = viewModel::startInstall),
+                onRetryAsCleanInstall = rememberDebouncedOnClick(onClick = viewModel::retryAsCleanInstall),
                 onNavigateToApp = onNavigateToApp,
+                scrollState = scrollState,
+                topContentPadding = topContentPadding,
             )
         }
     }
@@ -116,6 +119,7 @@ internal data class AppDetailsUiState(
     val installStatus: InstallStatus,
 )
 
+@Suppress("LongParameterList")
 @Composable
 private fun AppDetailsContent(
     state: AppDetailsUiState,
@@ -123,10 +127,16 @@ private fun AppDetailsContent(
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
     onNavigateToApp: (String) -> Unit,
+    scrollState: ScrollState,
+    topContentPadding: Dp,
 ) {
     val app = state.app
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(top = topContentPadding + DetailContentTopGap, start = 20.dp, end = 20.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // one compact header block instead of three stacked rows (name/package, badge/version,

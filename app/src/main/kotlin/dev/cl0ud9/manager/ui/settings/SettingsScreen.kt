@@ -5,15 +5,19 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -36,15 +40,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
+import dev.cl0ud9.manager.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.manager.ui.theme.ShapeCache
+import dev.cl0ud9.manager.ui.util.DebouncedButtonState
 import dev.cl0ud9.manager.ui.util.managerViewModel
+import dev.cl0ud9.manager.ui.util.rememberDebouncedButtonState
 
 // a flowing list of icon-badged category rows (badge + title + subtitle, expanding into the row's
 // own controls) instead of plain text blocks inside flat cards, so settings feel
@@ -52,7 +61,11 @@ import dev.cl0ud9.manager.ui.util.managerViewModel
 // so this keeps that honest scale rather than inventing categories we don't have
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    scrollState: ScrollState,
+    topContentPadding: Dp,
+    onNavigateToAppearance: () -> Unit,
+) {
     val viewModel =
         managerViewModel { container ->
             SettingsViewModel(
@@ -62,36 +75,64 @@ fun SettingsScreen() {
             )
         }
     val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
-    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-    val navBarStyle by viewModel.navBarStyle.collectAsStateWithLifecycle()
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     val managerUpdateState by viewModel.managerUpdateState.collectAsStateWithLifecycle()
     val versionName = rememberVersionName()
+    // both actions are already idempotent in the ViewModel itself (a second call while one is
+    // still running is a no-op) - this debounce is the UI-side half of that: the button itself goes
+    // disabled for the cooldown, so a fast repeat tap can't stack a second ripple on top of the
+    // first one still playing, on top of never reaching the ViewModel a second time either
+    val clearCacheState = rememberDebouncedButtonState(onClick = viewModel::clearCache)
+    val checkForUpdateState = rememberDebouncedButtonState(onClick = viewModel::checkForManagerUpdate)
 
+    // one continuous grouped list (2dp seams, square-ish touching corners) instead of four
+    // separately-floating cards - settingsGroupShape needs each row's position in the group.
+    // scrollState/topContentPadding come from the shared collapsing header this screen is hosted
+    // in - without that top space, the heading would sit on top of the Appearance row instead of
+    // sliding away above it
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(top = topContentPadding + DetailContentTopGap, start = 16.dp, end = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         AppearanceRow(
-            themeMode = themeMode,
-            onThemeModeChange = viewModel::setThemeMode,
-            navBarStyle = navBarStyle,
-            onNavBarStyleChange = viewModel::setNavBarStyle,
+            onClick = onNavigateToAppearance,
+            shape = settingsGroupShape(APPEARANCE_ROW_INDEX, SETTINGS_ROW_COUNT),
         )
-        AutomaticDownloadsRow(checked = automaticDownloads, onCheckedChange = viewModel::setAutomaticDownloads)
-        StorageRow(cacheClearedMessage = cacheClearedMessage, onClearCache = viewModel::clearCache)
+        AutomaticDownloadsRow(
+            checked = automaticDownloads,
+            onCheckedChange = viewModel::setAutomaticDownloads,
+            shape = settingsGroupShape(AUTOMATIC_DOWNLOADS_ROW_INDEX, SETTINGS_ROW_COUNT),
+        )
+        StorageRow(
+            cacheClearedMessage = cacheClearedMessage,
+            clearCacheState = clearCacheState,
+            shape = settingsGroupShape(STORAGE_ROW_INDEX, SETTINGS_ROW_COUNT),
+        )
         AboutRow(
             versionName = versionName,
             managerUpdateState = managerUpdateState,
-            onCheck = viewModel::checkForManagerUpdate,
+            checkForUpdateState = checkForUpdateState,
+            shape = settingsGroupShape(ABOUT_ROW_INDEX, SETTINGS_ROW_COUNT),
         )
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
+
+private const val APPEARANCE_ROW_INDEX = 0
+private const val AUTOMATIC_DOWNLOADS_ROW_INDEX = 1
+private const val STORAGE_ROW_INDEX = 2
+private const val ABOUT_ROW_INDEX = 3
+private const val SETTINGS_ROW_COUNT = 4
 
 @Composable
 private fun AutomaticDownloadsRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    shape: Shape,
 ) {
     SettingsRow(
         header =
@@ -101,6 +142,7 @@ private fun AutomaticDownloadsRow(
                 subtitle = "Download updates in the background. Installing always needs your confirmation.",
                 colors = defaultSettingsRowColors(),
             ),
+        shape = shape,
         trailing = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
     )
 }
@@ -108,7 +150,8 @@ private fun AutomaticDownloadsRow(
 @Composable
 private fun StorageRow(
     cacheClearedMessage: String?,
-    onClearCache: () -> Unit,
+    clearCacheState: DebouncedButtonState,
+    shape: Shape,
 ) {
     SettingsRow(
         header =
@@ -122,8 +165,9 @@ private fun StorageRow(
                         MaterialTheme.colorScheme.onTertiaryContainer,
                     ),
             ),
+        shape = shape,
     ) {
-        StorageRowContent(cacheClearedMessage = cacheClearedMessage, onClearCache = onClearCache)
+        StorageRowContent(cacheClearedMessage = cacheClearedMessage, clearCacheState = clearCacheState)
     }
 }
 
@@ -134,7 +178,8 @@ private fun StorageRow(
 private fun AboutRow(
     versionName: String,
     managerUpdateState: ManagerUpdateUiState,
-    onCheck: () -> Unit,
+    checkForUpdateState: DebouncedButtonState,
+    shape: Shape,
 ) {
     SettingsRow(
         header =
@@ -148,13 +193,14 @@ private fun AboutRow(
                         MaterialTheme.colorScheme.onSecondaryContainer,
                     ),
             ),
+        shape = shape,
     ) {
         Text(
             text = "Manager updates",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        ManagerUpdateSection(state = managerUpdateState, onCheck = onCheck)
+        ManagerUpdateSection(state = managerUpdateState, checkForUpdateState = checkForUpdateState)
     }
 }
 
@@ -170,9 +216,13 @@ private fun rememberVersionName(): String {
 @Composable
 private fun StorageRowContent(
     cacheClearedMessage: String?,
-    onClearCache: () -> Unit,
+    clearCacheState: DebouncedButtonState,
 ) {
-    OutlinedButton(onClick = onClearCache, modifier = Modifier.fillMaxWidth()) {
+    OutlinedButton(
+        onClick = clearCacheState.onClick,
+        enabled = clearCacheState.enabled,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Text("Clear download cache")
     }
     if (cacheClearedMessage != null) {
@@ -193,7 +243,7 @@ private const val STATE_FADE_MS = 220
 @Composable
 private fun ManagerUpdateSection(
     state: ManagerUpdateUiState,
-    onCheck: () -> Unit,
+    checkForUpdateState: DebouncedButtonState,
 ) {
     AnimatedContent(
         targetState = state,
@@ -201,8 +251,9 @@ private fun ManagerUpdateSection(
         transitionSpec = {
             fadeIn(tween(STATE_FADE_MS)) togetherWith fadeOut(tween(STATE_FADE_MS))
         },
+        modifier = Modifier.fillMaxWidth(),
     ) { animatedState ->
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when (animatedState) {
                 is ManagerUpdateUiState.Idle -> {
                     ManagerUpdateStatusRow(
@@ -211,7 +262,11 @@ private fun ManagerUpdateSection(
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         text = "Check GitHub for a newer release of the manager itself.",
                     )
-                    OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = checkForUpdateState.onClick,
+                        enabled = checkForUpdateState.enabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text("Check for updates")
                     }
                 }
@@ -238,7 +293,7 @@ private fun ManagerUpdateSection(
                 is ManagerUpdateUiState.Result ->
                     ManagerUpdateResultContent(
                         status = animatedState.status,
-                        onCheck = onCheck,
+                        checkForUpdateState = checkForUpdateState,
                     )
             }
         }
@@ -248,7 +303,7 @@ private fun ManagerUpdateSection(
 @Composable
 private fun ManagerUpdateResultContent(
     status: ManagerUpdateStatus,
-    onCheck: () -> Unit,
+    checkForUpdateState: DebouncedButtonState,
 ) {
     val uriHandler = LocalUriHandler.current
     when (status) {
@@ -259,9 +314,7 @@ private fun ManagerUpdateResultContent(
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 text = "You're on the latest version.",
             )
-            OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth()) {
-                Text("Check again")
-            }
+            CheckAgainButton(state = checkForUpdateState)
         }
 
         is ManagerUpdateStatus.UpdateAvailable -> {
@@ -284,9 +337,7 @@ private fun ManagerUpdateResultContent(
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 text = "No manager releases have been published yet.",
             )
-            OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth()) {
-                Text("Check again")
-            }
+            CheckAgainButton(state = checkForUpdateState)
         }
 
         is ManagerUpdateStatus.Failed -> {
@@ -296,10 +347,20 @@ private fun ManagerUpdateResultContent(
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 text = status.reason,
             )
-            OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth()) {
-                Text("Retry")
-            }
+            CheckAgainButton(state = checkForUpdateState, label = "Retry")
         }
+    }
+}
+
+// the same debounced retry action under three different labels - only the wording differs, so this
+// is the one place the button/enabled/fillMaxWidth wiring for it needs to be written out
+@Composable
+private fun CheckAgainButton(
+    state: DebouncedButtonState,
+    label: String = "Check again",
+) {
+    OutlinedButton(onClick = state.onClick, enabled = state.enabled, modifier = Modifier.fillMaxWidth()) {
+        Text(label)
     }
 }
 

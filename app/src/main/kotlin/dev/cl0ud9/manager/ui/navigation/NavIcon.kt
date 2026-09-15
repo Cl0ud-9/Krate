@@ -3,6 +3,7 @@ package dev.cl0ud9.manager.ui.navigation
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,7 +34,10 @@ fun NavIcon(
     contentDescription: String?,
     size: Dp,
     modifier: Modifier = Modifier,
-    tint: Color = Color.Unspecified,
+    // the drawables' own fillColor is a placeholder white so they show up in a plain XML preview -
+    // defaulting to the current content color (not Unspecified) is what actually makes them follow
+    // the caller's tint instead of always rendering that placeholder white regardless of theme
+    tint: Color = LocalContentColor.current,
 ) {
     when (icon) {
         is NavIcon.Vector ->
