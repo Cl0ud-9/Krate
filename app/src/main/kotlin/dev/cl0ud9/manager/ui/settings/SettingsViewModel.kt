@@ -3,6 +3,8 @@ package dev.cl0ud9.manager.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
+import dev.cl0ud9.manager.data.settings.DEFAULT_NAV_BAR_CORNER_RADIUS
+import dev.cl0ud9.manager.domain.model.LaunchTab
 import dev.cl0ud9.manager.domain.model.NavBarStyle
 import dev.cl0ud9.manager.domain.model.ThemeMode
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
@@ -27,6 +29,7 @@ sealed interface ManagerUpdateUiState {
     ) : ManagerUpdateUiState
 }
 
+@Suppress("TooManyFunctions")
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
     private val artifactDownloader: ArtifactDownloader,
@@ -47,6 +50,31 @@ class SettingsViewModel(
             .observeNavBarStyle()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), NavBarStyle.FLOATING_PILL)
 
+    val navBarCornerRadius: StateFlow<Int> =
+        settingsRepository
+            .observeNavBarCornerRadius()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DEFAULT_NAV_BAR_CORNER_RADIUS)
+
+    val navBarCompactMode: StateFlow<Boolean> =
+        settingsRepository
+            .observeNavBarCompactMode()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    val useSmoothCorners: StateFlow<Boolean> =
+        settingsRepository
+            .observeUseSmoothCorners()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
+
+    val disableBlur: StateFlow<Boolean> =
+        settingsRepository
+            .observeDisableBlur()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    val defaultLaunchTab: StateFlow<LaunchTab> =
+        settingsRepository
+            .observeDefaultLaunchTab()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LaunchTab.HOME)
+
     private val mutableCacheClearedMessage = MutableStateFlow<String?>(null)
     val cacheClearedMessage: StateFlow<String?> = mutableCacheClearedMessage.asStateFlow()
 
@@ -63,6 +91,26 @@ class SettingsViewModel(
 
     fun setNavBarStyle(style: NavBarStyle) {
         viewModelScope.launch { settingsRepository.setNavBarStyle(style) }
+    }
+
+    fun setNavBarCornerRadius(radius: Int) {
+        viewModelScope.launch { settingsRepository.setNavBarCornerRadius(radius) }
+    }
+
+    fun setNavBarCompactMode(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setNavBarCompactMode(enabled) }
+    }
+
+    fun setUseSmoothCorners(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setUseSmoothCorners(enabled) }
+    }
+
+    fun setDisableBlur(disabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setDisableBlur(disabled) }
+    }
+
+    fun setDefaultLaunchTab(tab: LaunchTab) {
+        viewModelScope.launch { settingsRepository.setDefaultLaunchTab(tab) }
     }
 
     // amendment 44.2 of the spec: a manual, user-initiated check against the manager's own GitHub
