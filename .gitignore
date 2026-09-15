@@ -14,6 +14,7 @@
 google-services.json
 /app/build/
 /app/release/
+/baselineprofile/build/
 .kotlin/
 __pycache__/
 *.pyc

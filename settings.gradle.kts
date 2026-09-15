@@ -18,3 +18,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "manager"
 include(":app")
+include(":baselineprofile")
