@@ -1,5 +1,6 @@
 package dev.cl0ud9.manager.data.downloads
 
+import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.DownloadStatus
@@ -113,7 +114,7 @@ class OkHttpArtifactDownloaderTest {
         val dir = tempFolder.newFolder()
         val target = File(dir, "target.apk").apply { writeText("bytes") }
         val other = File(dir, "other.apk").apply { writeText("bytes") }
-        val downloader = OkHttpArtifactDownloader(downloadsDir = dir, archiveReader = FakeArchiveReader("x", "y"))
+        val downloader = downloaderWithReader(FakeArchiveReader("x", "y"), dir)
 
         downloader.deleteDownloadedFile(target.absolutePath)
 
@@ -126,7 +127,7 @@ class OkHttpArtifactDownloaderTest {
         val dir = tempFolder.newFolder()
         val first = File(dir, "first.apk").apply { writeBytes(ByteArray(10)) }
         val second = File(dir, "second.apk").apply { writeBytes(ByteArray(20)) }
-        val downloader = OkHttpArtifactDownloader(downloadsDir = dir, archiveReader = FakeArchiveReader("x", "y"))
+        val downloader = downloaderWithReader(FakeArchiveReader("x", "y"), dir)
 
         val bytesFreed = downloader.clearCache()
 
@@ -138,7 +139,7 @@ class OkHttpArtifactDownloaderTest {
     @Test
     fun `clearCache on an empty or missing downloads dir frees nothing`() {
         val dir = File(tempFolder.newFolder(), "never-created")
-        val downloader = OkHttpArtifactDownloader(downloadsDir = dir, archiveReader = FakeArchiveReader("x", "y"))
+        val downloader = downloaderWithReader(FakeArchiveReader("x", "y"), dir)
 
         assertEquals(0L, downloader.clearCache())
     }
@@ -150,8 +151,11 @@ class OkHttpArtifactDownloaderTest {
         server.enqueue(MockResponse().setBody(Buffer().write(payload)))
     }
 
-    private fun downloaderWithReader(reader: ApkArchiveReader): OkHttpArtifactDownloader =
-        OkHttpArtifactDownloader(downloadsDir = tempFolder.newFolder(), archiveReader = reader)
+    private fun downloaderWithReader(
+        reader: ApkArchiveReader,
+        dir: File = tempFolder.newFolder(),
+    ): OkHttpArtifactDownloader =
+        OkHttpArtifactDownloader(downloadsDir = dir, archiveReader = reader, credentialStore = FakeCredentialStore())
 
     private fun appProfile(): AppProfile =
         AppProfile(
@@ -178,6 +182,16 @@ class OkHttpArtifactDownloaderTest {
     ) : ApkArchiveReader {
         override fun read(apkPath: String): ApkArchiveInfo =
             ApkArchiveInfo(packageName = packageName, certificateSha256Hex = certificateSha256Hex)
+    }
+
+    // none of these tests exercise a requiresAuth artifact, so a token is never needed - kept as a
+    // trivial no-op rather than a mock, since the downloader only ever calls getToken() here
+    private class FakeCredentialStore : GitHubCredentialStore {
+        override fun getToken(): String? = null
+
+        override fun setToken(token: String) = Unit
+
+        override fun clearToken() = Unit
     }
 
     private companion object {

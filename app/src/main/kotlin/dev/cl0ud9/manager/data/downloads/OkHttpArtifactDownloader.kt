@@ -1,6 +1,7 @@
 package dev.cl0ud9.manager.data.downloads
 
 import android.os.StatFs
+import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.DownloadStatus
@@ -37,6 +38,7 @@ private const val DEFAULT_MIN_FREE_BYTES = 50L * BYTES_PER_MB
 class OkHttpArtifactDownloader(
     private val downloadsDir: File,
     private val archiveReader: ApkArchiveReader,
+    private val credentialStore: GitHubCredentialStore,
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) : ArtifactDownloader {
     override fun download(app: AppProfile): Flow<DownloadStatus> =
@@ -46,18 +48,23 @@ class OkHttpArtifactDownloader(
                 emit(DownloadStatus.Failed("No downloadable artifact is available for this app yet."))
                 return@flow
             }
+            val token = credentialStore.getToken()
+            if (artifact.requiresAuth && token == null) {
+                emit(DownloadStatus.Failed("This app needs a GitHub access token - add one in Settings."))
+                return@flow
+            }
 
             downloadsDir.mkdirs()
             val partFile = File(downloadsDir, "${app.id}.apk.part")
             val readyFile = File(downloadsDir, "${app.id}.apk")
 
-            val preflightFailure = checkStoragePreflight(artifact)
+            val preflightFailure = checkStoragePreflight(artifact, token)
             if (preflightFailure != null) {
                 emit(DownloadStatus.Failed(preflightFailure))
                 return@flow
             }
 
-            val downloadFailure = runDownload(artifact, partFile, this)
+            val downloadFailure = runDownload(artifact, token, partFile, this)
             if (downloadFailure != null) {
                 emit(DownloadStatus.Failed(downloadFailure))
                 return@flow
@@ -88,14 +95,18 @@ class OkHttpArtifactDownloader(
     // returns a user-facing failure message, or null on success
     private suspend fun runDownload(
         artifact: ArtifactInfo,
+        token: String?,
         partFile: File,
         collector: FlowCollector<DownloadStatus>,
     ): String? =
-        runCatching { streamDownload(artifact, partFile, collector) }
+        runCatching { streamDownload(artifact, token, partFile, collector) }
             .fold(onSuccess = { null }, onFailure = { "Download failed: ${it.message ?: "network error"}" })
 
-    private fun checkStoragePreflight(artifact: ArtifactInfo): String? {
-        val contentLength = headContentLength(artifact.downloadUrl)
+    private fun checkStoragePreflight(
+        artifact: ArtifactInfo,
+        token: String?,
+    ): String? {
+        val contentLength = headContentLength(artifact, token)
         val required = ((contentLength ?: DEFAULT_MIN_FREE_BYTES) * STORAGE_SAFETY_MARGIN).toLong()
         val available = runCatching { StatFs(downloadsDir.path).availableBytes }.getOrDefault(Long.MAX_VALUE)
         if (available < required) {
@@ -106,29 +117,43 @@ class OkHttpArtifactDownloader(
         return null
     }
 
-    private fun headContentLength(url: String): Long? =
+    private fun headContentLength(
+        artifact: ArtifactInfo,
+        token: String?,
+    ): Long? =
         runCatching {
             httpClient
-                .newCall(
-                    Request
-                        .Builder()
-                        .url(url)
-                        .head()
-                        .build(),
-                ).execute()
+                .newCall(authorizedRequestBuilder(artifact, token).head().build())
+                .execute()
                 .use { response ->
                     response.header("Content-Length")?.toLongOrNull()
                 }
         }.getOrNull()
 
+    // a plain browser_download_url needs no headers, but a private/draft release asset's
+    // api.github.com URL only returns the actual binary (rather than JSON asset metadata) with both
+    // an authenticated request and this Accept header
+    private fun authorizedRequestBuilder(
+        artifact: ArtifactInfo,
+        token: String?,
+    ): Request.Builder {
+        val builder = Request.Builder().url(artifact.downloadUrl)
+        if (artifact.requiresAuth && token != null) {
+            builder.header("Authorization", "Bearer $token")
+            builder.header("Accept", "application/octet-stream")
+        }
+        return builder
+    }
+
     // streams the response body to the part file, resuming from its existing length when the server allows it
     private suspend fun streamDownload(
         artifact: ArtifactInfo,
+        token: String?,
         partFile: File,
         collector: FlowCollector<DownloadStatus>,
     ) {
         val existingBytes = if (partFile.exists()) partFile.length() else 0L
-        val requestBuilder = Request.Builder().url(artifact.downloadUrl)
+        val requestBuilder = authorizedRequestBuilder(artifact, token)
         if (existingBytes > 0) {
             requestBuilder.header("Range", "bytes=$existingBytes-")
         }

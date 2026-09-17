@@ -27,6 +27,7 @@ data class ManifestAppDto(
     val certificateSha256: String,
     val releaseNotes: String? = null,
     val enabled: Boolean = true,
+    val requiresAuth: Boolean = false,
 )
 
 fun ManifestAppDto.toDomain(): AppProfile =
@@ -48,5 +49,11 @@ fun ManifestAppDto.toDomain(): AppProfile =
         latestVersionName = latestVersionName,
         releaseNotes = releaseNotes,
         enabled = enabled,
-        artifact = ArtifactInfo(downloadUrl = downloadUrl, sha256 = sha256, certificateSha256 = certificateSha256),
+        artifact =
+            ArtifactInfo(
+                downloadUrl = downloadUrl,
+                sha256 = sha256,
+                certificateSha256 = certificateSha256,
+                requiresAuth = requiresAuth,
+            ),
     )

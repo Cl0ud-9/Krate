@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.profileinstaller)
+    implementation(libs.androidx.security.crypto)
 
     "baselineProfile"(project(":baselineprofile"))
 

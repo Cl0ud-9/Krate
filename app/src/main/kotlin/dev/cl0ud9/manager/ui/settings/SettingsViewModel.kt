@@ -2,6 +2,7 @@ package dev.cl0ud9.manager.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
 import dev.cl0ud9.manager.data.settings.DEFAULT_NAV_BAR_CORNER_RADIUS
 import dev.cl0ud9.manager.domain.model.LaunchTab
@@ -34,6 +35,7 @@ class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
     private val artifactDownloader: ArtifactDownloader,
     private val managerUpdateChecker: ManagerUpdateChecker,
+    private val githubCredentialStore: GitHubCredentialStore,
 ) : ViewModel() {
     val automaticDownloads: StateFlow<Boolean> =
         settingsRepository
@@ -80,6 +82,11 @@ class SettingsViewModel(
 
     private val mutableManagerUpdateState = MutableStateFlow<ManagerUpdateUiState>(ManagerUpdateUiState.Idle)
     val managerUpdateState: StateFlow<ManagerUpdateUiState> = mutableManagerUpdateState.asStateFlow()
+
+    // never surfaces the token value itself back to the UI, only whether one is currently saved -
+    // EncryptedSharedPreferences has no Flow of its own, so this is refreshed manually on set/clear
+    private val mutableHasGitHubToken = MutableStateFlow(githubCredentialStore.getToken() != null)
+    val hasGitHubToken: StateFlow<Boolean> = mutableHasGitHubToken.asStateFlow()
 
     fun setAutomaticDownloads(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setAutomaticDownloads(enabled) }
@@ -133,6 +140,19 @@ class SettingsViewModel(
             mutableCacheClearedMessage.value =
                 if (bytesFreed > 0) "Freed ${formatMb(bytesFreed)}." else "Cache is already empty."
         }
+    }
+
+    // read only by artifacts whose manifest entry is requiresAuth (currently just Videoapp Patched,
+    // hosted as a private release asset) - a read-only "Contents" token scoped to this one repo is
+    // all it ever needs
+    fun setGitHubToken(token: String) {
+        githubCredentialStore.setToken(token)
+        mutableHasGitHubToken.value = true
+    }
+
+    fun clearGitHubToken() {
+        githubCredentialStore.clearToken()
+        mutableHasGitHubToken.value = false
     }
 
     private fun formatMb(bytes: Long): String = "%.1f MB".format(bytes / BYTES_PER_MB)

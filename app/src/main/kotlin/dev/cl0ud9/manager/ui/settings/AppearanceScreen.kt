@@ -47,6 +47,7 @@ fun AppearanceRoute(
                 container.settingsRepository,
                 container.artifactDownloader,
                 container.managerUpdateChecker,
+                container.githubCredentialStore,
             )
         }
     AppearanceScreen(

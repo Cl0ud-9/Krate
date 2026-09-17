@@ -72,11 +72,13 @@ fun SettingsScreen(
                 container.settingsRepository,
                 container.artifactDownloader,
                 container.managerUpdateChecker,
+                container.githubCredentialStore,
             )
         }
     val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     val managerUpdateState by viewModel.managerUpdateState.collectAsStateWithLifecycle()
+    val hasGitHubToken by viewModel.hasGitHubToken.collectAsStateWithLifecycle()
     val versionName = rememberVersionName()
     // both actions are already idempotent in the ViewModel itself (a second call while one is
     // still running is a no-op) - this debounce is the UI-side half of that: the button itself goes
@@ -112,6 +114,12 @@ fun SettingsScreen(
             clearCacheState = clearCacheState,
             shape = settingsGroupShape(STORAGE_ROW_INDEX, SETTINGS_ROW_COUNT),
         )
+        GitHubAccessRow(
+            hasToken = hasGitHubToken,
+            onSaveToken = viewModel::setGitHubToken,
+            onClearToken = viewModel::clearGitHubToken,
+            shape = settingsGroupShape(GITHUB_ACCESS_ROW_INDEX, SETTINGS_ROW_COUNT),
+        )
         AboutRow(
             versionName = versionName,
             managerUpdateState = managerUpdateState,
@@ -125,8 +133,9 @@ fun SettingsScreen(
 private const val APPEARANCE_ROW_INDEX = 0
 private const val AUTOMATIC_DOWNLOADS_ROW_INDEX = 1
 private const val STORAGE_ROW_INDEX = 2
-private const val ABOUT_ROW_INDEX = 3
-private const val SETTINGS_ROW_COUNT = 4
+private const val GITHUB_ACCESS_ROW_INDEX = 3
+private const val ABOUT_ROW_INDEX = 4
+private const val SETTINGS_ROW_COUNT = 5
 
 @Composable
 private fun AutomaticDownloadsRow(

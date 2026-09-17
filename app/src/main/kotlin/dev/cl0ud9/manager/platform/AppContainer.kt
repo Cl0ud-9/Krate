@@ -2,6 +2,8 @@ package dev.cl0ud9.manager.platform
 
 import android.content.Context
 import dev.cl0ud9.manager.data.activity.DataStoreActivityLogRepository
+import dev.cl0ud9.manager.data.auth.EncryptedGitHubCredentialStore
+import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.data.catalog.AssetCatalogRepository
 import dev.cl0ud9.manager.data.catalog.RemoteCatalogRepository
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
@@ -30,10 +32,12 @@ class AppContainer(
     val catalogRepository: CatalogRepository =
         RemoteCatalogRepository(context.applicationContext, fallback = seedCatalogRepository)
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.applicationContext)
+    val githubCredentialStore: GitHubCredentialStore = EncryptedGitHubCredentialStore(context.applicationContext)
     val artifactDownloader: ArtifactDownloader =
         OkHttpArtifactDownloader(
             downloadsDir = File(context.applicationContext.cacheDir, "downloads"),
             archiveReader = PackageManagerApkArchiveReader(context.applicationContext),
+            credentialStore = githubCredentialStore,
         )
     val installationEngine: InstallationEngine = PackageInstallerEngine(context.applicationContext)
     val installedPackageReader: InstalledPackageReader =
