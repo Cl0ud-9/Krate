@@ -44,3 +44,29 @@ openssl pkey -in manifest-signing.key -pubout -out manifest-signing.pub
 ```
 
 Keep `manifest-signing.key` as a CI secret (`MANIFEST_SIGNING_KEY`), never commit it. The public key (`manifest-signing.pub`) gets baked into the app as a resource - that one's fine to commit once Phase 2 wires it in.
+
+## 4. GitHub access token (needed to install the Videoapp Patched catalog entry)
+
+Its build is published as a private draft release (see `patched/README.md` for why), so the app
+needs an authenticated request to fetch it - a plain download URL won't work for a draft asset.
+Create a fine-grained personal access token scoped to just this repo with read-only "Contents"
+access (github.com -> Settings -> Developer settings -> Fine-grained tokens), then paste it into
+the app's own Settings > GitHub access. This is a per-installer credential entered in the app
+itself, not a CI secret - skip this section entirely if you don't plan to install that entry.
+
+## 5. Patched signing keystore (needed for `.github/workflows/patched-videoapp.yml`)
+
+Reuses your own Patched Manager keystore rather than minting a new one, so anything this pipeline
+signs stays update-compatible with anything you've already installed through Patched Manager
+itself. Export it from the Patched Manager app (Settings -> Import & export -> Keystore ->
+Export), note its alias and both passwords from the same screen, then:
+
+```
+base64 -w0 patched-manager.keystore > patched-manager.keystore.b64
+gh secret set PATCHED_KEYSTORE_BASE64 < patched-manager.keystore.b64
+gh secret set PATCHED_KEYSTORE_PASSWORD
+gh secret set PATCHED_KEY_ALIAS
+gh secret set PATCHED_KEY_PASSWORD
+```
+
+Delete `patched-manager.keystore.b64` locally once uploaded.

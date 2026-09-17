@@ -42,6 +42,20 @@
         "assetPattern": "^microg-[0-9.]+-arm64-v8a\\.apk$",
         "includePrerelease": false
       }
+    },
+    {
+      "id": "videoapp-patched",
+      "displayName": "Videoapp (Patched)",
+      "packageName": "com.google.android.videoapp",
+      "supportStatus": "SUPPORTED",
+      "installationMode": "CLEAN_INSTALL",
+      "dependencyIds": ["microg-re"],
+      "enabled": true,
+      "source": {
+        "type": "self_draft_release",
+        "repo": "Cl0ud-9/manager",
+        "assetPattern": "^videoapp-patched-.*\\.apk$"
+      }
     }
   ]
 }

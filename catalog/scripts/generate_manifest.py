@@ -46,6 +46,17 @@ def pick_release(repo, include_prerelease):
     raise RuntimeError(f"no matching release found for {repo}")
 
 
+# videoapp-patched (so far the only self_draft_release source) is deliberately never published as a
+# public release - see the ADR note in patched/README.md - so this is the opposite filter of
+# pick_release: only drafts are eligible, and GitHub returns them newest-first already
+def pick_draft_release(repo):
+    releases = gh_get(f"/repos/{repo}/releases?per_page=20")
+    for release in releases:
+        if release.get("draft"):
+            return release
+    raise RuntimeError(f"no draft release found for {repo}")
+
+
 def pick_asset(release, pattern):
     regex = re.compile(pattern)
     for asset in release.get("assets", []):
@@ -54,8 +65,14 @@ def pick_asset(release, pattern):
     raise RuntimeError(f"no asset matching {pattern!r} in release {release['tag_name']}")
 
 
-def download(url, dest):
-    req = urllib.request.Request(url, headers={"Accept": "application/octet-stream"})
+def download(url, dest, authenticated=False):
+    headers = {"Accept": "application/octet-stream"}
+    if authenticated:
+        token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+        if not token:
+            raise RuntimeError("GH_TOKEN/GITHUB_TOKEN is required to download a private release asset")
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as out:
         shutil.copyfileobj(resp, out)
 
@@ -97,8 +114,7 @@ def certificate_sha256(apksigner_path, apk_path):
     return hashlib.sha256(openssl.stdout).hexdigest()
 
 
-def build_artifact(app, work_dir):
-    source = app["source"]
+def build_artifact_from_public_release(app, source, work_dir):
     release = pick_release(source["repo"], source["includePrerelease"])
     asset = pick_asset(release, source["assetPattern"])
 
@@ -111,8 +127,38 @@ def build_artifact(app, work_dir):
         "downloadUrl": asset["browser_download_url"],
         "sha256": sha256_of(apk_path),
         "certificateSha256": certificate_sha256(apksigner, apk_path),
+        "requiresAuth": False,
     }
     return artifact, release
+
+
+# our own repo's draft release rather than an upstream project's public one - the asset's
+# browser_download_url doesn't resolve for a draft even with auth, so the client (and this script,
+# for local verification) instead hits the authenticated REST asset endpoint
+def build_artifact_from_draft_release(app, source, work_dir):
+    release = pick_draft_release(source["repo"])
+    asset = pick_asset(release, source["assetPattern"])
+    asset_url = f"{GITHUB_API}/repos/{source['repo']}/releases/assets/{asset['id']}"
+
+    apk_path = work_dir / f"{app['id']}.apk"
+    download(asset_url, apk_path, authenticated=True)
+
+    apksigner = find_apksigner()
+    artifact = {
+        "versionName": release["tag_name"].lstrip("v"),
+        "downloadUrl": asset_url,
+        "sha256": sha256_of(apk_path),
+        "certificateSha256": certificate_sha256(apksigner, apk_path),
+        "requiresAuth": True,
+    }
+    return artifact, release
+
+
+def build_artifact(app, work_dir):
+    source = app["source"]
+    if source.get("type") == "self_draft_release":
+        return build_artifact_from_draft_release(app, source, work_dir)
+    return build_artifact_from_public_release(app, source, work_dir)
 
 
 def main():
@@ -142,6 +188,7 @@ def main():
                 "certificateSha256": artifact["certificateSha256"],
                 "releaseNotes": (release.get("body") or "").strip()[:2000],
                 "enabled": app["enabled"],
+                "requiresAuth": artifact["requiresAuth"],
             }
         )
 
