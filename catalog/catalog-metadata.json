@@ -31,7 +31,7 @@
     },
     {
       "id": "microg-re",
-      "displayName": "microG RE",
+      "displayName": "MicroG RE",
       "packageName": "app.patched.android.gms",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
