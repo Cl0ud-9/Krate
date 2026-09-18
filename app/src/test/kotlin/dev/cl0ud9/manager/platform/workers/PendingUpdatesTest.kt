@@ -48,12 +48,15 @@ class PendingUpdatesTest {
     fun `excludes a requiresAuth app without a token even if pending`() {
         val gated =
             profile("gated", latestVersionName = "2.0.0").copy(
-                artifact =
-                    ArtifactInfo(
-                        downloadUrl = "https://example.test/gated.apk",
-                        sha256 = "sha",
-                        certificateSha256 = "cert",
-                        requiresAuth = true,
+                artifacts =
+                    listOf(
+                        ArtifactInfo(
+                            versionName = "2.0.0",
+                            downloadUrl = "https://example.test/gated.apk",
+                            sha256 = "sha",
+                            certificateSha256 = "cert",
+                            requiresAuth = true,
+                        ),
                     ),
             )
         val reader = FakeInstalledPackageReader(mapOf(gated.packageName to InstalledVersion("1.0.0", 1)))
@@ -73,10 +76,17 @@ class PendingUpdatesTest {
             supportStatus = SupportStatus.SUPPORTED,
             installationMode = InstallationMode.UPDATE,
             dependencyIds = emptyList(),
-            latestVersionName = latestVersionName,
             releaseNotes = null,
             enabled = true,
-            artifact = null,
+            artifacts =
+                listOf(
+                    ArtifactInfo(
+                        versionName = latestVersionName,
+                        downloadUrl = "https://example.test/$id.apk",
+                        sha256 = "sha",
+                        certificateSha256 = "cert",
+                    ),
+                ),
         )
 
     private class FakeInstalledPackageReader(

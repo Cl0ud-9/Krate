@@ -39,9 +39,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.domain.model.latestArtifact
+import dev.cl0ud9.manager.domain.model.latestVersionName
 import dev.cl0ud9.manager.ui.components.AppIconAvatar
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.SupportStatusBadge
@@ -78,6 +81,7 @@ fun AppDetailsScreen(
     val dependencies by viewModel.dependencies.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
     val installStatus by viewModel.installStatus.collectAsStateWithLifecycle()
+    val selectedArtifact by viewModel.selectedArtifact.collectAsStateWithLifecycle()
     val currentApp = app
     // no pull-to-refresh here - RefreshOnResume above already re-checks this one app whenever the
     // screen comes back into view, so a swipe gesture on top of that was a redundant second trigger
@@ -98,10 +102,12 @@ fun AppDetailsScreen(
                         dependencies = dependencies,
                         downloadStatus = downloadStatus,
                         installStatus = installStatus,
+                        selectedArtifact = selectedArtifact,
                     ),
                 onDownload = rememberDebouncedOnClick(onClick = viewModel::startDownload),
                 onInstall = rememberDebouncedOnClick(onClick = viewModel::startInstall),
                 onRetryAsCleanInstall = rememberDebouncedOnClick(onClick = viewModel::retryAsCleanInstall),
+                onSelectVersion = viewModel::selectVersion,
                 onNavigateToApp = onNavigateToApp,
                 scrollState = scrollState,
                 topContentPadding = topContentPadding,
@@ -117,6 +123,7 @@ internal data class AppDetailsUiState(
     val dependencies: List<DependencyInfo>,
     val downloadStatus: DownloadStatus,
     val installStatus: InstallStatus,
+    val selectedArtifact: ArtifactInfo?,
 )
 
 @Suppress("LongParameterList")
@@ -126,6 +133,7 @@ private fun AppDetailsContent(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
+    onSelectVersion: (ArtifactInfo) -> Unit,
     onNavigateToApp: (String) -> Unit,
     scrollState: ScrollState,
     topContentPadding: Dp,
@@ -161,6 +169,15 @@ private fun AppDetailsContent(
             onDownload = onDownload,
             onInstall = onInstall,
             onRetryAsCleanInstall = onRetryAsCleanInstall,
+        )
+
+        // only renders once more than one version is actually retained (see catalog-metadata.json's
+        // retainVersions) - lets a broken newest build be worked around immediately instead of
+        // waiting for the next release, by picking an older version to download/install instead
+        VersionHistorySection(
+            artifacts = app.artifacts,
+            selectedArtifact = state.selectedArtifact,
+            onSelectVersion = onSelectVersion,
         )
 
         // Installation and Dependencies are both short, glanceable facts - side by side when
@@ -223,7 +240,7 @@ private fun AppDetailsHeader(
             // patches) - "Latest" above is always the app's own version (e.g. Videoapp's), so this
             // is shown alongside it rather than instead of it, giving a complete picture of both
             // what was patched and what patched it
-            app.artifact?.patchesVersionName?.let { patchesVersion ->
+            app.latestArtifact?.patchesVersionName?.let { patchesVersion ->
                 Text(
                     text = "Patches $patchesVersion",
                     style = MaterialTheme.typography.bodySmall,

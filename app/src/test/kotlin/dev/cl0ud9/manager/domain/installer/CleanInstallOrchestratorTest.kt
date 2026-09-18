@@ -24,10 +24,9 @@ class CleanInstallOrchestratorTest {
             supportStatus = SupportStatus.SUPPORTED,
             installationMode = InstallationMode.CLEAN_INSTALL,
             dependencyIds = emptyList(),
-            latestVersionName = "1.0.0",
             releaseNotes = null,
             enabled = true,
-            artifact = null,
+            artifacts = emptyList(),
         )
     private val newApk = File("new.apk")
     private val rollbackApk = File("rollback.apk")

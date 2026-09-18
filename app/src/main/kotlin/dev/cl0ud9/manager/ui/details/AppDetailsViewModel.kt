@@ -9,9 +9,11 @@ import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
@@ -74,19 +76,40 @@ class AppDetailsViewModel(
     private val mutableInstallStatus = MutableStateFlow<InstallStatus>(InstallStatus.Idle)
     val installStatus: StateFlow<InstallStatus> = mutableInstallStatus.asStateFlow()
 
+    // null means "no explicit pick yet, use the newest" - only ever non-null once the user taps a
+    // specific version in App Details' version history, section 9 of the spec (artifacts retains
+    // more than just the latest so a broken newest build still leaves older ones installable)
+    private val mutableExplicitArtifact = MutableStateFlow<ArtifactInfo?>(null)
+    val selectedArtifact: StateFlow<ArtifactInfo?> =
+        combine(app, mutableExplicitArtifact) { profile, explicit -> explicit ?: profile?.latestArtifact }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
     fun refresh() {
         refreshTrigger.tryEmit(Unit)
     }
 
+    // ignored while a download/install is actively in flight, same guard as startDownload/
+    // startInstall - switching what's selected out from under an in-progress operation would let a
+    // stale ReadyToInstall install the wrong (no longer selected) version, so this also resets
+    // downloadStatus back to Idle for the newly selected artifact
+    fun selectVersion(artifact: ArtifactInfo) {
+        val status = mutableDownloadStatus.value
+        if (isBusy() || status is DownloadStatus.Downloading || status is DownloadStatus.Verifying) return
+        mutableExplicitArtifact.value = artifact
+        mutableDownloadStatus.value = DownloadStatus.Idle
+    }
+
     fun startDownload() {
-        val currentApp = app.value ?: return
+        val currentApp = app.value
+        val artifact = selectedArtifact.value
+        if (currentApp == null || artifact == null) return
         if (mutableDownloadStatus.value is DownloadStatus.Downloading ||
             mutableDownloadStatus.value is DownloadStatus.Verifying
         ) {
             return
         }
         viewModelScope.launch {
-            artifactDownloader.download(currentApp).collect { status -> mutableDownloadStatus.value = status }
+            artifactDownloader.download(currentApp, artifact).collect { status -> mutableDownloadStatus.value = status }
         }
     }
 

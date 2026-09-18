@@ -80,9 +80,8 @@ class DependencyGraphTest {
             supportStatus = SupportStatus.SUPPORTED,
             installationMode = InstallationMode.UPDATE,
             dependencyIds = dependencyIds,
-            latestVersionName = "1.0.0",
             releaseNotes = null,
             enabled = true,
-            artifact = null,
+            artifacts = emptyList(),
         )
 }

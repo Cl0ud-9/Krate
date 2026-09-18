@@ -8,6 +8,7 @@ import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.WaitingForUserStep
+import dev.cl0ud9.manager.domain.model.latestArtifact
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.io.File
@@ -77,8 +78,11 @@ class UpdateAllEngine(
         app: AppProfile,
         onStatus: suspend (String) -> Unit,
     ): DownloadStatus.ReadyToInstall? {
+        // Update All always targets the newest version, never an older retained one - that
+        // picking is only ever an explicit, single-app choice made from App Details
+        val artifact = app.latestArtifact ?: return null
         var result: DownloadStatus.ReadyToInstall? = null
-        artifactDownloader.download(app).collect { status ->
+        artifactDownloader.download(app, artifact).collect { status ->
             when (status) {
                 is DownloadStatus.Downloading -> onStatus("Downloading ${app.displayName}")
                 is DownloadStatus.Verifying -> onStatus("Verifying ${app.displayName}")

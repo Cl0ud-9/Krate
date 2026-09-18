@@ -44,13 +44,11 @@ class OkHttpArtifactDownloader(
     private val credentialStore: GitHubCredentialStore,
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) : ArtifactDownloader {
-    override fun download(app: AppProfile): Flow<DownloadStatus> =
+    override fun download(
+        app: AppProfile,
+        artifact: ArtifactInfo,
+    ): Flow<DownloadStatus> =
         flow {
-            val artifact = app.artifact
-            if (artifact == null) {
-                emit(DownloadStatus.Failed("No downloadable artifact is available for this app yet."))
-                return@flow
-            }
             val token = credentialStore.getToken()
             if (artifact.requiresAuth && token == null) {
                 emit(DownloadStatus.Failed("This app needs a GitHub access token - add one in Settings."))
@@ -58,8 +56,12 @@ class OkHttpArtifactDownloader(
             }
 
             downloadsDir.mkdirs()
-            val partFile = File(downloadsDir, "${app.id}.apk.part")
-            val readyFile = File(downloadsDir, "${app.id}.apk")
+            // versionName is part of the file name, not just app.id - a user can now pick an older
+            // retained version from App Details' version history, and without this a stale .part
+            // file from a previously-downloaded different version could look resumable here
+            val fileId = "${app.id}-${artifact.versionName}"
+            val partFile = File(downloadsDir, "$fileId.apk.part")
+            val readyFile = File(downloadsDir, "$fileId.apk")
 
             val preflightFailure = checkStoragePreflight(artifact, token)
             if (preflightFailure != null) {
@@ -149,19 +151,18 @@ class OkHttpArtifactDownloader(
     }
 
     // a bare "Server returned HTTP 403" told the user nothing actionable - for a requiresAuth
-    // artifact this is almost always the token having read-only "Contents" scope, which GitHub
-    // rejects for a draft release: draft listings/assets are only visible to users with push
-    // access, so a read-only token 403s (or 404s, since GitHub sometimes hides a draft asset's
-    // existence from a token that can't see it) even though it works for every other request
+    // artifact hosted on the private artifacts repo, this almost always means the token is scoped
+    // to the wrong repo, was created before being added as a collaborator there, or was revoked
+    // (GitHub sometimes reports 404 instead of 403 to avoid confirming a private resource exists
+    // to a token that can't see it)
     private fun downloadFailureMessage(
         artifact: ArtifactInfo,
         code: Int,
     ): String {
         val isAuthCode = code == HTTP_UNAUTHORIZED || code == HTTP_FORBIDDEN || code == HTTP_NOT_FOUND
         if (!artifact.requiresAuth || !isAuthCode) return "Server returned HTTP $code"
-        return "GitHub rejected the download (HTTP $code). This app is hosted as a draft release, which " +
-            "needs a token with \"Contents: Read and write\" access - a read-only token can't see it. " +
-            "Check the token in Settings > GitHub access."
+        return "GitHub rejected the download (HTTP $code). Check that your token in Settings > GitHub " +
+            "access is scoped to the artifacts repo you were invited to, and hasn't been revoked."
     }
 
     // streams the response body to the part file, resuming from its existing length when the server allows it

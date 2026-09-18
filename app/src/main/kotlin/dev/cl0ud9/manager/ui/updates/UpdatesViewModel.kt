@@ -7,6 +7,7 @@ import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.isVisible
+import dev.cl0ud9.manager.domain.model.latestVersionName
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.updateall.UpdateAllEngine

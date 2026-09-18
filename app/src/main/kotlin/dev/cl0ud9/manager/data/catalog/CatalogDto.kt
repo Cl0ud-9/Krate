@@ -20,11 +20,14 @@ data class AppProfileDto(
     val supportStatus: String,
     val installationMode: String,
     val dependencyIds: List<String> = emptyList(),
-    val latestVersionName: String? = null,
     val releaseNotes: String? = null,
     val enabled: Boolean = true,
 )
 
+// seed entries never have real download data, so there is nothing to put in artifacts - a real
+// manifest fetch (RemoteCatalogRepository's primary path) replaces this with the real thing before
+// the user is ever likely to look for a specific version, this is only the offline-with-no-cache
+// first-launch fallback
 fun AppProfileDto.toDomain(): AppProfile =
     AppProfile(
         id = id,
@@ -41,8 +44,7 @@ fun AppProfileDto.toDomain(): AppProfile =
                 )
             }.getOrDefault(InstallationMode.UPDATE),
         dependencyIds = dependencyIds,
-        latestVersionName = latestVersionName,
         releaseNotes = releaseNotes,
         enabled = enabled,
-        artifact = null,
+        artifacts = emptyList(),
     )

@@ -35,18 +35,20 @@ import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 // section 16 of the spec: the ui shows Install, Update, or Reinstall based on real device state
-// compared against the catalog's latest version, not just the installation mode - a bare "Update"
-// whenever anything at all was installed (the old logic) is wrong once the installed version
-// already matches latest: there is nothing to update to, so this now says "Reinstall" instead.
-// Mode no longer drives the label at all: the Installation card below already explains the
-// clean-install mechanics separately, so this only needs to answer "is there something new"
+// compared against whichever version is currently selected (App Details' version history lets
+// that be an older retained one, not always the latest), not just the installation mode - a bare
+// "Update" whenever anything at all was installed (the old logic) is wrong once the installed
+// version already matches the selected one: there is nothing to update to, so this now says
+// "Reinstall" instead. Mode no longer drives the label at all: the Installation card below
+// already explains the clean-install mechanics separately, so this only needs to answer "is there
+// something new"
 private fun actionLabelFor(
-    app: AppProfile,
+    selectedVersionName: String?,
     installedVersionName: String?,
 ): String =
     when {
         installedVersionName == null -> "Install"
-        installedVersionName == app.latestVersionName -> "Reinstall"
+        installedVersionName == selectedVersionName -> "Reinstall"
         else -> "Update"
     }
 
@@ -59,7 +61,7 @@ internal fun DownloadSection(
 ) {
     val app = state.app
     val status = state.downloadStatus
-    val actionLabel = actionLabelFor(app, state.installedVersionName)
+    val actionLabel = actionLabelFor(state.selectedArtifact?.versionName, state.installedVersionName)
     // boxed in a card like every other detail section, instead of sitting bare on the screen background
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -113,18 +115,20 @@ private fun IdleContent(
     state: AppDetailsUiState,
     onDownload: () -> Unit,
 ) {
-    val app = state.app
-    val upToDate = state.installedVersionName != null && state.installedVersionName == app.latestVersionName
+    val selected = state.selectedArtifact
+    val upToDate = state.installedVersionName != null && state.installedVersionName == selected?.versionName
     if (upToDate) {
+        // selected is necessarily non-null here: upToDate can only be true when its versionName
+        // matched a real installedVersionName
         StatusRow(icon = Icons.Filled.CheckCircle, tint = MaterialTheme.colorScheme.tertiary, text = "Up to date.")
-        OutlinedButton(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
             Text("Redownload")
         }
     } else {
-        Button(onClick = onDownload, enabled = app.artifact != null, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
             Text("Download")
         }
-        if (app.artifact == null) {
+        if (selected == null) {
             HelperText("Not yet available for download.")
         }
     }

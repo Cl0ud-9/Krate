@@ -48,8 +48,9 @@ class OkHttpArtifactDownloaderTest {
         runBlocking {
             enqueuePayloadTwice()
             val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256))
+            val app = appProfile()
 
-            val statuses = downloader.download(appProfile()).toList()
+            val statuses = downloader.download(app, app.artifacts.single()).toList()
 
             val ready = statuses.last()
             assertTrue(ready is DownloadStatus.ReadyToInstall)
@@ -62,9 +63,9 @@ class OkHttpArtifactDownloaderTest {
             enqueuePayloadTwice()
             val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256))
             val app = appProfile()
-            val corrupted = app.copy(artifact = app.artifact!!.copy(sha256 = "0000000000000000"))
+            val corrupted = app.artifacts.single().copy(sha256 = "0000000000000000")
 
-            val statuses = downloader.download(corrupted).toList()
+            val statuses = downloader.download(app, corrupted).toList()
 
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
@@ -76,8 +77,9 @@ class OkHttpArtifactDownloaderTest {
         runBlocking {
             enqueuePayloadTwice()
             val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, "wrong-cert-hash"))
+            val app = appProfile()
 
-            val statuses = downloader.download(appProfile()).toList()
+            val statuses = downloader.download(app, app.artifacts.single()).toList()
 
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
@@ -89,8 +91,9 @@ class OkHttpArtifactDownloaderTest {
         runBlocking {
             enqueuePayloadTwice()
             val downloader = downloaderWithReader(FakeArchiveReader("some.other.package", matchingCertSha256))
+            val app = appProfile()
 
-            val statuses = downloader.download(appProfile()).toList()
+            val statuses = downloader.download(app, app.artifacts.single()).toList()
 
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
@@ -98,7 +101,7 @@ class OkHttpArtifactDownloaderTest {
         }
 
     @Test
-    fun `a 403 on a requiresAuth artifact explains the token needs write access`() =
+    fun `a 403 on a requiresAuth artifact explains the token scope, not just the status code`() =
         runBlocking {
             server.enqueue(MockResponse().setHeader("Content-Length", "0"))
             server.enqueue(MockResponse().setResponseCode(403))
@@ -109,14 +112,14 @@ class OkHttpArtifactDownloaderTest {
                     credentialStore = FakeCredentialStore(token = "fake-token"),
                 )
             val app = appProfile()
-            val gated = app.copy(artifact = app.artifact!!.copy(requiresAuth = true))
+            val gated = app.artifacts.single().copy(requiresAuth = true)
 
-            val statuses = downloader.download(gated).toList()
+            val statuses = downloader.download(app, gated).toList()
 
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
             val reason = (failure as DownloadStatus.Failed).reason
-            assertTrue(reason.contains("Read and write"))
+            assertTrue(reason.contains("artifacts repo"))
         }
 
     @Test
@@ -125,26 +128,15 @@ class OkHttpArtifactDownloaderTest {
             server.enqueue(MockResponse().setHeader("Content-Length", "0"))
             server.enqueue(MockResponse().setResponseCode(403))
             val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256))
+            val app = appProfile()
 
-            val statuses = downloader.download(appProfile()).toList()
+            val statuses = downloader.download(app, app.artifacts.single()).toList()
 
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
             val reason = (failure as DownloadStatus.Failed).reason
             assertTrue(reason.contains("403"))
-            assertTrue(!reason.contains("Read and write"))
-        }
-
-    @Test
-    fun `missing artifact fails immediately without a network call`() =
-        runBlocking {
-            val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256))
-            val appWithoutArtifact = appProfile().copy(artifact = null)
-
-            val statuses = downloader.download(appWithoutArtifact).toList()
-
-            assertEquals(1, statuses.size)
-            assertTrue(statuses.single() is DownloadStatus.Failed)
+            assertTrue(!reason.contains("artifacts repo"))
         }
 
     @Test
@@ -203,14 +195,16 @@ class OkHttpArtifactDownloaderTest {
             supportStatus = SupportStatus.SUPPORTED,
             installationMode = InstallationMode.UPDATE,
             dependencyIds = emptyList(),
-            latestVersionName = "1.0.0",
             releaseNotes = null,
             enabled = true,
-            artifact =
-                ArtifactInfo(
-                    downloadUrl = server.url("/sample.apk").toString(),
-                    sha256 = payloadSha256,
-                    certificateSha256 = matchingCertSha256,
+            artifacts =
+                listOf(
+                    ArtifactInfo(
+                        versionName = "1.0.0",
+                        downloadUrl = server.url("/sample.apk").toString(),
+                        sha256 = payloadSha256,
+                        certificateSha256 = matchingCertSha256,
+                    ),
                 ),
         )
 
