@@ -19,9 +19,11 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 
-// only a couple of catalog entries (currently just Videoapp Patched) are hosted as a private
-// release asset rather than a public one - this token is what lets the download engine authenticate
-// to fetch those. A read-only "Contents" scope on the manager repo alone is all it ever needs
+// only a couple of catalog entries (currently just Videoapp Patched) are hosted as a private draft
+// release rather than a public one - this token is what lets the download engine authenticate to
+// fetch those. Needs "Contents: Read and write" scope on the manager repo, not read-only: GitHub
+// only exposes a draft release's listing and assets to users with push access, so a read-only
+// token gets a 403/404 - see SETUP.md section 4
 @Composable
 internal fun GitHubAccessRow(
     hasToken: Boolean,
@@ -65,6 +67,15 @@ private fun GitHubAccessRowContent(
         return
     }
     var tokenInput by remember { mutableStateOf("") }
+    // a read-only "Contents" token silently fails with a 403/404 here - draft releases (how Videoapp
+    // Patched is published) only show up to users with push access, so this is spelled out up
+    // front rather than left for the user to discover from a bare HTTP error after saving
+    Text(
+        text = "Needs a fine-grained token for this repo with \"Contents: Read and write\" access - " +
+            "read-only won't work, since draft releases require push access to view.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     OutlinedTextField(
         value = tokenInput,
         onValueChange = { tokenInput = it },

@@ -23,6 +23,9 @@ import java.io.InputStream
 private const val STREAM_BUFFER_SIZE = 8192
 private const val PROGRESS_EMIT_INTERVAL_BYTES = 256 * 1024L
 private const val HTTP_PARTIAL_CONTENT = 206
+private const val HTTP_UNAUTHORIZED = 401
+private const val HTTP_FORBIDDEN = 403
+private const val HTTP_NOT_FOUND = 404
 
 // safety margin over the artifact size to leave room for the rollback copy and install staging, section 42.6
 private const val STORAGE_SAFETY_MARGIN = 1.5
@@ -145,6 +148,22 @@ class OkHttpArtifactDownloader(
         return builder
     }
 
+    // a bare "Server returned HTTP 403" told the user nothing actionable - for a requiresAuth
+    // artifact this is almost always the token having read-only "Contents" scope, which GitHub
+    // rejects for a draft release: draft listings/assets are only visible to users with push
+    // access, so a read-only token 403s (or 404s, since GitHub sometimes hides a draft asset's
+    // existence from a token that can't see it) even though it works for every other request
+    private fun downloadFailureMessage(
+        artifact: ArtifactInfo,
+        code: Int,
+    ): String {
+        val isAuthCode = code == HTTP_UNAUTHORIZED || code == HTTP_FORBIDDEN || code == HTTP_NOT_FOUND
+        if (!artifact.requiresAuth || !isAuthCode) return "Server returned HTTP $code"
+        return "GitHub rejected the download (HTTP $code). This app is hosted as a draft release, which " +
+            "needs a token with \"Contents: Read and write\" access - a read-only token can't see it. " +
+            "Check the token in Settings > GitHub access."
+    }
+
     // streams the response body to the part file, resuming from its existing length when the server allows it
     private suspend fun streamDownload(
         artifact: ArtifactInfo,
@@ -158,7 +177,7 @@ class OkHttpArtifactDownloader(
             requestBuilder.header("Range", "bytes=$existingBytes-")
         }
         httpClient.newCall(requestBuilder.build()).execute().use { response ->
-            if (!response.isSuccessful) error("Server returned HTTP ${response.code}")
+            if (!response.isSuccessful) error(downloadFailureMessage(artifact, response.code))
             val resuming = response.code == HTTP_PARTIAL_CONTENT
             val body = response.body ?: error("Empty response body")
             val totalBytes = resolveTotalBytes(response, resuming, existingBytes, body.contentLength())

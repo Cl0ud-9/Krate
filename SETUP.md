@@ -47,12 +47,16 @@ Keep `manifest-signing.key` as a CI secret (`MANIFEST_SIGNING_KEY`), never commi
 
 ## 4. GitHub access token (needed to install the Videoapp Patched catalog entry)
 
-Its build is published as a private draft release (see `patched/README.md` for why), so the app
-needs an authenticated request to fetch it - a plain download URL won't work for a draft asset.
-Create a fine-grained personal access token scoped to just this repo with read-only "Contents"
-access (github.com -> Settings -> Developer settings -> Fine-grained tokens), then paste it into
-the app's own Settings > GitHub access. This is a per-installer credential entered in the app
-itself, not a CI secret - skip this section entirely if you don't plan to install that entry.
+Its build is published as a private **draft** release (see `patched/README.md` for why), so the
+app needs an authenticated request to fetch it - a plain download URL won't work for a draft
+asset. Importantly, this needs more than read access: per GitHub's own REST API docs, draft
+release listings and their assets are only visible to users with **push** access to the repo -
+"Only users with push access will receive listings for draft releases" - a read-only token cannot
+see them at all and gets a 403/404 trying. Create a fine-grained personal access token scoped to
+just this repo with **"Contents: Read and write"** access (github.com -> Settings -> Developer
+settings -> Fine-grained tokens), then paste it into the app's own Settings > GitHub access. This
+is a per-installer credential entered in the app itself, not a CI secret - skip this section
+entirely if you don't plan to install that entry.
 
 ## 5. Patched signing keystore (needed for `.github/workflows/patched-videoapp.yml`)
 

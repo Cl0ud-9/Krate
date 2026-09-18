@@ -143,8 +143,9 @@ class SettingsViewModel(
     }
 
     // read only by artifacts whose manifest entry is requiresAuth (currently just Videoapp Patched,
-    // hosted as a private release asset) - a read-only "Contents" token scoped to this one repo is
-    // all it ever needs
+    // hosted as a draft release) - needs "Contents: Read and write" scoped to this one repo, not
+    // read-only: GitHub only exposes draft release listings/assets to users with push access, see
+    // SETUP.md section 4
     fun setGitHubToken(token: String) {
         githubCredentialStore.setToken(token)
         mutableHasGitHubToken.value = true

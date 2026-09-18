@@ -98,6 +98,44 @@ class OkHttpArtifactDownloaderTest {
         }
 
     @Test
+    fun `a 403 on a requiresAuth artifact explains the token needs write access`() =
+        runBlocking {
+            server.enqueue(MockResponse().setHeader("Content-Length", "0"))
+            server.enqueue(MockResponse().setResponseCode(403))
+            val downloader =
+                OkHttpArtifactDownloader(
+                    downloadsDir = tempFolder.newFolder(),
+                    archiveReader = FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256),
+                    credentialStore = FakeCredentialStore(token = "fake-token"),
+                )
+            val app = appProfile()
+            val gated = app.copy(artifact = app.artifact!!.copy(requiresAuth = true))
+
+            val statuses = downloader.download(gated).toList()
+
+            val failure = statuses.last()
+            assertTrue(failure is DownloadStatus.Failed)
+            val reason = (failure as DownloadStatus.Failed).reason
+            assertTrue(reason.contains("Read and write"))
+        }
+
+    @Test
+    fun `a 403 without requiresAuth keeps the plain status message`() =
+        runBlocking {
+            server.enqueue(MockResponse().setHeader("Content-Length", "0"))
+            server.enqueue(MockResponse().setResponseCode(403))
+            val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256))
+
+            val statuses = downloader.download(appProfile()).toList()
+
+            val failure = statuses.last()
+            assertTrue(failure is DownloadStatus.Failed)
+            val reason = (failure as DownloadStatus.Failed).reason
+            assertTrue(reason.contains("403"))
+            assertTrue(!reason.contains("Read and write"))
+        }
+
+    @Test
     fun `missing artifact fails immediately without a network call`() =
         runBlocking {
             val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256))
@@ -184,10 +222,13 @@ class OkHttpArtifactDownloaderTest {
             ApkArchiveInfo(packageName = packageName, certificateSha256Hex = certificateSha256Hex)
     }
 
-    // none of these tests exercise a requiresAuth artifact, so a token is never needed - kept as a
-    // trivial no-op rather than a mock, since the downloader only ever calls getToken() here
-    private class FakeCredentialStore : GitHubCredentialStore {
-        override fun getToken(): String? = null
+    // most of these tests never exercise a requiresAuth artifact, so a token is never needed by
+    // default - kept as a trivial fake rather than a mock, since the downloader only ever calls
+    // getToken() here
+    private class FakeCredentialStore(
+        private val token: String? = null,
+    ) : GitHubCredentialStore {
+        override fun getToken(): String? = token
 
         override fun setToken(token: String) = Unit
 
