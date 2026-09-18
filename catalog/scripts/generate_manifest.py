@@ -25,15 +25,25 @@ GITHUB_API = "https://api.github.com"
 # release (see RemoteCatalogRepository.kt's hardcoded MANIFEST_URL on the client side) - not a
 # per-app source, so it isn't read from catalog-metadata.json
 OWN_REPO = "Cl0ud-9/manager"
+# every Patched-style app's releases (past and present) live on one shared *private* repo, kept
+# entirely separate from OWN_REPO's public source/workflows/secrets - see SETUP.md section 6. The
+# default per-run GITHUB_TOKEN is scoped only to the repo a workflow runs in, so reading this
+# different repo needs its own token
+ARTIFACTS_TOKEN_ENV = "ARTIFACTS_REPO_TOKEN"
+DEFAULT_RETAIN_VERSIONS = 3
 
 
-def gh_get(path):
+def _resolve_token(explicit_token):
+    return explicit_token or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+
+
+def gh_get(path, token=None):
     # Authenticated requests get 1000 req/hour instead of the 60 req/hour anonymous limit -
     # this runs on a 15-minute schedule (section 10), so staying anonymous risks 403s under load.
     headers = {"Accept": "application/vnd.github+json"}
-    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    resolved = _resolve_token(token)
+    if resolved:
+        headers["Authorization"] = f"Bearer {resolved}"
     req = urllib.request.Request(GITHUB_API + path, headers=headers)
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp)
@@ -50,15 +60,19 @@ def pick_release(repo, include_prerelease):
     raise RuntimeError(f"no matching release found for {repo}")
 
 
-# videoapp-patched (so far the only self_draft_release source) is deliberately never published as a
-# public release - see the ADR note in patched/README.md - so this is the opposite filter of
-# pick_release: only drafts are eligible, and GitHub returns them newest-first already
-def pick_draft_release(repo):
-    releases = gh_get(f"/repos/{repo}/releases?per_page=20")
-    for release in releases:
-        if release.get("draft"):
-            return release
-    raise RuntimeError(f"no draft release found for {repo}")
+# every release whose tag starts with tag_prefix, newest-first by the numeric version encoded in
+# the tag (not creation date, so a same-day multi-build day still orders correctly) - this is what
+# lets one shared private repo hold releases for several different apps (each with its own prefix)
+# without them colliding, and lets each app keep more than just its single latest version
+def list_releases(repo, tag_prefix, token):
+    releases = gh_get(f"/repos/{repo}/releases?per_page=100", token=token)
+    matching = [r for r in releases if not r.get("draft") and r["tag_name"].startswith(tag_prefix)]
+    matching.sort(key=lambda r: _version_sort_key(r["tag_name"][len(tag_prefix):]), reverse=True)
+    return matching
+
+
+def _version_sort_key(version):
+    return [int(part) for part in re.findall(r"\d+", version)] or [0]
 
 
 def pick_asset(release, pattern):
@@ -69,25 +83,25 @@ def pick_asset(release, pattern):
     raise RuntimeError(f"no asset matching {pattern!r} in release {release['tag_name']}")
 
 
-def _asset_request_headers(authenticated):
+def _asset_request_headers(authenticated, token=None):
     headers = {"Accept": "application/octet-stream"}
     if authenticated:
-        token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-        if not token:
-            raise RuntimeError("GH_TOKEN/GITHUB_TOKEN is required to download a private release asset")
-        headers["Authorization"] = f"Bearer {token}"
+        resolved = _resolve_token(token)
+        if not resolved:
+            raise RuntimeError("no token available to download a private release asset")
+        headers["Authorization"] = f"Bearer {resolved}"
     return headers
 
 
-def download(url, dest, authenticated=False):
-    req = urllib.request.Request(url, headers=_asset_request_headers(authenticated))
+def download(url, dest, authenticated=False, token=None):
+    req = urllib.request.Request(url, headers=_asset_request_headers(authenticated, token))
     with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as out:
         shutil.copyfileobj(resp, out)
 
 
 # small release assets (e.g. artifact.json) that are read directly rather than saved to disk first
-def download_json(url, authenticated=False):
-    req = urllib.request.Request(url, headers=_asset_request_headers(authenticated))
+def download_json(url, authenticated=False, token=None):
+    req = urllib.request.Request(url, headers=_asset_request_headers(authenticated, token))
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp)
 
@@ -145,47 +159,52 @@ def build_artifact_from_public_release(app, source, work_dir):
         "requiresAuth": False,
         "patchesVersionName": None,
     }
-    return artifact, release
+    return [(artifact, release)]
 
 
-# our own repo's draft release rather than an upstream project's public one - the asset's
-# browser_download_url doesn't resolve for a draft even with auth, so the client (and this script,
-# for local verification) instead hits the authenticated REST asset endpoint
-def build_artifact_from_draft_release(app, source, work_dir):
-    release = pick_draft_release(source["repo"])
-    asset = pick_asset(release, source["assetPattern"])
-    asset_url = f"{GITHUB_API}/repos/{source['repo']}/releases/assets/{asset['id']}"
-
-    apk_path = work_dir / f"{app['id']}.apk"
-    download(asset_url, apk_path, authenticated=True)
-
-    # the release tag is "videoapp-patched-<patches_version>" - the Patched *patches* bundle's own
-    # version, not the version of the Videoapp app that patches bundle was applied to. Using only
-    # that as "latest version" told the user nothing about what Videoapp version they'd actually be
-    # installing, and could never match a real installed Videoapp versionName for an "up to date"
-    # comparison. build_patched_videoapp.py separately writes artifact.json with both the real
-    # videoappVersion it patched and the patchesVersion that did the patching, uploaded to this same
-    # release alongside the apk - fetch and surface both, rather than picking one over the other.
-    artifact_json_asset = pick_asset(release, r"^artifact\.json$")
-    artifact_json_url = f"{GITHUB_API}/repos/{source['repo']}/releases/assets/{artifact_json_asset['id']}"
-    artifact_metadata = download_json(artifact_json_url, authenticated=True)
+# the shared private artifacts repo (see SETUP.md section 6) - up to source["retainVersions"]
+# releases matching this app's tagPrefix, newest first, each downloaded and verified the same way
+# a single-artifact app would be. artifact.json (uploaded alongside the apk by whichever build
+# script produced it) carries both the patched app's own version and the version of the tool that
+# patched it - surfaced as two separate fields rather than picking one over the other
+def build_artifacts_from_private_release(app, source, work_dir):
+    token = os.environ.get(ARTIFACTS_TOKEN_ENV)
+    if not token:
+        raise RuntimeError(f"{ARTIFACTS_TOKEN_ENV} is not set - needed to read {source['repo']}")
+    repo = source["repo"]
+    retain = source.get("retainVersions", DEFAULT_RETAIN_VERSIONS)
+    releases = list_releases(repo, source["tagPrefix"], token)[:retain]
+    if not releases:
+        raise RuntimeError(f"no releases found for prefix {source['tagPrefix']!r} in {repo}")
 
     apksigner = find_apksigner()
-    artifact = {
-        "versionName": artifact_metadata["videoappVersion"],
-        "downloadUrl": asset_url,
-        "sha256": sha256_of(apk_path),
-        "certificateSha256": certificate_sha256(apksigner, apk_path),
-        "requiresAuth": True,
-        "patchesVersionName": artifact_metadata["patchesVersion"],
-    }
-    return artifact, release
+    results = []
+    for release in releases:
+        asset = pick_asset(release, source["assetPattern"])
+        asset_url = f"{GITHUB_API}/repos/{repo}/releases/assets/{asset['id']}"
+        apk_path = work_dir / f"{app['id']}-{release['tag_name']}.apk"
+        download(asset_url, apk_path, authenticated=True, token=token)
+
+        artifact_json_asset = pick_asset(release, r"^artifact\.json$")
+        artifact_json_url = f"{GITHUB_API}/repos/{repo}/releases/assets/{artifact_json_asset['id']}"
+        artifact_metadata = download_json(artifact_json_url, authenticated=True, token=token)
+
+        artifact = {
+            "versionName": artifact_metadata["patchedAppVersion"],
+            "downloadUrl": asset_url,
+            "sha256": sha256_of(apk_path),
+            "certificateSha256": certificate_sha256(apksigner, apk_path),
+            "requiresAuth": True,
+            "patchesVersionName": artifact_metadata.get("patchesVersion"),
+        }
+        results.append((artifact, release))
+    return results
 
 
-def build_artifact(app, work_dir):
+def build_artifacts(app, work_dir):
     source = app["source"]
-    if source.get("type") == "self_draft_release":
-        return build_artifact_from_draft_release(app, source, work_dir)
+    if source.get("type") == "private_release":
+        return build_artifacts_from_private_release(app, source, work_dir)
     return build_artifact_from_public_release(app, source, work_dir)
 
 
@@ -215,7 +234,7 @@ def main():
     failures = []
     for app in metadata["apps"]:
         try:
-            artifact, release = build_artifact(app, WORK_DIR)
+            results = build_artifacts(app, WORK_DIR)
         except (RuntimeError, urllib.error.URLError, subprocess.CalledProcessError) as exc:
             previous = previous_apps_by_id.get(app["id"])
             if previous is None:
@@ -225,6 +244,7 @@ def main():
                 apps_out.append(previous)
             continue
 
+        newest_release = results[0][1]
         apps_out.append(
             {
                 "id": app["id"],
@@ -233,14 +253,19 @@ def main():
                 "supportStatus": app["supportStatus"],
                 "installationMode": app["installationMode"],
                 "dependencyIds": app["dependencyIds"],
-                "latestVersionName": artifact["versionName"],
-                "downloadUrl": artifact["downloadUrl"],
-                "sha256": artifact["sha256"],
-                "certificateSha256": artifact["certificateSha256"],
-                "releaseNotes": (release.get("body") or "").strip()[:2000],
+                "artifacts": [
+                    {
+                        "versionName": artifact["versionName"],
+                        "downloadUrl": artifact["downloadUrl"],
+                        "sha256": artifact["sha256"],
+                        "certificateSha256": artifact["certificateSha256"],
+                        "requiresAuth": artifact["requiresAuth"],
+                        "patchesVersionName": artifact.get("patchesVersionName"),
+                    }
+                    for artifact, _release in results
+                ],
+                "releaseNotes": (newest_release.get("body") or "").strip()[:2000],
                 "enabled": app["enabled"],
-                "requiresAuth": artifact["requiresAuth"],
-                "patchesVersionName": artifact.get("patchesVersionName"),
             }
         )
 

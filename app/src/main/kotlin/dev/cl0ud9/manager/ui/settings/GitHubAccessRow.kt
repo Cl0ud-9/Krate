@@ -19,11 +19,12 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 
-// only a couple of catalog entries (currently just Videoapp Patched) are hosted as a private draft
-// release rather than a public one - this token is what lets the download engine authenticate to
-// fetch those. Needs "Contents: Read and write" scope on the manager repo, not read-only: GitHub
-// only exposes a draft release's listing and assets to users with push access, so a read-only
-// token gets a 403/404 - see SETUP.md section 4
+// the Patched-style catalog entries (Videoapp, and any future sibling app built the same way) are
+// hosted as published releases on one shared *private* artifacts repo, never the public manager
+// repo itself - this token is what lets the download engine authenticate to fetch those. A
+// read-only fine-grained token scoped to just that repo is all it ever needs: unlike a draft
+// release (which GitHub only exposes to push-access accounts), a private repo's published release
+// only needs read access - see SETUP.md section 4
 @Composable
 internal fun GitHubAccessRow(
     hasToken: Boolean,
@@ -67,12 +68,13 @@ private fun GitHubAccessRowContent(
         return
     }
     var tokenInput by remember { mutableStateOf("") }
-    // a read-only "Contents" token silently fails with a 403/404 here - draft releases (how Videoapp
-    // Patched is published) only show up to users with push access, so this is spelled out up
-    // front rather than left for the user to discover from a bare HTTP error after saving
+    // spelled out up front rather than left for the user to discover from a bare HTTP error after
+    // saving - a token scoped to the wrong repo, or created before being added as a collaborator
+    // on the artifacts repo, still fails with a 403/404
     Text(
-        text = "Needs a fine-grained token for this repo with \"Contents: Read and write\" access - " +
-            "read-only won't work, since draft releases require push access to view.",
+        text =
+            "Needs a fine-grained token scoped to the private artifacts repo you were invited to, " +
+                "with \"Contents: Read-only\" access.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

@@ -27,6 +27,10 @@ jobs:
       - name: Generate manifest
         env:
           GH_TOKEN: ${{ github.token }}
+          # needed to read the Patched-style apps' releases on the shared private artifacts repo
+          # (a different repo than this workflow runs in, so the ambient GH_TOKEN above can't see
+          # it on its own) - see SETUP.md section 6
+          ARTIFACTS_REPO_TOKEN: ${{ secrets.ARTIFACTS_REPO_TOKEN }}
         run: python3 catalog/scripts/generate_manifest.py
 
       - name: Check for changes

@@ -52,9 +52,11 @@
       "dependencyIds": ["microg-re"],
       "enabled": true,
       "source": {
-        "type": "self_draft_release",
-        "repo": "Cl0ud-9/manager",
-        "assetPattern": "^videoapp-patched-.*\\.apk$"
+        "type": "private_release",
+        "repo": "Cl0ud-9/manager-artifacts",
+        "tagPrefix": "videoapp-patched-",
+        "assetPattern": "^videoapp-patched-.*\\.apk$",
+        "retainVersions": 3
       }
     }
   ]

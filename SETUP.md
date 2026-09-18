@@ -45,18 +45,24 @@ openssl pkey -in manifest-signing.key -pubout -out manifest-signing.pub
 
 Keep `manifest-signing.key` as a CI secret (`MANIFEST_SIGNING_KEY`), never commit it. The public key (`manifest-signing.pub`) gets baked into the app as a resource - that one's fine to commit once Phase 2 wires it in.
 
-## 4. GitHub access token (needed to install the Videoapp Patched catalog entry)
+## 4. GitHub access token (needed to install any Patched-style catalog entry)
 
-Its build is published as a private **draft** release (see `patched/README.md` for why), so the
-app needs an authenticated request to fetch it - a plain download URL won't work for a draft
-asset. Importantly, this needs more than read access: per GitHub's own REST API docs, draft
-release listings and their assets are only visible to users with **push** access to the repo -
-"Only users with push access will receive listings for draft releases" - a read-only token cannot
-see them at all and gets a 403/404 trying. Create a fine-grained personal access token scoped to
-just this repo with **"Contents: Read and write"** access (github.com -> Settings -> Developer
-settings -> Fine-grained tokens), then paste it into the app's own Settings > GitHub access. This
-is a per-installer credential entered in the app itself, not a CI secret - skip this section
-entirely if you don't plan to install that entry.
+Videoapp Patched, and any future sibling app built the same way (Videoapp Music, Photos, etc.), are
+published as normal releases on one shared **private** repo (`Cl0ud-9/manager-artifacts`, see
+section 6) rather than as public releases or drafts on the manager repo itself. For a private
+repo, plain read access is enough to view and download a published release - unlike a draft
+release, which GitHub only exposes to accounts with push access.
+
+To install one of these apps you need to:
+1. Be added as a collaborator on `Cl0ud-9/manager-artifacts` (ask whoever manages that repo - it's
+   never self-service, since it's private).
+2. Create a fine-grained personal access token scoped to just that repo with **"Contents:
+   Read-only"** access (github.com -> Settings -> Developer settings -> Fine-grained tokens).
+3. Paste it into the app's own Settings > GitHub access.
+
+This is a per-installer credential entered in the app itself, not a CI secret - skip this section
+entirely if you don't plan to install one of those entries. A token can never grant more access
+than its owner's actual collaborator role, so step 1 has to happen before step 2 does anything.
 
 ## 5. Patched signing keystore (needed for `.github/workflows/patched-videoapp.yml`)
 
@@ -74,3 +80,33 @@ gh secret set PATCHED_KEY_PASSWORD
 ```
 
 Delete `patched-manager.keystore.b64` locally once uploaded.
+
+## 6. Private artifacts repo (needed for `patched-videoapp.yml` and any future sibling app pipeline)
+
+A shared **private** repo, `Cl0ud-9/manager-artifacts`, holds nothing but release binaries and
+their `artifact.json` metadata for every Patched-style app - never source, never workflows, never
+secrets. Each app publishes one release per retained version there (see `catalog-metadata.json`'s
+`retainVersions`), tagged `<app-id>-<version>` so multiple apps can share the one repo without
+colliding.
+
+Create it once:
+
+```
+gh repo create Cl0ud-9/manager-artifacts --private --description "Private release binaries for manager's Patched-style catalog entries"
+```
+
+The publishing workflow runs in the `manager` repo but needs to create/update releases in this
+*different* repo - the workflow's own ambient `GITHUB_TOKEN` is scoped only to the repo it runs in,
+so it cannot do that on its own. Create a second fine-grained personal access token, scoped to just
+`manager-artifacts`, with **"Contents: Read and write"** access (this one legitimately needs write,
+since it's the automation's own publishing credential, not a per-installer download token), then:
+
+```
+gh secret set ARTIFACTS_REPO_TOKEN --repo Cl0ud-9/manager
+```
+
+To let a friend install a Patched-style app, add them as a collaborator on `manager-artifacts`
+only (Settings -> Collaborators, or `gh repo add-collaborator`) - never on `manager` itself, and
+never with anything above Read. They then follow section 4 to get their own read-only token. This
+is the entire access-control surface: adding or removing that one collaborator entry is the only
+thing that grants or revokes someone's ability to install these apps.
