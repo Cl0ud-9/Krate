@@ -26,3 +26,13 @@ data class AppProfile(
     val enabled: Boolean,
     val artifact: ArtifactInfo?,
 )
+
+// an app only belongs in front-of-user surfaces (Apps/Home/Updates) when the catalog's own
+// `enabled` kill switch is on, and - for an artifact hosted as a private release asset, currently
+// just Videoapp Patched - only once a GitHub token is actually present. Without a token there is
+// nothing it could do (its download would just fail with a 401), so it should not be offered as an
+// option in the first place rather than shown and then broken. Dependency resolution deliberately
+// does not use this: a dependency must still resolve against the full catalog regardless of whether
+// it would itself be visible if browsed directly
+fun AppProfile.isVisible(hasGitHubToken: Boolean): Boolean =
+    enabled && (artifact?.requiresAuth != true || hasGitHubToken)

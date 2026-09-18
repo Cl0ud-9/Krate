@@ -1,6 +1,7 @@
 package dev.cl0ud9.manager.platform.workers
 
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.SupportStatus
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
@@ -22,7 +23,7 @@ class PendingUpdatesTest {
                 ),
             )
 
-        val count = pendingUpdateCount(listOf(upToDate, pending, notInstalled), reader)
+        val count = pendingUpdateCount(listOf(upToDate, pending, notInstalled), reader, hasGitHubToken = false)
 
         assertEquals(1, count)
     }
@@ -32,7 +33,33 @@ class PendingUpdatesTest {
         val app = profile("app", latestVersionName = "1.0.0")
         val reader = FakeInstalledPackageReader(mapOf(app.packageName to InstalledVersion("1.0.0", 1)))
 
-        assertEquals(0, pendingUpdateCount(listOf(app), reader))
+        assertEquals(0, pendingUpdateCount(listOf(app), reader, hasGitHubToken = false))
+    }
+
+    @Test
+    fun `excludes a disabled app even if its installed version differs from latest`() {
+        val disabled = profile("disabled", latestVersionName = "2.0.0").copy(enabled = false)
+        val reader = FakeInstalledPackageReader(mapOf(disabled.packageName to InstalledVersion("1.0.0", 1)))
+
+        assertEquals(0, pendingUpdateCount(listOf(disabled), reader, hasGitHubToken = false))
+    }
+
+    @Test
+    fun `excludes a requiresAuth app without a token even if pending`() {
+        val gated =
+            profile("gated", latestVersionName = "2.0.0").copy(
+                artifact =
+                    ArtifactInfo(
+                        downloadUrl = "https://example.test/gated.apk",
+                        sha256 = "sha",
+                        certificateSha256 = "cert",
+                        requiresAuth = true,
+                    ),
+            )
+        val reader = FakeInstalledPackageReader(mapOf(gated.packageName to InstalledVersion("1.0.0", 1)))
+
+        assertEquals(0, pendingUpdateCount(listOf(gated), reader, hasGitHubToken = false))
+        assertEquals(1, pendingUpdateCount(listOf(gated), reader, hasGitHubToken = true))
     }
 
     private fun profile(

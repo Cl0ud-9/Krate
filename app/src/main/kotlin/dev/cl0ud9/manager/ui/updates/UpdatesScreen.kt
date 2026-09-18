@@ -44,6 +44,7 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
                 container.installedPackageReader,
                 container.updateAllEngine,
                 container.activityLogRepository,
+                container.githubCredentialStore,
             )
         }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()

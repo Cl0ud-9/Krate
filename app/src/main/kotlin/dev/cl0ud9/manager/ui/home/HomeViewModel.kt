@@ -2,7 +2,9 @@ package dev.cl0ud9.manager.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.domain.model.ActivityEntry
+import dev.cl0ud9.manager.domain.model.isVisible
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
@@ -26,6 +28,7 @@ class HomeViewModel(
     private val installedPackageReader: InstalledPackageReader,
     activityLogRepository: ActivityLogRepository,
     private val managerUpdateChecker: ManagerUpdateChecker,
+    private val githubCredentialStore: GitHubCredentialStore,
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -35,8 +38,11 @@ class HomeViewModel(
     private val mutableUpdateAnnouncement = MutableStateFlow<ManagerUpdateStatus.UpdateAvailable?>(null)
     val updateAnnouncement: StateFlow<ManagerUpdateStatus.UpdateAvailable?> = mutableUpdateAnnouncement.asStateFlow()
 
+    // filtered the same way Apps/Updates are - a requiresAuth app without a token, or one the
+    // catalog itself disabled, should not count towards these totals either
     private val refreshedApps =
         combine(catalogRepository.observeApps(), refreshTrigger.onStart { emit(Unit) }) { apps, _ -> apps }
+            .map { apps -> apps.filter { it.isVisible(githubCredentialStore.getToken() != null) } }
 
     val catalogCount: StateFlow<Int> =
         refreshedApps

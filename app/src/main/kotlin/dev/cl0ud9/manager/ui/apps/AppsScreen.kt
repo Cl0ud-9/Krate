@@ -39,7 +39,13 @@ import dev.cl0ud9.manager.ui.util.managerViewModel
 @Composable
 fun AppsScreen(onAppClick: (String) -> Unit) {
     val viewModel =
-        managerViewModel { container -> AppsViewModel(container.catalogRepository, container.installedPackageReader) }
+        managerViewModel { container ->
+            AppsViewModel(
+                container.catalogRepository,
+                container.installedPackageReader,
+                container.githubCredentialStore,
+            )
+        }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)

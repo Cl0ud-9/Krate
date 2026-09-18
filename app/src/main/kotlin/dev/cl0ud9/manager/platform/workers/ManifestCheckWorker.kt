@@ -24,7 +24,8 @@ class ManifestCheckWorker(
                 // background check
                 container.catalogRepository.refresh()
                 val apps = container.catalogRepository.observeApps().first()
-                pendingUpdateCount(apps, container.installedPackageReader)
+                val hasToken = container.githubCredentialStore.getToken() != null
+                pendingUpdateCount(apps, container.installedPackageReader, hasToken)
             }.onSuccess { count ->
                 if (count > 0) UpdateNotifier.notifyPendingUpdates(applicationContext, count)
             }

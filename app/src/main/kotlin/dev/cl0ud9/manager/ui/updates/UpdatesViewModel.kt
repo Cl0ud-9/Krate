@@ -2,9 +2,11 @@ package dev.cl0ud9.manager.ui.updates
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.model.isVisible
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.updateall.UpdateAllEngine
@@ -58,6 +60,7 @@ class UpdatesViewModel(
     private val installedPackageReader: InstalledPackageReader,
     private val updateAllEngine: UpdateAllEngine,
     private val activityLogRepository: ActivityLogRepository,
+    private val githubCredentialStore: GitHubCredentialStore,
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -143,10 +146,13 @@ class UpdatesViewModel(
     }
 
     private fun toUiState(apps: List<AppProfile>): UpdatesUiState {
+        val hasToken = githubCredentialStore.getToken() != null
         val pending =
-            apps.filter { app ->
-                isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app.latestVersionName)
-            }
+            apps
+                .filter { it.isVisible(hasToken) }
+                .filter { app ->
+                    isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app.latestVersionName)
+                }
         return if (pending.isEmpty()) UpdatesUiState.UpToDate else UpdatesUiState.Content(pending)
     }
 

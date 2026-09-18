@@ -65,6 +65,7 @@ fun HomeScreen(onNavigateToUpdates: () -> Unit) {
                 container.installedPackageReader,
                 container.activityLogRepository,
                 container.managerUpdateChecker,
+                container.githubCredentialStore,
             )
         }
     val catalogCount by viewModel.catalogCount.collectAsStateWithLifecycle()
