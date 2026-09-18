@@ -219,6 +219,18 @@ private fun AppDetailsHeader(
                 )
             }
 
+            // only set for an artifact built by an intermediate tool (currently just Patched
+            // patches) - "Latest" above is always the app's own version (e.g. Videoapp's), so this
+            // is shown alongside it rather than instead of it, giving a complete picture of both
+            // what was patched and what patched it
+            app.artifact?.patchesVersionName?.let { patchesVersion ->
+                Text(
+                    text = "Patches $patchesVersion",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             InstalledStatusRow(installedVersionName = installedVersionName)
         }
     }

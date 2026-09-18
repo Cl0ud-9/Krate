@@ -28,6 +28,7 @@ data class ManifestAppDto(
     val releaseNotes: String? = null,
     val enabled: Boolean = true,
     val requiresAuth: Boolean = false,
+    val patchesVersionName: String? = null,
 )
 
 fun ManifestAppDto.toDomain(): AppProfile =
@@ -55,5 +56,6 @@ fun ManifestAppDto.toDomain(): AppProfile =
                 sha256 = sha256,
                 certificateSha256 = certificateSha256,
                 requiresAuth = requiresAuth,
+                patchesVersionName = patchesVersionName,
             ),
     )

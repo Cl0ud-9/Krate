@@ -143,6 +143,7 @@ def build_artifact_from_public_release(app, source, work_dir):
         "sha256": sha256_of(apk_path),
         "certificateSha256": certificate_sha256(apksigner, apk_path),
         "requiresAuth": False,
+        "patchesVersionName": None,
     }
     return artifact, release
 
@@ -159,11 +160,12 @@ def build_artifact_from_draft_release(app, source, work_dir):
     download(asset_url, apk_path, authenticated=True)
 
     # the release tag is "videoapp-patched-<patches_version>" - the Patched *patches* bundle's own
-    # version, not the version of the Videoapp app that patches bundle was applied to. Showing that
-    # as "latest version" told the user nothing about what Videoapp version they'd actually be
+    # version, not the version of the Videoapp app that patches bundle was applied to. Using only
+    # that as "latest version" told the user nothing about what Videoapp version they'd actually be
     # installing, and could never match a real installed Videoapp versionName for an "up to date"
-    # comparison. build_patched_videoapp.py separately writes artifact.json with the real
-    # videoappVersion it patched, uploaded to this same release alongside the apk - fetch and use that.
+    # comparison. build_patched_videoapp.py separately writes artifact.json with both the real
+    # videoappVersion it patched and the patchesVersion that did the patching, uploaded to this same
+    # release alongside the apk - fetch and surface both, rather than picking one over the other.
     artifact_json_asset = pick_asset(release, r"^artifact\.json$")
     artifact_json_url = f"{GITHUB_API}/repos/{source['repo']}/releases/assets/{artifact_json_asset['id']}"
     artifact_metadata = download_json(artifact_json_url, authenticated=True)
@@ -175,6 +177,7 @@ def build_artifact_from_draft_release(app, source, work_dir):
         "sha256": sha256_of(apk_path),
         "certificateSha256": certificate_sha256(apksigner, apk_path),
         "requiresAuth": True,
+        "patchesVersionName": artifact_metadata["patchesVersion"],
     }
     return artifact, release
 
@@ -237,6 +240,7 @@ def main():
                 "releaseNotes": (release.get("body") or "").strip()[:2000],
                 "enabled": app["enabled"],
                 "requiresAuth": artifact["requiresAuth"],
+                "patchesVersionName": artifact.get("patchesVersionName"),
             }
         )
 

@@ -6,11 +6,15 @@ package dev.cl0ud9.manager.domain.model
 // just Videoapp Patched, kept off public releases) - downloadUrl is then a
 // api.github.com/repos/.../releases/assets/{id} URL rather than a plain browser_download_url, and
 // needs a bearer token the download engine reads from GitHubCredentialStore
+// patchesVersionName is the version of the *tool* that built this artifact (e.g. the Patched
+// patches bundle), distinct from the app's own latestVersionName (e.g. the Videoapp version that
+// tool patched) - null for artifacts with no such intermediate build tool
 data class ArtifactInfo(
     val downloadUrl: String,
     val sha256: String,
     val certificateSha256: String,
     val requiresAuth: Boolean = false,
+    val patchesVersionName: String? = null,
 )
 
 // curated catalog entry, section 7 of the spec
