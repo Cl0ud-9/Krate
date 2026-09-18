@@ -46,7 +46,7 @@
     {
       "id": "videoapp-patched",
       "displayName": "Videoapp (Patched)",
-      "packageName": "com.google.android.videoapp",
+      "packageName": "app.patched.android.videoapp",
       "supportStatus": "SUPPORTED",
       "installationMode": "CLEAN_INSTALL",
       "dependencyIds": ["microg-re"],

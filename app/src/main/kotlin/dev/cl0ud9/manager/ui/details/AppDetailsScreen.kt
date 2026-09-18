@@ -144,6 +144,15 @@ private fun AppDetailsContent(
         // intentional grouped together than as separate full-width rows with their own gaps
         AppDetailsHeader(app = app, installedVersionName = state.installedVersionName)
 
+        // shown before the user ever reaches the Install button - a required dependency missing
+        // (e.g. microG RE for Videoapp Patched) means the app installs but silently fails to open,
+        // so this is surfaced as early and as plainly as possible rather than only as a disabled
+        // button and small helper text further down the page
+        val unmetDependencies = state.dependencies.filter { !it.installed }
+        if (unmetDependencies.isNotEmpty()) {
+            MissingDependencyWarning(unmetDependencies = unmetDependencies, onNavigateToApp = onNavigateToApp)
+        }
+
         // the primary action moves right under the header instead of sitting below Release notes,
         // which could push it off-screen for apps with long release notes - a detail page exists
         // to get the user to this action, so it should not be the thing they have to scroll to find
