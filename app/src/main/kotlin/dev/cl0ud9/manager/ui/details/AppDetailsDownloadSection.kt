@@ -34,14 +34,20 @@ import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
-// section 16 of the spec: the ui shows Install or Update based on real device state, not just app metadata
+// section 16 of the spec: the ui shows Install, Update, or Reinstall based on real device state
+// compared against the catalog's latest version, not just the installation mode - a bare "Update"
+// whenever anything at all was installed (the old logic) is wrong once the installed version
+// already matches latest: there is nothing to update to, so this now says "Reinstall" instead.
+// Mode no longer drives the label at all: the Installation card below already explains the
+// clean-install mechanics separately, so this only needs to answer "is there something new"
 private fun actionLabelFor(
     app: AppProfile,
     installedVersionName: String?,
 ): String =
-    when (app.installationMode) {
-        InstallationMode.CLEAN_INSTALL -> "Install"
-        InstallationMode.UPDATE -> if (installedVersionName != null) "Update" else "Install"
+    when {
+        installedVersionName == null -> "Install"
+        installedVersionName == app.latestVersionName -> "Reinstall"
+        else -> "Update"
     }
 
 @Composable
