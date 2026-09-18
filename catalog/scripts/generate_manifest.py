@@ -26,7 +26,7 @@ GITHUB_API = "https://api.github.com"
 # per-app source, so it isn't read from catalog-metadata.json
 OWN_REPO = "Cl0ud-9/manager"
 # every Patched-style app's releases (past and present) live on one shared *private* repo, kept
-# entirely separate from OWN_REPO's public source/workflows/secrets - see SETUP.md section 6. The
+# entirely separate from OWN_REPO's public source/workflows/secrets - see SETUP.md section 5. The
 # default per-run GITHUB_TOKEN is scoped only to the repo a workflow runs in, so reading this
 # different repo needs its own token
 ARTIFACTS_TOKEN_ENV = "ARTIFACTS_REPO_TOKEN"
@@ -162,7 +162,7 @@ def build_artifact_from_public_release(app, source, work_dir):
     return [(artifact, release)]
 
 
-# the shared private artifacts repo (see SETUP.md section 6) - up to source["retainVersions"]
+# the shared private artifacts repo (see SETUP.md section 5) - up to source["retainVersions"]
 # releases matching this app's tagPrefix, newest first, each downloaded and verified the same way
 # a single-artifact app would be. artifact.json (uploaded alongside the apk by whichever build
 # script produced it) carries both the patched app's own version and the version of the tool that

@@ -49,7 +49,7 @@ Keep `manifest-signing.key` as a CI secret (`MANIFEST_SIGNING_KEY`), never commi
 
 Videoapp Patched, and any future sibling app built the same way (Videoapp Music, Photos, etc.), are
 published as normal releases on one shared **private** repo (`Cl0ud-9/manager-artifacts`, see
-section 6) rather than as public releases or drafts on the manager repo itself. For a private
+section 5) rather than as public releases or drafts on the manager repo itself. For a private
 repo, plain read access is enough to view and download a published release - unlike a draft
 release, which GitHub only exposes to accounts with push access.
 
@@ -64,49 +64,28 @@ This is a per-installer credential entered in the app itself, not a CI secret - 
 entirely if you don't plan to install one of those entries. A token can never grant more access
 than its owner's actual collaborator role, so step 1 has to happen before step 2 does anything.
 
-## 5. Patched signing keystore (needed for `.github/workflows/patched-videoapp.yml`)
+## 5. Private artifacts repo (needed for `manifest.yml` to see any Patched-style catalog entry)
 
-Reuses your own Patched Manager keystore rather than minting a new one, so anything this pipeline
-signs stays update-compatible with anything you've already installed through Patched Manager
-itself. Export it from the Patched Manager app (Settings -> Import & export -> Keystore ->
-Export), note its alias and both passwords from the same screen, then:
+The actual patch-building pipeline for Videoapp Patched (and any future sibling app built the same
+way) does **not** live in this repo at all. It lives entirely in
+[Cl0ud-9/manager-artifacts](https://github.com/Cl0ud-9/manager-artifacts) - a separate, genuinely
+private repo, deliberately, so that manager's public source and public Actions history never show
+any trace of an automated Videoapp-patching pipeline (the mechanics, not just the resulting APK).
+See that repo's own `README.md`/`SETUP.md` for its build script, its workflow, and its signing
+secrets - none of that is this repo's concern.
 
-```
-base64 -w0 patched-manager.keystore > patched-manager.keystore.b64
-gh secret set PATCHED_KEYSTORE_BASE64 < patched-manager.keystore.b64
-gh secret set PATCHED_KEYSTORE_PASSWORD
-gh secret set PATCHED_KEY_ALIAS
-gh secret set PATCHED_KEY_PASSWORD
-```
-
-Delete `patched-manager.keystore.b64` locally once uploaded.
-
-## 6. Private artifacts repo (needed for `patched-videoapp.yml` and any future sibling app pipeline)
-
-A shared **private** repo, `Cl0ud-9/manager-artifacts`, holds nothing but release binaries and
-their `artifact.json` metadata for every Patched-style app - never source, never workflows, never
-secrets. Each app publishes one release per retained version there (see `catalog-metadata.json`'s
-`retainVersions`), tagged `<app-id>-<version>` so multiple apps can share the one repo without
-colliding.
-
-Create it once:
-
-```
-gh repo create Cl0ud-9/manager-artifacts --private --description "Private release binaries for manager's Patched-style catalog entries"
-```
-
-The publishing workflow runs in the `manager` repo but needs to create/update releases in this
-*different* repo - the workflow's own ambient `GITHUB_TOKEN` is scoped only to the repo it runs in,
-so it cannot do that on its own. Create a second fine-grained personal access token, scoped to just
-`manager-artifacts`, with **"Contents: Read and write"** access (this one legitimately needs write,
-since it's the automation's own publishing credential, not a per-installer download token), then:
+What manager *does* still need: `catalog/scripts/generate_manifest.py` (run by `manifest.yml`
+here) has to read whatever's published on that other repo, and the default per-run `GITHUB_TOKEN`
+can't see a different repo than the one it's running in. Create a fine-grained personal access
+token scoped to just `manager-artifacts`, with **"Contents: Read-only"** access - this workflow
+only ever reads from that repo, never writes to it - then:
 
 ```
 gh secret set ARTIFACTS_REPO_TOKEN --repo Cl0ud-9/manager
 ```
 
 To let a friend install a Patched-style app, add them as a collaborator on `manager-artifacts`
-only (Settings -> Collaborators, or `gh repo add-collaborator`) - never on `manager` itself, and
-never with anything above Read. They then follow section 4 to get their own read-only token. This
-is the entire access-control surface: adding or removing that one collaborator entry is the only
-thing that grants or revokes someone's ability to install these apps.
+(never on `manager` itself, never with anything above Read) - see that repo's `SETUP.md`. They
+then follow section 4 above to get their own read-only token. That collaborator entry is the
+entire access-control surface: adding or removing it is the only thing that grants or revokes
+someone's ability to install these apps.
