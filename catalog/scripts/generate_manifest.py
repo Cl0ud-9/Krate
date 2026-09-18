@@ -21,6 +21,10 @@ OUTPUT_PATH = REPO_ROOT / "manifest.json"
 WORK_DIR = Path("manifest-work")
 
 GITHUB_API = "https://api.github.com"
+# this script only ever runs in this repo's own CI, publishing this repo's own manifest-latest
+# release (see RemoteCatalogRepository.kt's hardcoded MANIFEST_URL on the client side) - not a
+# per-app source, so it isn't read from catalog-metadata.json
+OWN_REPO = "Cl0ud-9/manager"
 
 
 def gh_get(path):
@@ -65,16 +69,27 @@ def pick_asset(release, pattern):
     raise RuntimeError(f"no asset matching {pattern!r} in release {release['tag_name']}")
 
 
-def download(url, dest, authenticated=False):
+def _asset_request_headers(authenticated):
     headers = {"Accept": "application/octet-stream"}
     if authenticated:
         token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
         if not token:
             raise RuntimeError("GH_TOKEN/GITHUB_TOKEN is required to download a private release asset")
         headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, headers=headers)
+    return headers
+
+
+def download(url, dest, authenticated=False):
+    req = urllib.request.Request(url, headers=_asset_request_headers(authenticated))
     with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as out:
         shutil.copyfileobj(resp, out)
+
+
+# small release assets (e.g. artifact.json) that are read directly rather than saved to disk first
+def download_json(url, authenticated=False):
+    req = urllib.request.Request(url, headers=_asset_request_headers(authenticated))
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.load(resp)
 
 
 def sha256_of(path):
@@ -143,9 +158,19 @@ def build_artifact_from_draft_release(app, source, work_dir):
     apk_path = work_dir / f"{app['id']}.apk"
     download(asset_url, apk_path, authenticated=True)
 
+    # the release tag is "videoapp-patched-<patches_version>" - the Patched *patches* bundle's own
+    # version, not the version of the Videoapp app that patches bundle was applied to. Showing that
+    # as "latest version" told the user nothing about what Videoapp version they'd actually be
+    # installing, and could never match a real installed Videoapp versionName for an "up to date"
+    # comparison. build_patched_videoapp.py separately writes artifact.json with the real
+    # videoappVersion it patched, uploaded to this same release alongside the apk - fetch and use that.
+    artifact_json_asset = pick_asset(release, r"^artifact\.json$")
+    artifact_json_url = f"{GITHUB_API}/repos/{source['repo']}/releases/assets/{artifact_json_asset['id']}"
+    artifact_metadata = download_json(artifact_json_url, authenticated=True)
+
     apksigner = find_apksigner()
     artifact = {
-        "versionName": release["tag_name"].lstrip("v"),
+        "versionName": artifact_metadata["videoappVersion"],
         "downloadUrl": asset_url,
         "sha256": sha256_of(apk_path),
         "certificateSha256": certificate_sha256(apksigner, apk_path),
@@ -161,17 +186,40 @@ def build_artifact(app, work_dir):
     return build_artifact_from_public_release(app, source, work_dir)
 
 
+# best-effort only, and never fatal on its own: this is purely the fallback source for an app whose
+# fresh ingestion fails this run (see main()) - a first-ever run with no manifest-latest release
+# yet, or any fetch hiccup, just means there is nothing to fall back to, which main() already
+# handles as a hard failure for that one app
+def fetch_previous_manifest():
+    try:
+        release = gh_get(f"/repos/{OWN_REPO}/releases/tags/manifest-latest")
+        asset = pick_asset(release, r"^manifest\.json$")
+        asset_url = f"{GITHUB_API}/repos/{OWN_REPO}/releases/assets/{asset['id']}"
+        manifest = download_json(asset_url, authenticated=True)
+        return {app["id"]: app for app in manifest.get("apps", [])}
+    except Exception as exc:  # noqa: BLE001 - deliberately broad, see docstring above
+        print(f"Could not fetch the previously published manifest as a fallback source: {exc}", file=sys.stderr)
+        return {}
+
+
 def main():
     metadata = json.loads(METADATA_PATH.read_text())
     WORK_DIR.mkdir(exist_ok=True)
+    previous_apps_by_id = fetch_previous_manifest()
 
     apps_out = []
+    degraded = []
     failures = []
     for app in metadata["apps"]:
         try:
             artifact, release = build_artifact(app, WORK_DIR)
         except (RuntimeError, urllib.error.URLError, subprocess.CalledProcessError) as exc:
-            failures.append(f"{app['id']}: {exc}")
+            previous = previous_apps_by_id.get(app["id"])
+            if previous is None:
+                failures.append(f"{app['id']}: {exc}")
+            else:
+                degraded.append(f"{app['id']}: {exc}")
+                apps_out.append(previous)
             continue
 
         apps_out.append(
@@ -192,8 +240,13 @@ def main():
             }
         )
 
+    if degraded:
+        print("Ingestion failures (kept last published manifest entry for these apps):", file=sys.stderr)
+        for line in degraded:
+            print(f"  - {line}", file=sys.stderr)
+
     if failures:
-        print("Ingestion failures (these apps will keep their last published manifest entry):", file=sys.stderr)
+        print("Ingestion failures with no previous entry to fall back to:", file=sys.stderr)
         for line in failures:
             print(f"  - {line}", file=sys.stderr)
 
@@ -203,7 +256,7 @@ def main():
 
     manifest = {"schemaVersion": metadata["schemaVersion"], "apps": apps_out}
     OUTPUT_PATH.write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"Wrote {OUTPUT_PATH} with {len(apps_out)} app(s), {len(failures)} failure(s).")
+    print(f"Wrote {OUTPUT_PATH} with {len(apps_out)} app(s), {len(failures)} hard failure(s).")
 
     if failures:
         sys.exit(1)
