@@ -121,6 +121,11 @@ private fun InstallStatusContent(
                 tint = MaterialTheme.colorScheme.primary,
                 text = "$actionLabel complete.",
             )
+            // previously nothing followed this message - the app was reachable again only after
+            // leaving and re-entering App Details (which re-derives downloadStatus back to Idle and
+            // shows UpToDateActions instead). OpenAppButton renders nothing for a package with no
+            // launcher activity, same fallback UpToDateActions already relies on
+            OpenAppButton(packageName = state.app.packageName)
         }
     }
 }

@@ -25,6 +25,10 @@ sealed interface ManagerUpdateStatus {
     data class UpdateAvailable(
         val latestVersion: String,
         val releaseUrl: String,
+        // null when the release has no .apk asset attached (shouldn't happen for a release built by
+        // this repo's own pipeline, but a release created by hand could omit it) - the UI falls back
+        // to "view on GitHub" in that case instead of offering a download button with nothing to fetch
+        val downloadUrl: String?,
     ) : ManagerUpdateStatus
 
     // distinct from Failed: the check itself succeeded, there is just genuinely no manager release
@@ -40,6 +44,13 @@ sealed interface ManagerUpdateStatus {
 private data class GithubReleaseDto(
     @SerialName("tag_name") val tagName: String,
     @SerialName("html_url") val htmlUrl: String,
+    val assets: List<GithubReleaseAssetDto> = emptyList(),
+)
+
+@Serializable
+private data class GithubReleaseAssetDto(
+    val name: String,
+    @SerialName("browser_download_url") val browserDownloadUrl: String,
 )
 
 // dot-separated numeric comparison (1.4.10 vs 1.4.9) with a plain-inequality fallback for tags that
@@ -82,11 +93,8 @@ private fun defaultHttpClient(): OkHttpClient =
         .build()
 
 // checks the manager's own GitHub Releases page against the installed version, amendment 44.2 of the
-// spec. this repo does not yet publish a signed release APK as a build artifact - that needs external
-// release-signing infrastructure this can't set up on its own - so an available update opens the
-// release page for a manual download rather than attempting a silent in-app self-install. the check
-// itself is fully real: it calls GitHub's public Releases API and compares against the actual
-// installed versionName, it never fabricates availability (section 32 of the spec)
+// spec. the check itself is fully real: it calls GitHub's public Releases API and compares against
+// the actual installed versionName, it never fabricates availability (section 32 of the spec)
 class ManagerUpdateChecker(
     context: Context,
     private val httpClient: OkHttpClient = defaultHttpClient(),
@@ -116,7 +124,8 @@ class ManagerUpdateChecker(
         if (release == null) return ManagerUpdateStatus.NoReleasePublished
         val latestVersion = release.tagName.removePrefix("v")
         return if (isNewerVersion(latestVersion, installedVersion)) {
-            ManagerUpdateStatus.UpdateAvailable(latestVersion, release.htmlUrl)
+            val apkUrl = release.assets.firstOrNull { it.name.endsWith(".apk") }?.browserDownloadUrl
+            ManagerUpdateStatus.UpdateAvailable(latestVersion, release.htmlUrl, apkUrl)
         } else {
             ManagerUpdateStatus.UpToDate
         }

@@ -12,8 +12,10 @@ import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
+import dev.cl0ud9.manager.platform.selfupdate.ManagerSelfUpdateInstaller
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
+import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +41,7 @@ class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
     private val artifactDownloader: ArtifactDownloader,
     private val managerUpdateChecker: ManagerUpdateChecker,
+    private val managerSelfUpdateInstaller: ManagerSelfUpdateInstaller,
     private val githubCredentialStore: GitHubCredentialStore,
     private val catalogRepository: CatalogRepository,
     private val installedPackageReader: InstalledPackageReader,
@@ -89,6 +92,9 @@ class SettingsViewModel(
 
     private val mutableManagerUpdateState = MutableStateFlow<ManagerUpdateUiState>(ManagerUpdateUiState.Idle)
     val managerUpdateState: StateFlow<ManagerUpdateUiState> = mutableManagerUpdateState.asStateFlow()
+
+    private val mutableSelfUpdateState = MutableStateFlow<SelfUpdateState?>(null)
+    val selfUpdateState: StateFlow<SelfUpdateState?> = mutableSelfUpdateState.asStateFlow()
 
     // never surfaces the token value itself back to the UI, only whether one is currently saved -
     // EncryptedSharedPreferences has no Flow of its own, so this is refreshed manually on set/clear
@@ -169,6 +175,19 @@ class SettingsViewModel(
             mutableManagerUpdateState.value = ManagerUpdateUiState.Checking
             val status = managerUpdateChecker.check()
             mutableManagerUpdateState.value = ManagerUpdateUiState.Result(status)
+        }
+    }
+
+    // downloads the release apk and hands it to PackageInstaller, which raises Android's own
+    // install-confirmation dialog - that system dialog IS the "prompt to update" this replaces
+    // opening the GitHub release page with. Guarded the same way checkForManagerUpdate() is: a
+    // second tap while one is already running is a no-op rather than starting a duplicate download
+    fun installManagerUpdate(downloadUrl: String) {
+        if (mutableSelfUpdateState.value is SelfUpdateState.Downloading) return
+        viewModelScope.launch {
+            managerSelfUpdateInstaller.downloadAndInstall(downloadUrl).collect { state ->
+                mutableSelfUpdateState.value = state
+            }
         }
     }
 

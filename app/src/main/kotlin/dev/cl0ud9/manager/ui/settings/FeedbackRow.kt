@@ -69,6 +69,7 @@ internal fun rememberSettingsViewModel(): SettingsViewModel =
             container.settingsRepository,
             container.artifactDownloader,
             container.managerUpdateChecker,
+            container.managerSelfUpdateInstaller,
             container.githubCredentialStore,
             container.catalogRepository,
             container.installedPackageReader,

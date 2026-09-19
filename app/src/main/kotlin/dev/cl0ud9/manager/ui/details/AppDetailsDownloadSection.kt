@@ -253,10 +253,11 @@ private fun UpToDateActions(
     }
 }
 
-// shared by UpToDateActions and the Failed branch above - renders nothing for a package with no
-// launcher activity (a pure library dependency, e.g. microG RE), same fallback both call sites need
+// shared by UpToDateActions and the Failed branch above, plus InstallStatus.Success in
+// AppDetailsInstallSection.kt (same package) - renders nothing for a package with no launcher
+// activity (a pure library dependency, e.g. microG RE), same fallback every call site needs
 @Composable
-private fun OpenAppButton(packageName: String) {
+internal fun OpenAppButton(packageName: String) {
     val context = LocalContext.current
     val launchIntent =
         remember(packageName) { context.packageManager.getLaunchIntentForPackage(packageName) }
