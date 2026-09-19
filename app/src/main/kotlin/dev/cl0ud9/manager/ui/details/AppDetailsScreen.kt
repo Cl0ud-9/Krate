@@ -130,7 +130,13 @@ internal data class AppDetailsUiState(
     val downloadStatus: DownloadStatus,
     val installStatus: InstallStatus,
     val selectedArtifact: ArtifactInfo?,
-)
+) {
+    // read by both the Idle and Failed branches of the download section - whether the installed
+    // app already matches what's selected is independent of whatever the current download
+    // attempt's own status is, so a failed redownload shouldn't hide that the app is fine
+    val isUpToDate: Boolean
+        get() = installedVersionName != null && installedVersionName == selectedArtifact?.versionName
+}
 
 @Suppress("LongParameterList")
 @Composable

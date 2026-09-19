@@ -22,6 +22,9 @@ import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.WaitingForUserStep
+import dev.cl0ud9.manager.ui.components.HelperText
+import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
+import dev.cl0ud9.manager.ui.components.StatusRow
 
 // split out of AppDetailsDownloadSection.kt purely to keep that file under detekt's per-file
 // function-count threshold - this half owns everything that happens once a download has reached

@@ -7,9 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -18,18 +16,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -38,7 +29,10 @@ import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.WaitingForUserStep
+import dev.cl0ud9.manager.ui.components.HelperText
+import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
 import dev.cl0ud9.manager.ui.components.SectionHeader
+import dev.cl0ud9.manager.ui.components.StatusRow
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 // section 16 of the spec: the ui shows Install, Update, or Reinstall based on real device state
@@ -149,7 +143,26 @@ private fun DownloadStatusContent(
                 tint = MaterialTheme.colorScheme.error,
                 text = status.reason,
             )
-            Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+            // a failed redownload attempt used to hide the Open button entirely, even when the
+            // already-installed app is perfectly fine - isUpToDate here is the same check IdleContent
+            // uses, just also applied to the Failed branch, so the app stays reachable while the
+            // retry option sits alongside it instead of replacing it
+            if (state.isUpToDate) {
+                OpenAppButton(packageName = state.app.packageName)
+            }
+            Button(
+                onClick = onDownload,
+                modifier = Modifier.fillMaxWidth(),
+                colors =
+                    if (state.isUpToDate) {
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    } else {
+                        ButtonDefaults.buttonColors()
+                    },
+            ) {
                 Text("Retry download")
             }
         }
@@ -168,7 +181,7 @@ private fun IdleContent(
     onDownload: () -> Unit,
 ) {
     val selected = state.selectedArtifact
-    val upToDate = state.installedVersionName != null && state.installedVersionName == selected?.versionName
+    val upToDate = state.isUpToDate
     val awaitingUninstallConfirm =
         state.installStatus is InstallStatus.WaitingForUser &&
             state.installStatus.step == WaitingForUserStep.UNINSTALL_CONFIRM
@@ -220,9 +233,7 @@ private fun UpToDateActions(
         remember(packageName) { context.packageManager.getLaunchIntentForPackage(packageName) }
     if (launchIntent != null) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = { context.startActivity(launchIntent) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Open")
-            }
+            OpenAppButton(packageName = packageName)
             Button(
                 onClick = onDownload,
                 modifier = Modifier.fillMaxWidth(),
@@ -242,6 +253,20 @@ private fun UpToDateActions(
     }
 }
 
+// shared by UpToDateActions and the Failed branch above - renders nothing for a package with no
+// launcher activity (a pure library dependency, e.g. microG RE), same fallback both call sites need
+@Composable
+private fun OpenAppButton(packageName: String) {
+    val context = LocalContext.current
+    val launchIntent =
+        remember(packageName) { context.packageManager.getLaunchIntentForPackage(packageName) }
+    if (launchIntent != null) {
+        Button(onClick = { context.startActivity(launchIntent) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Open")
+        }
+    }
+}
+
 // installStatus is shared with the install flow elsewhere on this screen, but Uninstalling/
 // WaitingForUser(UNINSTALL_CONFIRM) are only ever emitted by the uninstall flow itself, so reading
 // them here is unambiguous. A successful uninstall isn't shown explicitly: refresh() flips
@@ -257,50 +282,6 @@ private fun UninstallingStatus(installStatus: InstallStatus) {
             "Confirm the uninstall in the system dialog."
         },
     )
-}
-
-// every in-progress state below shares this exact indicator - one definition instead of six copies.
-// determinate progress (real download bytes) keeps the wavy linear bar, since a filled fraction is
-// genuinely informative there. indeterminate states (installing, uninstalling, waiting for the user)
-// used to reuse the same indeterminate wavy bar, but that animates as two independently-phased wavy
-// segments chasing each other - readable as an actual progress bar when it's genuinely determinate,
-// but noisy and easy to misread as "two bars" when there is no real progress fraction behind it. the
-// expressive LoadingIndicator (a single morphing shape) is Material's own component for exactly this
-// indeterminate case, so it replaces the wavy bar rather than reusing it just because it's already wired up
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-internal fun ManagerLinearProgress(progress: Float?) {
-    if (progress != null) {
-        // stock M3 ramps the wave amplitude down to 0 below 10% and above 95% progress (settling
-        // down as it starts/finishes) - held constant here instead, since a download nearing
-        // completion flattening out read as the progress bar stalling rather than almost done
-        LinearWavyProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.fillMaxWidth(),
-            amplitude = { 1f },
-        )
-    } else {
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            LoadingIndicator()
-        }
-    }
-}
-
-@Composable
-internal fun StatusRow(
-    icon: Painter,
-    tint: Color,
-    text: String,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(icon, contentDescription = null, tint = tint)
-        Text(text, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-internal fun HelperText(text: String) {
-    Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 private const val BYTES_PER_MB = 1024 * 1024

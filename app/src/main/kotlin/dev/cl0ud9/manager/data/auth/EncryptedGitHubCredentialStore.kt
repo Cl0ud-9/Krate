@@ -15,10 +15,16 @@ class EncryptedGitHubCredentialStore(
 ) : GitHubCredentialStore {
     private val prefs: SharedPreferences by lazy { buildEncryptedPrefs(context) }
 
-    override fun getToken(): String? = prefs.getString(KEY_TOKEN, null)?.takeIf { it.isNotBlank() }
+    // .trim() here too, not just in setToken - an already-saved token from before that trim existed
+    // would otherwise keep failing every download until the user notices and manually re-enters it
+    override fun getToken(): String? = prefs.getString(KEY_TOKEN, null)?.trim()?.takeIf { it.isNotBlank() }
 
+    // trimmed here, not just at the UI layer - a token copied from a terminal or a file often
+    // carries a trailing newline, and OkHttp's header validation rejects any control character in
+    // an Authorization value outright ("Unexpected char 0x0a..."), failing every download until the
+    // user notices and manually re-types it
     override fun setToken(token: String) {
-        prefs.edit().putString(KEY_TOKEN, token).apply()
+        prefs.edit().putString(KEY_TOKEN, token.trim()).apply()
     }
 
     override fun clearToken() {
