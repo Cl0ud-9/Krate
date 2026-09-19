@@ -8,7 +8,10 @@ import dev.cl0ud9.manager.data.settings.DEFAULT_NAV_BAR_CORNER_RADIUS
 import dev.cl0ud9.manager.domain.model.LaunchTab
 import dev.cl0ud9.manager.domain.model.NavBarStyle
 import dev.cl0ud9.manager.domain.model.ThemeMode
+import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
+import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
+import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,12 +34,15 @@ sealed interface ManagerUpdateUiState {
     ) : ManagerUpdateUiState
 }
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LongParameterList")
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
     private val artifactDownloader: ArtifactDownloader,
     private val managerUpdateChecker: ManagerUpdateChecker,
     private val githubCredentialStore: GitHubCredentialStore,
+    private val catalogRepository: CatalogRepository,
+    private val installedPackageReader: InstalledPackageReader,
+    private val activityLogRepository: ActivityLogRepository,
 ) : ViewModel() {
     val automaticDownloads: StateFlow<Boolean> =
         settingsRepository
@@ -87,6 +94,40 @@ class SettingsViewModel(
     // EncryptedSharedPreferences has no Flow of its own, so this is refreshed manually on set/clear
     private val mutableHasGitHubToken = MutableStateFlow(githubCredentialStore.getToken() != null)
     val hasGitHubToken: StateFlow<Boolean> = mutableHasGitHubToken.asStateFlow()
+
+    private val mutableFeedbackText = MutableStateFlow("")
+    val feedbackText: StateFlow<String> = mutableFeedbackText.asStateFlow()
+
+    private val mutableDiagnosticReport = MutableStateFlow<String?>(null)
+    val diagnosticReport: StateFlow<String?> = mutableDiagnosticReport.asStateFlow()
+
+    private val mutableGeneratingReport = MutableStateFlow(false)
+    val generatingReport: StateFlow<Boolean> = mutableGeneratingReport.asStateFlow()
+
+    fun setFeedbackText(text: String) {
+        mutableFeedbackText.value = text
+    }
+
+    // deviceSummary is gathered by the caller (rememberDeviceSummary(), UI layer) since it's plain
+    // Context/PackageManager facts, not app state this ViewModel otherwise owns - see that
+    // composable's own comment for why. Everything below IS this ViewModel's own state, so it stays
+    // here: catalog size, install count, and recent activity all come from the same repositories
+    // Home/Apps/Updates already read, just assembled into one text blob instead of separate StateFlows
+    fun generateDiagnosticReport(deviceSummary: String) {
+        if (mutableGeneratingReport.value) return
+        viewModelScope.launch {
+            mutableGeneratingReport.value = true
+            val report =
+                withContext(Dispatchers.IO) {
+                    val apps = catalogRepository.observeApps().first()
+                    val installedCount = apps.count { installedPackageReader.installedVersion(it.packageName) != null }
+                    val recentActivity = activityLogRepository.observeRecent().first()
+                    formatDiagnosticReport(deviceSummary, apps.size, installedCount, recentActivity)
+                }
+            mutableDiagnosticReport.value = report
+            mutableGeneratingReport.value = false
+        }
+    }
 
     fun setAutomaticDownloads(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setAutomaticDownloads(enabled) }

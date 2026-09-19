@@ -13,12 +13,14 @@ import dev.cl0ud9.manager.platform.packageinfo.isUpdateAvailable
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import dev.cl0ud9.manager.ui.util.withMinimumDuration
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -50,18 +52,22 @@ class HomeViewModel(
             .map { it.size }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
-    // real device-installed vs catalog-latest comparison, section 13 + 42.19 of the spec
+    // real device-installed vs catalog-latest comparison, section 13 + 42.19 of the spec.
+    // installedVersion() is a real PackageManager Binder call per app - flowOn(IO) keeps this
+    // (and installedCount below) off the main thread, same reasoning as Apps/Updates' identical fix
     val pendingUpdateCount: StateFlow<Int> =
         refreshedApps
             .map { apps ->
                 apps.count { app ->
                     isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app.latestVersionName)
                 }
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
+            }.flowOn(Dispatchers.IO)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
     val installedCount: StateFlow<Int> =
         refreshedApps
             .map { apps -> apps.count { installedPackageReader.installedVersion(it.packageName) != null } }
+            .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
     val recentActivity: StateFlow<List<ActivityEntry>> =

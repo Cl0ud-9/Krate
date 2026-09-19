@@ -10,10 +10,19 @@ import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import dev.cl0ud9.manager.EXTRA_TARGET_ROUTE
 import dev.cl0ud9.manager.MainActivity
 import dev.cl0ud9.manager.R
 
-private const val CHANNEL_ID = "updates"
+// "_v2", not just "updates": a notification channel's importance can't be changed after it's first
+// created under a given id - Android ignores createNotificationChannel() for an id that already
+// exists, and a delete+recreate under the SAME id doesn't reliably reset it either (Android restores
+// the channel's prior effective importance rather than honoring the new request - confirmed live via
+// `dumpsys notification` on the sibling "downloads" channel, which stayed stuck at its original
+// importance through exactly that delete+recreate dance). This channel predates IMPORTANCE_HIGH
+// being requested here, so it was stuck at whatever it originally shipped with; a new id is the only
+// reliable fix - the old "updates" channel is simply orphaned, which is harmless
+private const val CHANNEL_ID = "updates_v2"
 private const val PENDING_UPDATES_NOTIFICATION_ID = 1001
 private const val MANAGER_UPDATE_NOTIFICATION_ID = 1002
 private const val UPDATE_ALL_RESULT_NOTIFICATION_ID = 1003
@@ -25,11 +34,12 @@ private const val UPDATE_ALL_RESULT_NOTIFICATION_ID = 1003
 // FCM is ever wired up
 object UpdateNotifier {
     fun ensureChannel(context: Context) {
+        val manager = context.getSystemService(NotificationManager::class.java)
         val channel =
-            NotificationChannel(CHANNEL_ID, "Updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            NotificationChannel(CHANNEL_ID, "Updates", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Notifies about catalog app updates, manager updates, and Update All results"
             }
-        context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        manager?.createNotificationChannel(channel)
     }
 
     fun notifyPendingUpdates(
@@ -41,6 +51,7 @@ object UpdateNotifier {
             id = PENDING_UPDATES_NOTIFICATION_ID,
             title = if (count == 1) "1 update available" else "$count updates available",
             text = "Tap to see what's new.",
+            targetRoute = "updates",
         )
     }
 
@@ -55,6 +66,7 @@ object UpdateNotifier {
             id = MANAGER_UPDATE_NOTIFICATION_ID,
             title = "Manager update available",
             text = "Version $version is ready on GitHub.",
+            targetRoute = "updates",
         )
     }
 
@@ -79,6 +91,7 @@ object UpdateNotifier {
             id = UPDATE_ALL_RESULT_NOTIFICATION_ID,
             title = title,
             text = "Tap to see the details.",
+            targetRoute = "updates",
         )
     }
 
@@ -91,18 +104,24 @@ object UpdateNotifier {
         id: Int,
         title: String,
         text: String,
+        targetRoute: String,
     ) {
         val granted =
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
                 PackageManager.PERMISSION_GRANTED
         if (!granted) return
 
+        ensureChannel(context)
+
         val openApp =
             PendingIntent.getActivity(
                 context,
-                0,
-                Intent(context, MainActivity::class.java),
-                PendingIntent.FLAG_IMMUTABLE,
+                id,
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    putExtra(EXTRA_TARGET_ROUTE, targetRoute)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         val notification =
             NotificationCompat
@@ -112,6 +131,9 @@ object UpdateNotifier {
                 .setContentText(text)
                 .setContentIntent(openApp)
                 .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setCategory(NotificationCompat.CATEGORY_EVENT)
                 .build()
         NotificationManagerCompat.from(context).notify(id, notification)
     }

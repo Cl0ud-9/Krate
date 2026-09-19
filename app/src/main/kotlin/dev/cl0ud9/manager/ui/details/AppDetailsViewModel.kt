@@ -3,6 +3,7 @@ package dev.cl0ud9.manager.ui.details
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
+import dev.cl0ud9.manager.data.downloads.DownloadProgressNotifier
 import dev.cl0ud9.manager.domain.dependency.DependencyGraph
 import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
@@ -17,6 +18,7 @@ import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,10 +26,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
@@ -36,10 +41,14 @@ data class DependencyInfo(
     val installed: Boolean,
 )
 
-// six collaborators plus the screen's own appId argument - each one is a distinct, already-shared
+// seven collaborators plus the screen's own appId argument - each one is a distinct, already-shared
 // singleton from AppContainer (not something to bundle into an artificial "dependencies" wrapper
-// purely to dodge this count), so the added activityLogRepository param is a justified exception
-@Suppress("LongParameterList")
+// purely to dodge this count). TooManyFunctions is similarly a real but justified count: this is the
+// one class that owns every distinct user-facing operation on this screen (refresh, select a
+// version, start/retry a download or install, plus the onCleared cleanup that keeps a backgrounded
+// download's notification from outliving it) - splitting those apart would scatter one screen's
+// state across several classes rather than actually shrinking any of it
+@Suppress("LongParameterList", "TooManyFunctions")
 class AppDetailsViewModel(
     private val catalogRepository: CatalogRepository,
     private val artifactDownloader: ArtifactDownloader,
@@ -47,7 +56,8 @@ class AppDetailsViewModel(
     private val cleanInstallOrchestrator: CleanInstallOrchestrator,
     private val installedPackageReader: InstalledPackageReader,
     private val activityLogRepository: ActivityLogRepository,
-    appId: String,
+    private val downloadProgressNotifier: DownloadProgressNotifier,
+    private val appId: String,
 ) : ViewModel() {
     val app: StateFlow<AppProfile?> =
         catalogRepository
@@ -58,16 +68,23 @@ class AppDetailsViewModel(
     // install also refreshes immediately below, section 13 + 42.19 of the spec
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
+    // installedVersion() is a real PackageManager Binder call, not free - flowOn(IO) keeps it off
+    // the main thread, which otherwise blocked right during this screen's own enter transition
+    // (collapsing header, depth-blur) every single time it opened
     val installedVersionName: StateFlow<String?> =
         combine(app, refreshTrigger.onStart { emit(Unit) }) { profile, _ -> profile }
             .map { profile -> profile?.let { installedPackageReader.installedVersion(it.packageName)?.versionName } }
+            .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
-    // direct dependencies with real install state, section 14 + 42.11 of the spec - most apps have none
+    // direct dependencies with real install state, section 14 + 42.11 of the spec - most apps have
+    // none. Same flowOn(IO) reasoning as installedVersionName above - resolveDependencies() calls
+    // installedPackageReader once per dependency
     val dependencies: StateFlow<List<DependencyInfo>> =
         combine(app, catalogRepository.observeApps(), refreshTrigger.onStart { emit(Unit) }) { profile, catalog, _ ->
             profile to catalog
         }.map { (profile, catalog) -> profile?.let { resolveDependencies(it, catalog) } ?: emptyList() }
+            .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     private val mutableDownloadStatus = MutableStateFlow<DownloadStatus>(DownloadStatus.Idle)
@@ -83,6 +100,29 @@ class AppDetailsViewModel(
     val selectedArtifact: StateFlow<ArtifactInfo?> =
         combine(app, mutableExplicitArtifact) { profile, explicit -> explicit ?: profile?.latestArtifact }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    // a fresh ViewModel (any plain revisit of this screen - navigating away and back mints a new
+    // screen-scoped instance every time, not just process death) otherwise starts at Idle even when
+    // a verified download for the current app+version is already sitting on disk from earlier,
+    // forcing a redundant "Redownload" the user shouldn't have to do. Only ever moves Idle ->
+    // ReadyToInstall, never overwrites a real in-flight Downloading/Verifying/Failed status.
+    // existingReadyFile() is a real (if small) blocking File.exists() call - withContext(IO) keeps
+    // it off the main thread, same reasoning as installedVersionName/dependencies above
+    init {
+        viewModelScope.launch {
+            combine(app.filterNotNull(), selectedArtifact.filterNotNull()) { profile, artifact ->
+                profile to artifact
+            }.collect { (profile, artifact) ->
+                if (mutableDownloadStatus.value == DownloadStatus.Idle) {
+                    val readyFile =
+                        withContext(Dispatchers.IO) { artifactDownloader.existingReadyFile(profile, artifact) }
+                    if (readyFile != null) {
+                        mutableDownloadStatus.value = DownloadStatus.ReadyToInstall(readyFile)
+                    }
+                }
+            }
+        }
+    }
 
     fun refresh() {
         refreshTrigger.tryEmit(Unit)
@@ -108,9 +148,43 @@ class AppDetailsViewModel(
         ) {
             return
         }
+        // this keeps running for as long as the ViewModel itself is alive, which backgrounding the
+        // app via Home does not affect - only leaving this screen (clearing the ViewModel) or the
+        // process actually dying does. downloadProgressNotifier decides on its own whether a
+        // notification is actually worth showing (it no-ops while the app is in the foreground,
+        // where App Details' own progress bar already covers this) and whether a finished result
+        // is worth surfacing even after the app comes back to the foreground
         viewModelScope.launch {
-            artifactDownloader.download(currentApp, artifact).collect { status -> mutableDownloadStatus.value = status }
+            artifactDownloader.download(currentApp, artifact).collect { status ->
+                mutableDownloadStatus.value = status
+                when (status) {
+                    is DownloadStatus.Downloading ->
+                        downloadProgressNotifier.onDownloading(
+                            currentApp.id,
+                            currentApp.displayName,
+                            status.bytesDownloaded,
+                            status.totalBytes,
+                        )
+
+                    is DownloadStatus.Verifying ->
+                        downloadProgressNotifier.onVerifying(currentApp.id, currentApp.displayName)
+
+                    is DownloadStatus.ReadyToInstall ->
+                        downloadProgressNotifier.onComplete(currentApp.id, currentApp.displayName)
+
+                    is DownloadStatus.Failed ->
+                        downloadProgressNotifier.onFailed(currentApp.id, currentApp.displayName, status.reason)
+
+                    is DownloadStatus.Idle -> downloadProgressNotifier.clear(currentApp.id)
+                }
+            }
         }
+    }
+
+    // leaving this screen mid-download cancels the download itself (viewModelScope goes with it) -
+    // this makes sure a lingering progress notification doesn't outlive that
+    override fun onCleared() {
+        downloadProgressNotifier.clear(appId)
     }
 
     // videoapp patched (CLEAN_INSTALL) always goes through the orchestrator, section 16, 42.12 of the spec.
@@ -135,6 +209,23 @@ class AppDetailsViewModel(
         val readyStatus = readyDownload()
         if (currentApp == null || readyStatus == null || isBusy()) return
         runInstallFlow(cleanInstallOrchestrator.cleanInstall(currentApp, File(readyStatus.filePath)), currentApp)
+    }
+
+    // a standalone uninstall, independent of any download - reuses the same InstallationEngine the
+    // clean-install path already drives for its own uninstall step, and the same system
+    // confirmation-dialog flow (WaitingForUser(UNINSTALL_CONFIRM) -> Uninstalling -> Success/Failed)
+    fun startUninstall() {
+        val currentApp = app.value
+        if (currentApp == null || installedVersionName.value == null || isBusy()) return
+        viewModelScope.launch {
+            installationEngine.uninstall(currentApp.packageName).collect { status ->
+                mutableInstallStatus.value = status
+                if (status is InstallStatus.Success) {
+                    recordActivity(currentApp, ActivityAction.UNINSTALLED)
+                    refresh()
+                }
+            }
+        }
     }
 
     private fun resolveDependencies(
@@ -164,7 +255,7 @@ class AppDetailsViewModel(
     ) {
         // captured before the flow runs, not after: installedVersionName reflects the OLD device
         // state right now, which is exactly what decides whether this is an install or an update
-        val wasInstalled = installedVersionName.value != null
+        val action = if (installedVersionName.value != null) ActivityAction.UPDATED else ActivityAction.INSTALLED
         viewModelScope.launch {
             flow.collect { status ->
                 mutableInstallStatus.value = status
@@ -172,7 +263,7 @@ class AppDetailsViewModel(
                     // the downloaded apk is redundant once PackageInstaller has actually committed it -
                     // not deleted on failure, since a retry reuses this same file instead of re-downloading
                     readyDownload()?.let { artifactDownloader.deleteDownloadedFile(it.filePath) }
-                    recordActivity(targetApp, wasInstalled)
+                    recordActivity(targetApp, action)
                     refresh()
                 }
             }
@@ -181,14 +272,14 @@ class AppDetailsViewModel(
 
     private suspend fun recordActivity(
         targetApp: AppProfile,
-        wasInstalled: Boolean,
+        action: ActivityAction,
     ) {
         activityLogRepository.record(
             ActivityEntry(
                 id = UUID.randomUUID().toString(),
                 appId = targetApp.id,
                 appName = targetApp.displayName,
-                action = if (wasInstalled) ActivityAction.UPDATED else ActivityAction.INSTALLED,
+                action = action,
                 timestampMillis = System.currentTimeMillis(),
             ),
         )

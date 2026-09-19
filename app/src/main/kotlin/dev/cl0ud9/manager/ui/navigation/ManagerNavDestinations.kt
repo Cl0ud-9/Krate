@@ -32,7 +32,10 @@ internal fun NavGraphBuilder.tabDestinations(navController: NavHostController) {
                 SettingsShortcutAction(onClick = openSettings)
             },
         ) {
-            HomeScreen(onNavigateToUpdates = { navController.navigateToTab(ManagerDestination.UPDATES.route) })
+            HomeScreen(
+                onNavigateToApps = { navController.navigateToTab(ManagerDestination.APPS.route) },
+                onNavigateToUpdates = { navController.navigateToTab(ManagerDestination.UPDATES.route) },
+            )
         }
     }
     composable(ManagerDestination.APPS.route) { entry ->

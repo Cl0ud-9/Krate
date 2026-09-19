@@ -12,11 +12,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -32,11 +30,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
@@ -57,7 +58,10 @@ private const val MAX_ACTIVITY_ROWS = 5
 // themselves, section 30 of the spec
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onNavigateToUpdates: () -> Unit) {
+fun HomeScreen(
+    onNavigateToApps: () -> Unit,
+    onNavigateToUpdates: () -> Unit,
+) {
     val viewModel =
         managerViewModel { container ->
             HomeViewModel(
@@ -101,15 +105,13 @@ fun HomeScreen(onNavigateToUpdates: () -> Unit) {
                     label = "Apps in catalog",
                     value = catalogCount.toString(),
                     modifier = Modifier.weight(1f),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    onClick = onNavigateToApps,
                 )
                 StatTile(
                     label = "Installed on device",
                     value = installedCount.toString(),
                     modifier = Modifier.weight(1f),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    onClick = onNavigateToApps,
                 )
             }
 
@@ -152,8 +154,10 @@ private fun StatusHeroCard(
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
     ) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            val heroIconRes =
+                if (upToDate) R.drawable.ic_check_circle_rounded else R.drawable.ic_system_update_alt_rounded
             Icon(
-                imageVector = if (upToDate) Icons.Filled.CheckCircle else Icons.Filled.SystemUpdateAlt,
+                painter = painterResource(heroIconRes),
                 contentDescription = null,
                 modifier = Modifier.size(36.dp),
             )
@@ -193,7 +197,7 @@ private fun RecentActivitySection(entries: List<ActivityEntry>) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionHeader(
             title = "Recent activity",
-            icon = Icons.Filled.History,
+            icon = rememberVectorPainter(Icons.Filled.History),
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         )
@@ -262,7 +266,7 @@ private fun ActivityRow(entry: ActivityEntry) {
 }
 
 private data class ActivityPresentation(
-    val icon: ImageVector,
+    val icon: Painter,
     val badgeColor: Color,
     val onBadgeColor: Color,
     val label: String,
@@ -273,7 +277,7 @@ private fun activityPresentation(action: ActivityAction): ActivityPresentation =
     when (action) {
         ActivityAction.INSTALLED ->
             ActivityPresentation(
-                Icons.Filled.Download,
+                rememberVectorPainter(Icons.Filled.Download),
                 MaterialTheme.colorScheme.primaryContainer,
                 MaterialTheme.colorScheme.onPrimaryContainer,
                 "Installed",
@@ -281,7 +285,7 @@ private fun activityPresentation(action: ActivityAction): ActivityPresentation =
 
         ActivityAction.UPDATED ->
             ActivityPresentation(
-                Icons.Filled.SystemUpdateAlt,
+                painterResource(R.drawable.ic_system_update_alt_rounded),
                 MaterialTheme.colorScheme.tertiaryContainer,
                 MaterialTheme.colorScheme.onTertiaryContainer,
                 "Updated",
@@ -289,7 +293,7 @@ private fun activityPresentation(action: ActivityAction): ActivityPresentation =
 
         ActivityAction.UNINSTALLED ->
             ActivityPresentation(
-                Icons.Filled.Delete,
+                rememberVectorPainter(Icons.Filled.Delete),
                 MaterialTheme.colorScheme.errorContainer,
                 MaterialTheme.colorScheme.onErrorContainer,
                 "Uninstalled",

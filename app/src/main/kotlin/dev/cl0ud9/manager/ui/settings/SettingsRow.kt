@@ -22,7 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -50,7 +50,7 @@ internal fun defaultSettingsRowColors() =
 // the icon/title/subtitle/colors that make up a row's header, bundled together so SettingsRow
 // itself stays under detekt's parameter-count threshold
 internal data class SettingsRowHeader(
-    val icon: ImageVector,
+    val icon: Painter,
     val title: String,
     val subtitle: String,
     val colors: SettingsRowColors,

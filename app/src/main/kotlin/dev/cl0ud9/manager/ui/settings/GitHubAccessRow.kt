@@ -2,8 +2,6 @@ package dev.cl0ud9.manager.ui.settings
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -16,8 +14,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import dev.cl0ud9.manager.R
 
 // the Patched-style catalog entries (Videoapp, and any future sibling app built the same way) are
 // hosted as published releases on one shared *private* artifacts repo, never the public manager
@@ -35,7 +35,7 @@ internal fun GitHubAccessRow(
     SettingsRow(
         header =
             SettingsRowHeader(
-                icon = Icons.Filled.Key,
+                icon = painterResource(R.drawable.ic_key_rounded),
                 title = "GitHub access",
                 subtitle =
                     if (hasToken) {

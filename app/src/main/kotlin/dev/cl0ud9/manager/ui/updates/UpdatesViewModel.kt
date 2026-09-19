@@ -17,12 +17,16 @@ import dev.cl0ud9.manager.domain.updateall.UpdateAllProgress
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.isUpdateAvailable
 import dev.cl0ud9.manager.ui.util.withMinimumDuration
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -68,14 +72,23 @@ class UpdatesViewModel(
     private val mutableIsRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = mutableIsRefreshing.asStateFlow()
 
+    // one-shot: a failed pull-to-refresh used to just stop the spinner with zero feedback - see
+    // AppsViewModel's identical field for why this doesn't mean the list itself ever goes empty
+    private val mutableRefreshFailed = MutableSharedFlow<Unit>()
+    val refreshFailed: SharedFlow<Unit> = mutableRefreshFailed.asSharedFlow()
+
     private val catalog: StateFlow<List<AppProfile>> =
         catalogRepository
             .observeApps()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
+    // toUiState() calls installedPackageReader.installedVersion() (a real PackageManager Binder
+    // call) once per catalog app - flowOn(IO) keeps that off the main thread, same reasoning as
+    // AppsViewModel's identical fix
     val uiState: StateFlow<UpdatesUiState> =
         combine(catalog, refreshTrigger.onStart { emit(Unit) }) { apps, _ -> apps }
             .map { apps -> toUiState(apps) }
+            .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), UpdatesUiState.Loading)
 
     private val mutableUpdateAllState = MutableStateFlow<UpdateAllUiState>(UpdateAllUiState.Idle)
@@ -92,8 +105,9 @@ class UpdatesViewModel(
         if (mutableIsRefreshing.value) return
         viewModelScope.launch {
             mutableIsRefreshing.value = true
-            withMinimumDuration { runCatching { catalogRepository.refresh() } }
+            val result = withMinimumDuration { runCatching { catalogRepository.refresh() } }
             mutableIsRefreshing.value = false
+            if (result.isFailure) mutableRefreshFailed.emit(Unit)
         }
     }
 

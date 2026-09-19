@@ -24,4 +24,13 @@ interface ArtifactDownloader {
     // was never followed by a successful install: abandoned, or from a build before this existed).
     // Returns bytes freed, so the UI can confirm what actually happened.
     fun clearCache(): Long
+
+    // a verified download for this exact app+version already sitting on disk from earlier - lets a
+    // fresh AppDetailsViewModel (a plain revisit of the screen, not just process death: navigating
+    // away and back mints a new screen-scoped ViewModel every time) recognize it instead of forcing
+    // a redundant redownload of something that's already there and ready to install
+    fun existingReadyFile(
+        app: AppProfile,
+        artifact: ArtifactInfo,
+    ): String?
 }

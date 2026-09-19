@@ -24,15 +24,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.ui.components.AppListItem
 import dev.cl0ud9.manager.ui.components.EmptyState
 import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
+import dev.cl0ud9.manager.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.manager.ui.components.RefreshPillButton
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
+import dev.cl0ud9.manager.ui.util.rememberDebouncedOnClick
 
 // curated application catalog, section 30 of the spec
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -50,15 +53,22 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
 
-    // the catalog can go stale between visits (a new app added, a new version published), and this is
-    // the primary list screen for it - refreshFromNetwork() re-fetches the shared manifest cache rather
-    // than just re-checking local installed state, so every other screen sharing that cache benefits too
-    ManagerPullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = viewModel::refreshFromNetwork,
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        AppsContent(uiState = uiState, isRefreshing = isRefreshing, viewModel = viewModel, onAppClick = onAppClick)
+    Box(modifier = Modifier.fillMaxSize()) {
+        // the catalog can go stale between visits (a new app added, a new version published), and this
+        // is the primary list screen for it - refreshFromNetwork() re-fetches the shared manifest cache
+        // rather than just re-checking local installed state, so every other screen sharing that cache
+        // benefits too
+        ManagerPullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = viewModel::refreshFromNetwork,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            AppsContent(uiState = uiState, isRefreshing = isRefreshing, viewModel = viewModel, onAppClick = onAppClick)
+        }
+        RefreshFailureSnackbar(
+            refreshFailed = viewModel.refreshFailed,
+            message = "Couldn't refresh - showing the last known catalog.",
+        )
     }
 }
 
@@ -87,7 +97,7 @@ private fun AppsContent(
 
             is AppsUiState.Empty -> {
                 EmptyState(
-                    icon = Icons.Filled.Apps,
+                    icon = rememberVectorPainter(Icons.Filled.Apps),
                     title = "No apps in the catalog yet",
                     subtitle = "Curated apps will appear here once the catalog is populated.",
                 )
@@ -112,7 +122,10 @@ private fun AppsContent(
                             AppListItem(
                                 app = app,
                                 installed = app.packageName in state.installedPackageNames,
-                                onClick = { onAppClick(app.id) },
+                                // a fast double-tap could otherwise reach the nav controller twice
+                                // before the first navigate() call's recomposition landed, pushing
+                                // App Details onto the back stack twice
+                                onClick = rememberDebouncedOnClick(onClick = { onAppClick(app.id) }),
                             )
                         }
                     }

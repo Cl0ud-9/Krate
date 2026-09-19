@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,16 +33,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.model.latestVersionName
 import dev.cl0ud9.manager.ui.components.AppIconAvatar
@@ -72,6 +76,7 @@ fun AppDetailsScreen(
                 container.cleanInstallOrchestrator,
                 container.installedPackageReader,
                 container.activityLogRepository,
+                container.downloadProgressNotifier,
                 appId,
             )
         }
@@ -107,6 +112,7 @@ fun AppDetailsScreen(
                 onDownload = rememberDebouncedOnClick(onClick = viewModel::startDownload),
                 onInstall = rememberDebouncedOnClick(onClick = viewModel::startInstall),
                 onRetryAsCleanInstall = rememberDebouncedOnClick(onClick = viewModel::retryAsCleanInstall),
+                onUninstall = rememberDebouncedOnClick(onClick = viewModel::startUninstall),
                 onSelectVersion = viewModel::selectVersion,
                 onNavigateToApp = onNavigateToApp,
                 scrollState = scrollState,
@@ -133,12 +139,18 @@ private fun AppDetailsContent(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
+    onUninstall: () -> Unit,
     onSelectVersion: (ArtifactInfo) -> Unit,
     onNavigateToApp: (String) -> Unit,
     scrollState: ScrollState,
     topContentPadding: Dp,
 ) {
     val app = state.app
+    val awaitingUninstallConfirm =
+        state.installStatus is InstallStatus.WaitingForUser &&
+            state.installStatus.step == WaitingForUserStep.UNINSTALL_CONFIRM
+    val uninstalling = state.installStatus is InstallStatus.Uninstalling || awaitingUninstallConfirm
+
     Column(
         modifier =
             Modifier
@@ -150,7 +162,12 @@ private fun AppDetailsContent(
         // one compact header block instead of three stacked rows (name/package, badge/version,
         // installed status) - each of those is a short fragment on its own and reads as more
         // intentional grouped together than as separate full-width rows with their own gaps
-        AppDetailsHeader(app = app, installedVersionName = state.installedVersionName)
+        AppDetailsHeader(
+            app = app,
+            installedVersionName = state.installedVersionName,
+            uninstalling = uninstalling,
+            onUninstall = onUninstall,
+        )
 
         // shown before the user ever reaches the Install button - a required dependency missing
         // (e.g. microG RE for Videoapp Patched) means the app installs but silently fails to open,
@@ -202,10 +219,15 @@ private fun AppDetailsContent(
     }
 }
 
+// the trash action sits beside the name/compatibility/version block as a whole, vertically centered
+// against its full height (not pinned to the bottom "Installed" line) - a floating trailing action
+// for the header overall, rather than a control that belongs to any one row within it
 @Composable
 private fun AppDetailsHeader(
     app: AppProfile,
     installedVersionName: String?,
+    uninstalling: Boolean,
+    onUninstall: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -213,42 +235,77 @@ private fun AppDetailsHeader(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                AppIconAvatar(displayName = app.displayName, seed = app.id, size = 56.dp, packageName = app.packageName)
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(text = app.displayName, style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        text = app.packageName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        AppIconAvatar(
+                            displayName = app.displayName,
+                            seed = app.id,
+                            size = 56.dp,
+                            packageName = app.packageName,
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(text = app.displayName, style = MaterialTheme.typography.headlineSmall)
+                            Text(
+                                text = app.packageName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SupportStatusBadge(status = app.supportStatus)
+                        Text(
+                            text = app.latestVersionName?.let { "Latest $it" } ?: "Latest version unknown",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+
+                    // only set for an artifact built by an intermediate tool (currently just
+                    // Patched patches) - "Latest" above is always the app's own version (e.g.
+                    // Videoapp's), so this is shown alongside it rather than instead of it, giving a
+                    // complete picture of both what was patched and what patched it
+                    app.latestArtifact?.patchesVersionName?.let { patchesVersion ->
+                        Text(
+                            text = "Patches $patchesVersion",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (installedVersionName != null) {
+                    UninstallIconControl(uninstalling = uninstalling, onUninstall = onUninstall)
                 }
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SupportStatusBadge(status = app.supportStatus)
-                Text(
-                    text = app.latestVersionName?.let { "Latest $it" } ?: "Latest version unknown",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-
-            // only set for an artifact built by an intermediate tool (currently just Patched
-            // patches) - "Latest" above is always the app's own version (e.g. Videoapp's), so this
-            // is shown alongside it rather than instead of it, giving a complete picture of both
-            // what was patched and what patched it
-            app.latestArtifact?.patchesVersionName?.let { patchesVersion ->
-                Text(
-                    text = "Patches $patchesVersion",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
             InstalledStatusRow(installedVersionName = installedVersionName)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun UninstallIconControl(
+    uninstalling: Boolean,
+    onUninstall: () -> Unit,
+) {
+    if (uninstalling) {
+        LoadingIndicator(modifier = Modifier.size(20.dp))
+    } else {
+        IconButton(onClick = onUninstall, modifier = Modifier.size(32.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = "Uninstall app",
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
@@ -262,7 +319,7 @@ private fun InstalledStatusRow(installedVersionName: String?) {
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         }
-    val icon = if (installedVersionName != null) Icons.Filled.CheckCircle else null
+    val icon = if (installedVersionName != null) painterResource(R.drawable.ic_check_circle_rounded) else null
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (icon != null) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
@@ -278,7 +335,7 @@ private fun InstallationSection(
 ) {
     DetailSection(
         title = "Installation",
-        icon = Icons.Filled.Build,
+        icon = rememberVectorPainter(Icons.Filled.Build),
         modifier = modifier,
         body =
             AnnotatedString(
@@ -316,7 +373,7 @@ private fun ReleaseNotesSection(app: AppProfile) {
             ) {
                 SectionHeader(
                     title = "Release notes",
-                    icon = Icons.Filled.Description,
+                    icon = rememberVectorPainter(Icons.Filled.Description),
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
@@ -343,7 +400,7 @@ private const val COLLAPSED_RELEASE_NOTES_LINES = 4
 @Composable
 private fun DetailSection(
     title: String,
-    icon: ImageVector,
+    icon: Painter,
     body: AnnotatedString,
     modifier: Modifier = Modifier,
 ) {

@@ -6,10 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -21,7 +17,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
@@ -57,7 +55,7 @@ private fun IdleContent(
 ) {
     SectionHeader(
         title = "Update all",
-        icon = Icons.Filled.SystemUpdateAlt,
+        icon = painterResource(R.drawable.ic_system_update_alt_rounded),
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
     )
@@ -81,7 +79,7 @@ private fun IdleContent(
 private fun RunningContent(state: UpdateAllUiState.Running) {
     SectionHeader(
         title = "Update all",
-        icon = Icons.Filled.SystemUpdateAlt,
+        icon = painterResource(R.drawable.ic_system_update_alt_rounded),
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
     )
@@ -108,9 +106,10 @@ private fun DoneContent(
     val succeeded = state.outcomes.count { it.succeeded }
     val failed = state.outcomes.size - succeeded
 
+    val statusIconRes = if (failed == 0) R.drawable.ic_check_circle_rounded else R.drawable.ic_error_rounded
     SectionHeader(
         title = "Update all",
-        icon = if (failed == 0) Icons.Filled.CheckCircle else Icons.Filled.Error,
+        icon = painterResource(statusIconRes),
         containerColor =
             if (failed == 0) {
                 MaterialTheme.colorScheme.tertiaryContainer
@@ -137,7 +136,7 @@ private fun DoneContent(
         state.outcomes.filter { !it.succeeded }.forEach { outcome ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(
-                    Icons.Filled.Error,
+                    painterResource(R.drawable.ic_error_rounded),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.height(14.dp),

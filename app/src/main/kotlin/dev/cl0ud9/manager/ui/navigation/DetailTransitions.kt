@@ -10,13 +10,16 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 
-// the public M3 emphasized-easing token, same curve regardless of who's implementing the spec
-private val M3EmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+// the public M3 emphasized-easing token, same curve regardless of who's implementing the spec.
+// internal (not private): ManagerNavHost's nav bar hide/show tracks this exact spec too, so the
+// bar finishes its slide at the same instant as the screen it's making way for instead of two
+// independently-timed animations drifting apart mid-transition
+internal val M3EmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 // slow start, fast finish - used only for the pop-exit slide, so the outgoing screen barely moves
 // at first and then leaves all at once, instead of a constant-speed slide the whole way
 private val CubicInEasing = Easing { fraction -> fraction * fraction * fraction }
-private const val DETAIL_TRANSITION_MS = 350
+internal const val DETAIL_TRANSITION_MS = 350
 
 // push/pop for the App Details route. Both directions travel only a third of the screen width and
 // fade in on the way in; on the way out the departing screen also shrinks (scaleOut) instead of

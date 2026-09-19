@@ -18,20 +18,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.SystemUpdateAlt
-import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,18 +33,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
+import dev.cl0ud9.manager.ui.components.ManagerSwitch
 import dev.cl0ud9.manager.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.DebouncedButtonState
-import dev.cl0ud9.manager.ui.util.managerViewModel
 import dev.cl0ud9.manager.ui.util.rememberDebouncedButtonState
 
 // a flowing list of icon-badged category rows (badge + title + subtitle, expanding into the row's
@@ -66,19 +60,13 @@ fun SettingsScreen(
     topContentPadding: Dp,
     onNavigateToAppearance: () -> Unit,
 ) {
-    val viewModel =
-        managerViewModel { container ->
-            SettingsViewModel(
-                container.settingsRepository,
-                container.artifactDownloader,
-                container.managerUpdateChecker,
-                container.githubCredentialStore,
-            )
-        }
+    val viewModel = rememberSettingsViewModel()
     val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     val managerUpdateState by viewModel.managerUpdateState.collectAsStateWithLifecycle()
     val hasGitHubToken by viewModel.hasGitHubToken.collectAsStateWithLifecycle()
+    val feedbackState = rememberFeedbackUiState(viewModel)
+    val deviceSummary = rememberDeviceSummary()
     val versionName = rememberVersionName()
     // both actions are already idempotent in the ViewModel itself (a second call while one is
     // still running is a no-op) - this debounce is the UI-side half of that: the button itself goes
@@ -120,6 +108,12 @@ fun SettingsScreen(
             onClearToken = viewModel::clearGitHubToken,
             shape = settingsGroupShape(GITHUB_ACCESS_ROW_INDEX, SETTINGS_ROW_COUNT),
         )
+        FeedbackRow(
+            state = feedbackState,
+            onFeedbackTextChange = viewModel::setFeedbackText,
+            onGenerateReport = { viewModel.generateDiagnosticReport(deviceSummary) },
+            shape = settingsGroupShape(FEEDBACK_ROW_INDEX, SETTINGS_ROW_COUNT),
+        )
         AboutRow(
             versionName = versionName,
             managerUpdateState = managerUpdateState,
@@ -134,8 +128,9 @@ private const val APPEARANCE_ROW_INDEX = 0
 private const val AUTOMATIC_DOWNLOADS_ROW_INDEX = 1
 private const val STORAGE_ROW_INDEX = 2
 private const val GITHUB_ACCESS_ROW_INDEX = 3
-private const val ABOUT_ROW_INDEX = 4
-private const val SETTINGS_ROW_COUNT = 5
+private const val FEEDBACK_ROW_INDEX = 4
+private const val ABOUT_ROW_INDEX = 5
+private const val SETTINGS_ROW_COUNT = 6
 
 @Composable
 private fun AutomaticDownloadsRow(
@@ -146,13 +141,13 @@ private fun AutomaticDownloadsRow(
     SettingsRow(
         header =
             SettingsRowHeader(
-                icon = Icons.Filled.Update,
+                icon = painterResource(R.drawable.ic_update_rounded),
                 title = "Automatic downloads",
                 subtitle = "Download updates in the background. Installing always needs your confirmation.",
                 colors = defaultSettingsRowColors(),
             ),
         shape = shape,
-        trailing = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
+        trailing = { ManagerSwitch(checked = checked, onCheckedChange = onCheckedChange) },
     )
 }
 
@@ -165,7 +160,7 @@ private fun StorageRow(
     SettingsRow(
         header =
             SettingsRowHeader(
-                icon = Icons.Filled.DeleteSweep,
+                icon = painterResource(R.drawable.ic_delete_sweep_rounded),
                 title = "Storage",
                 subtitle = "Downloaded apks are removed right after a successful install.",
                 colors =
@@ -193,7 +188,7 @@ private fun AboutRow(
     SettingsRow(
         header =
             SettingsRowHeader(
-                icon = Icons.Filled.Info,
+                icon = painterResource(R.drawable.ic_info_rounded),
                 title = "About",
                 subtitle = "Version $versionName",
                 colors =
@@ -227,7 +222,7 @@ private fun StorageRowContent(
     cacheClearedMessage: String?,
     clearCacheState: DebouncedButtonState,
 ) {
-    OutlinedButton(
+    FilledTonalButton(
         onClick = clearCacheState.onClick,
         enabled = clearCacheState.enabled,
         modifier = Modifier.fillMaxWidth(),
@@ -266,12 +261,12 @@ private fun ManagerUpdateSection(
             when (animatedState) {
                 is ManagerUpdateUiState.Idle -> {
                     ManagerUpdateStatusRow(
-                        icon = Icons.Filled.SystemUpdateAlt,
+                        icon = painterResource(R.drawable.ic_system_update_alt_rounded),
                         badgeColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         text = "Check GitHub for a newer release of the manager itself.",
                     )
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = checkForUpdateState.onClick,
                         enabled = checkForUpdateState.enabled,
                         modifier = Modifier.fillMaxWidth(),
@@ -318,7 +313,7 @@ private fun ManagerUpdateResultContent(
     when (status) {
         is ManagerUpdateStatus.UpToDate -> {
             ManagerUpdateStatusRow(
-                icon = Icons.Filled.CheckCircle,
+                icon = painterResource(R.drawable.ic_check_circle_rounded),
                 badgeColor = MaterialTheme.colorScheme.tertiaryContainer,
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 text = "You're on the latest version.",
@@ -328,7 +323,7 @@ private fun ManagerUpdateResultContent(
 
         is ManagerUpdateStatus.UpdateAvailable -> {
             ManagerUpdateStatusRow(
-                icon = Icons.Filled.SystemUpdateAlt,
+                icon = painterResource(R.drawable.ic_system_update_alt_rounded),
                 badgeColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 text = "Version ${status.latestVersion} is available.",
@@ -341,7 +336,7 @@ private fun ManagerUpdateResultContent(
 
         is ManagerUpdateStatus.NoReleasePublished -> {
             ManagerUpdateStatusRow(
-                icon = Icons.Filled.Info,
+                icon = painterResource(R.drawable.ic_info_rounded),
                 badgeColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 text = "No manager releases have been published yet.",
@@ -351,7 +346,7 @@ private fun ManagerUpdateResultContent(
 
         is ManagerUpdateStatus.Failed -> {
             ManagerUpdateStatusRow(
-                icon = Icons.Filled.Error,
+                icon = painterResource(R.drawable.ic_error_rounded),
                 badgeColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 text = status.reason,
@@ -368,14 +363,14 @@ private fun CheckAgainButton(
     state: DebouncedButtonState,
     label: String = "Check again",
 ) {
-    OutlinedButton(onClick = state.onClick, enabled = state.enabled, modifier = Modifier.fillMaxWidth()) {
+    FilledTonalButton(onClick = state.onClick, enabled = state.enabled, modifier = Modifier.fillMaxWidth()) {
         Text(label)
     }
 }
 
 @Composable
 private fun ManagerUpdateStatusRow(
-    icon: ImageVector,
+    icon: Painter,
     badgeColor: Color,
     contentColor: Color,
     text: String,

@@ -16,7 +16,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,8 +29,8 @@ import dev.cl0ud9.manager.data.settings.MIN_NAV_BAR_CORNER_RADIUS
 import dev.cl0ud9.manager.domain.model.LaunchTab
 import dev.cl0ud9.manager.domain.model.NavBarStyle
 import dev.cl0ud9.manager.domain.model.ThemeMode
+import dev.cl0ud9.manager.ui.components.ManagerSwitch
 import dev.cl0ud9.manager.ui.navigation.DetailContentTopGap
-import dev.cl0ud9.manager.ui.util.managerViewModel
 
 // the nav-graph entry point: owns the ViewModel and state collection, then hands plain state +
 // callbacks down to the stateless AppearanceScreen below. scrollState/topContentPadding come from
@@ -41,15 +40,7 @@ fun AppearanceRoute(
     scrollState: ScrollState,
     topContentPadding: Dp,
 ) {
-    val viewModel =
-        managerViewModel { container ->
-            SettingsViewModel(
-                container.settingsRepository,
-                container.artifactDownloader,
-                container.managerUpdateChecker,
-                container.githubCredentialStore,
-            )
-        }
+    val viewModel = rememberSettingsViewModel()
     AppearanceScreen(
         scrollState = scrollState,
         topContentPadding = topContentPadding,
@@ -249,7 +240,7 @@ private fun SwitchRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        ManagerSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

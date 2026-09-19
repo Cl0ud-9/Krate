@@ -1,6 +1,7 @@
 package dev.cl0ud9.manager
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,10 +23,17 @@ import dev.cl0ud9.manager.ui.navigation.ManagerNavHost
 import dev.cl0ud9.manager.ui.onboarding.OnboardingScreen
 import dev.cl0ud9.manager.ui.theme.ManagerTheme
 import dev.cl0ud9.manager.ui.theme.resolveDarkTheme
+import kotlinx.coroutines.flow.MutableStateFlow
+
+const val EXTRA_TARGET_ROUTE = "target_route"
+const val EXTRA_APP_ID = "appId"
 
 class MainActivity : ComponentActivity() {
+    private val pendingRoute = MutableStateFlow<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
         enableEdgeToEdge()
         setContent {
             val context = LocalContext.current
@@ -34,6 +42,7 @@ class MainActivity : ComponentActivity() {
                 settingsRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
             val useSmoothCorners by
                 settingsRepository.observeUseSmoothCorners().collectAsStateWithLifecycle(initialValue = true)
+            val route by pendingRoute.collectAsStateWithLifecycle()
 
             // enableEdgeToEdge() alone only ever picks status/nav bar icon color from the raw system
             // dark-mode setting at launch, so an explicit in-app Light/Dark override (independent of
@@ -48,9 +57,27 @@ class MainActivity : ComponentActivity() {
 
             ManagerTheme(themeMode = themeMode, useSmoothCorners = useSmoothCorners) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppRoot()
+                    AppRoot(
+                        pendingRoute = route,
+                        onRouteHandled = { pendingRoute.value = null },
+                    )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val route =
+            intent?.getStringExtra(EXTRA_TARGET_ROUTE)
+                ?: intent?.getStringExtra(EXTRA_APP_ID)?.let { "apps/$it" }
+        if (!route.isNullOrEmpty()) {
+            pendingRoute.value = route
         }
     }
 }
@@ -64,7 +91,10 @@ private const val BENCHMARK_EXTRA = "is_benchmark"
 // DataStore read is still in flight, so a returning user is never shown a flash of onboarding they
 // already completed
 @Composable
-private fun AppRoot() {
+private fun AppRoot(
+    pendingRoute: String? = null,
+    onRouteHandled: () -> Unit = {},
+) {
     val context = LocalContext.current
     val isBenchmarkMode =
         remember { (context as? Activity)?.intent?.getBooleanExtra(BENCHMARK_EXTRA, false) == true }
@@ -73,9 +103,9 @@ private fun AppRoot() {
         settingsRepository.observeOnboardingCompleted().collectAsStateWithLifecycle(initialValue = null)
 
     when {
-        isBenchmarkMode -> ManagerNavHost()
+        isBenchmarkMode -> ManagerNavHost(pendingRoute = pendingRoute, onRouteHandled = onRouteHandled)
         onboardingCompleted == null -> Unit
         onboardingCompleted == false -> OnboardingScreen(onComplete = {})
-        else -> ManagerNavHost()
+        else -> ManagerNavHost(pendingRoute = pendingRoute, onRouteHandled = onRouteHandled)
     }
 }

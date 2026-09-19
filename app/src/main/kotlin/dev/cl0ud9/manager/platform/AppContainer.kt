@@ -6,7 +6,9 @@ import dev.cl0ud9.manager.data.auth.EncryptedGitHubCredentialStore
 import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.data.catalog.AssetCatalogRepository
 import dev.cl0ud9.manager.data.catalog.RemoteCatalogRepository
+import dev.cl0ud9.manager.data.downloads.AndroidDownloadProgressNotifier
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
+import dev.cl0ud9.manager.data.downloads.DownloadProgressNotifier
 import dev.cl0ud9.manager.data.downloads.OkHttpArtifactDownloader
 import dev.cl0ud9.manager.data.settings.DataStoreSettingsRepository
 import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
@@ -39,6 +41,7 @@ class AppContainer(
             archiveReader = PackageManagerApkArchiveReader(context.applicationContext),
             credentialStore = githubCredentialStore,
         )
+    val downloadProgressNotifier: DownloadProgressNotifier = AndroidDownloadProgressNotifier(context.applicationContext)
     val installationEngine: InstallationEngine = PackageInstallerEngine(context.applicationContext)
     val installedPackageReader: InstalledPackageReader =
         PackageManagerInstalledPackageReader(context.applicationContext)

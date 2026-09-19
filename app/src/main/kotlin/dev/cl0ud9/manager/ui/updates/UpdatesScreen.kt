@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
@@ -22,12 +20,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.platform.workers.UpdateNotifier
 import dev.cl0ud9.manager.ui.components.AppListItem
 import dev.cl0ud9.manager.ui.components.EmptyState
 import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
+import dev.cl0ud9.manager.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
@@ -63,18 +64,24 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
         UpdateNotifier.notifyUpdateAllResult(context, succeeded, failed)
     }
 
-    // pending updates are the most time-sensitive data in the app - a stale manifest here directly
-    // means a missed update, so this is the highest-value place for pull-to-refresh
-    ManagerPullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = viewModel::refreshFromNetwork,
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        UpdatesContent(
-            uiState = uiState,
-            updateAllState = updateAllState,
-            viewModel = viewModel,
-            onAppClick = onAppClick,
+    Box(modifier = Modifier.fillMaxSize()) {
+        // pending updates are the most time-sensitive data in the app - a stale manifest here
+        // directly means a missed update, so this is the highest-value place for pull-to-refresh
+        ManagerPullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = viewModel::refreshFromNetwork,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            UpdatesContent(
+                uiState = uiState,
+                updateAllState = updateAllState,
+                viewModel = viewModel,
+                onAppClick = onAppClick,
+            )
+        }
+        RefreshFailureSnackbar(
+            refreshFailed = viewModel.refreshFailed,
+            message = "Couldn't refresh - showing the last known list.",
         )
     }
 }
@@ -104,7 +111,7 @@ private fun UpdatesContent(
 
             is UpdatesUiState.UpToDate -> {
                 EmptyState(
-                    icon = Icons.Filled.CheckCircle,
+                    icon = painterResource(R.drawable.ic_check_circle_rounded),
                     title = "You're all caught up",
                     subtitle = "Installed apps matching the catalog's latest version have nothing pending.",
                 )
@@ -130,7 +137,7 @@ private fun UpdatesContent(
                             AppListItem(
                                 app = app,
                                 installed = true,
-                                onClick = { onAppClick(app.id) },
+                                onClick = rememberDebouncedOnClick(onClick = { onAppClick(app.id) }),
                             )
                         }
                     }

@@ -13,17 +13,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 // a small tinted icon chip ahead of a section title - every card in the app was the same flat
 // surfaceContainer rectangle with plain text, which reads as generic/placeholder-ish rather than
-// Material 3 Expressive's characteristic use of color to give each grouping its own identity
+// Material 3 Expressive's characteristic use of color to give each grouping its own identity.
+// Painter, not ImageVector - callers pass either a custom rounded drawable (painterResource) or a
+// stock Compose icon (rememberVectorPainter) through the same param
 @Composable
 fun SectionHeader(
     title: String,
-    icon: ImageVector,
+    icon: Painter,
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
     contentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -42,7 +44,7 @@ fun SectionHeader(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = icon,
+                painter = icon,
                 contentDescription = null,
                 tint = contentColor,
                 modifier = Modifier.size(16.dp),

@@ -18,6 +18,37 @@ for the filename:
   ic_nav_settings_filled.xml  <- settings/materialsymbolsrounded/settings_fill1_24px.xml
   ic_refresh_rounded.xml      <- refresh/materialsymbolsrounded/refresh_24px.xml
   ic_newspaper_rounded.xml    <- newspaper/materialsymbolsrounded/newspaper_24px.xml
+  ic_check_circle_rounded.xml       <- check_circle/materialsymbolsrounded/check_circle_fill1_24px.xml
+  ic_error_rounded.xml              <- error/materialsymbolsrounded/error_fill1_24px.xml
+  ic_system_update_alt_rounded.xml  <- system_update_alt/materialsymbolsrounded/system_update_alt_fill1_24px.xml
+  ic_arrow_back_rounded.xml         <- arrow_back/materialsymbolsrounded/arrow_back_fill1_24px.xml
+  ic_arrow_forward_rounded.xml      <- arrow_forward/materialsymbolsrounded/arrow_forward_fill1_24px.xml
+  ic_security_rounded.xml           <- security/materialsymbolsrounded/security_fill1_24px.xml
+  ic_verified_user_rounded.xml      <- verified_user/materialsymbolsrounded/verified_user_fill1_24px.xml
+  ic_lock_rounded.xml               <- lock/materialsymbolsrounded/lock_fill1_24px.xml
+  ic_gpp_good_rounded.xml           <- verified/materialsymbolsrounded/verified_fill1_24px.xml
+  ic_notifications_rounded.xml      <- notifications/materialsymbolsrounded/notifications_fill1_24px.xml
+  ic_notifications_active_rounded.xml <- notifications_active/materialsymbolsrounded/notifications_active_fill1_24px.xml
+  ic_notifications_none_rounded.xml <- notifications/materialsymbolsrounded/notifications_24px.xml
+  ic_campaign_rounded.xml           <- campaign/materialsymbolsrounded/campaign_fill1_24px.xml
+  ic_shield_rounded.xml             <- shield/materialsymbolsrounded/shield_fill1_24px.xml
+  ic_policy_rounded.xml             <- policy/materialsymbolsrounded/policy_fill1_24px.xml
+  ic_check_rounded.xml              <- check/materialsymbolsrounded/check_fill1_24px.xml
+  ic_update_rounded.xml             <- update/materialsymbolsrounded/update_fill1_24px.xml
+  ic_delete_sweep_rounded.xml       <- delete_sweep/materialsymbolsrounded/delete_sweep_fill1_24px.xml
+  ic_info_rounded.xml               <- info/materialsymbolsrounded/info_fill1_24px.xml
+  ic_key_rounded.xml                <- key/materialsymbolsrounded/key_fill1_24px.xml
+  ic_palette_rounded.xml            <- palette/materialsymbolsrounded/palette_fill1_24px.xml
+  ic_chevron_right_rounded.xml      <- chevron_right/materialsymbolsrounded/chevron_right_fill1_24px.xml
+  ic_feedback_rounded.xml           <- feedback/materialsymbolsrounded/feedback_fill1_24px.xml
+
+Note: Compose's legacy Icons.Filled.GppGood has no "gpp_good" glyph in Material Symbols (checked
+the source repository directly - that name doesn't exist there); Material Symbols renamed it to
+"verified" (same shield-with-checkmark silhouette), so ic_gpp_good_rounded.xml is sourced from
+that glyph instead. Similarly there's no separate "notifications_none" glyph - Material Symbols
+folds the outline/filled bell into one glyph via the FILL axis, so ic_notifications_none_rounded.xml
+reuses notifications/materialsymbolsrounded but takes the plain (non-fill1) outline variant, the
+same way Icons.Filled.NotificationsNone was always just the outline bell next to the filled ones.
 
 Note: apps_24px/apps_fill1_24px were used for ic_nav_apps_* and update_24px/update_fill1_24px
 for ic_nav_update_* originally, but Google's own outline/fill1 variants of those two glyphs are
@@ -28,3 +59,10 @@ tried in between but read as cluttered at 24dp) - both have distinct outline/fil
 
 Used for the bottom navigation bar's icon set (dev.cl0ud9.manager.ui.navigation.NavIcon /
 ManagerDestination), for a consistent Material Symbols Rounded icon style.
+The four icons added below extend that same rounded icon family to the app's highest-visibility
+non-nav icons (status badges, the manager-update glyph, and every pushed screen's back button) -
+each is the "fill1" (solid) variant, matching Compose's Icons.Filled family these replace. The
+twelve icons after that extend the family again to the onboarding flow's icon collage and morphing
+action button, and the six after that extend it once more to the Settings/Appearance/GitHub-access
+rows' badge icons and their shared trailing chevron. The feedback icon added last is the badge for
+the Feedback & diagnostics settings row - same fill1-matches-Icons.Filled convention throughout.

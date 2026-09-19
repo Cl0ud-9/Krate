@@ -8,12 +8,16 @@ import dev.cl0ud9.manager.domain.model.isVisible
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.ui.util.withMinimumDuration
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -42,9 +46,21 @@ class AppsViewModel(
     private val mutableIsRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = mutableIsRefreshing.asStateFlow()
 
+    // one-shot: a failed pull-to-refresh used to just stop the spinner with zero feedback - the
+    // catalog itself never goes empty on a failure (RemoteCatalogRepository always falls back to
+    // the last cache or the seed asset, section 32), so this exists purely to tell the user their
+    // explicit refresh attempt specifically didn't reach the network, not to signal missing data
+    private val mutableRefreshFailed = MutableSharedFlow<Unit>()
+    val refreshFailed: SharedFlow<Unit> = mutableRefreshFailed.asSharedFlow()
+
+    // toUiState() calls installedPackageReader.installedVersion() (a real PackageManager Binder
+    // call) once per catalog app - flowOn(IO) keeps that whole loop off the main thread, which
+    // otherwise blocked right during this screen's own enter transition on every single visit
+    // (RefreshOnResume re-triggers this on every return to the tab, not just first load)
     val uiState: StateFlow<AppsUiState> =
         combine(catalogRepository.observeApps(), refreshTrigger.onStart { emit(Unit) }) { apps, _ -> apps }
             .map { apps -> toUiState(apps) }
+            .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), AppsUiState.Loading)
 
     fun refresh() {
@@ -58,14 +74,18 @@ class AppsViewModel(
         if (mutableIsRefreshing.value) return
         viewModelScope.launch {
             mutableIsRefreshing.value = true
-            withMinimumDuration { runCatching { catalogRepository.refresh() } }
+            val result = withMinimumDuration { runCatching { catalogRepository.refresh() } }
             mutableIsRefreshing.value = false
+            if (result.isFailure) mutableRefreshFailed.emit(Unit)
         }
     }
 
     private fun toUiState(apps: List<AppProfile>): AppsUiState {
         val hasToken = githubCredentialStore.getToken() != null
-        val visibleApps = apps.filter { it.isVisible(hasToken) }
+        // alphabetical (case-insensitive), not catalog/manifest order - the manifest's own app
+        // array order is just whatever catalog-metadata.json happens to list them in, not a
+        // deliberate display order
+        val visibleApps = apps.filter { it.isVisible(hasToken) }.sortedBy { it.displayName.lowercase() }
         if (visibleApps.isEmpty()) return AppsUiState.Empty
         val installed =
             visibleApps

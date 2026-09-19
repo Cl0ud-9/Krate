@@ -56,10 +56,7 @@ class OkHttpArtifactDownloader(
             }
 
             downloadsDir.mkdirs()
-            // versionName is part of the file name, not just app.id - a user can now pick an older
-            // retained version from App Details' version history, and without this a stale .part
-            // file from a previously-downloaded different version could look resumable here
-            val fileId = "${app.id}-${artifact.versionName}"
+            val fileId = fileIdFor(app, artifact)
             val partFile = File(downloadsDir, "$fileId.apk.part")
             val readyFile = File(downloadsDir, "$fileId.apk")
 
@@ -96,6 +93,22 @@ class OkHttpArtifactDownloader(
         val files = downloadsDir.listFiles() ?: return 0L
         return files.sumOf { file -> file.length().also { file.delete() } }
     }
+
+    override fun existingReadyFile(
+        app: AppProfile,
+        artifact: ArtifactInfo,
+    ): String? {
+        val readyFile = File(downloadsDir, "${fileIdFor(app, artifact)}.apk")
+        return if (readyFile.exists()) readyFile.absolutePath else null
+    }
+
+    // versionName is part of the file name, not just app.id - a user can now pick an older retained
+    // version from App Details' version history, and without this a stale .part/.apk file from a
+    // previously-downloaded different version could look resumable/ready here
+    private fun fileIdFor(
+        app: AppProfile,
+        artifact: ArtifactInfo,
+    ): String = "${app.id}-${artifact.versionName}"
 
     // returns a user-facing failure message, or null on success
     private suspend fun runDownload(
