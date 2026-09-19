@@ -427,14 +427,16 @@ internal fun AnimatedContentScope.TabScreen(
                 }
             }
         }
-        // skipped entirely at rest (dimAlpha == 0) rather than always drawn transparent - one less
-        // full-screen layer on every tab, every frame, while nothing is actually covering it
-        if (depth.dimAlpha > 0f) {
+        // skipped entirely at rest (isDimVisible == false) rather than always drawn transparent -
+        // one less full-screen layer on every tab, every frame, while nothing is actually covering
+        // it. alpha itself is read as depth.dimAlpha.value inside the layer lambda, not passed in
+        // as a plain Float, so the fade doesn't force this whole composable to recompose every frame
+        if (depth.isDimVisible) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .graphicsLayer { alpha = depth.dimAlpha }
+                        .graphicsLayer { alpha = depth.dimAlpha.value }
                         .background(Color.Black),
             )
         }
@@ -468,12 +470,12 @@ internal fun AnimatedContentScope.DetailScreen(
     ) {
         content(scrollState, headerState.headerHeight)
         CollapsingDetailHeader(title = title, state = headerState, onBack = onBack)
-        if (depth.dimAlpha > 0f) {
+        if (depth.isDimVisible) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .graphicsLayer { alpha = depth.dimAlpha }
+                        .graphicsLayer { alpha = depth.dimAlpha.value }
                         .background(Color.Black),
             )
         }

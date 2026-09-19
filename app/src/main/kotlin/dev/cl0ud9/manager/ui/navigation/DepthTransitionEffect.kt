@@ -11,11 +11,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
@@ -50,7 +52,10 @@ private fun isMainRootRoute(route: String?): Boolean = ManagerBottomNavDestinati
 // rather than simply beside it
 data class DepthEffect(
     val contentModifier: Modifier,
-    val dimAlpha: Float,
+    // exposed as State, not Float, so the dim Box's own graphicsLayer can read .value inside its
+    // draw-phase lambda instead of via `by` here - see the comment on isDimVisible below for why
+    val dimAlpha: State<Float>,
+    val isDimVisible: Boolean,
 )
 
 // tab-to-tab switching alone never softens either side, but as soon as a detail screen is part of
@@ -98,26 +103,38 @@ fun AnimatedContentScope.rememberDepthEffect(
     val canBlur = canDim && !disableBlur
     val dimAlpha = if (disableBlur) DEPTH_DIM_ALPHA_BLUR_DISABLED else DEPTH_DIM_ALPHA
 
-    val cornerRadius by
+    // NOT unwrapped with `by` here - these States get read inside a graphicsLayer draw-phase lambda
+    // instead (see depthEffectModifier and the dim Box below), so a change on any of the ~20 frames
+    // of the 350ms tween only re-records that one layer instead of recomposing this whole composable
+    // (and everything inline in TabScreen/DetailScreen's body - Scaffold, TopAppBar, Surface...).
+    // Reading them with `by` right here was confirmed live via `dumpsys gfxinfo` to be the actual
+    // cause of the "Number Slow UI thread" jank behind the reported transition lag - GPU cost was
+    // already low (3-15ms), the frames were slow because the CPU was redoing full recomposition on
+    // every single animation tick, not because of any GPU compositing cost
+    val cornerRadiusState =
         transition.animateDp(
             transitionSpec = { tween(DEPTH_TRANSITION_MS, easing = FastOutSlowInEasing) },
             label = "depthCornerRadius",
         ) { state -> if (canRound && state in RECEDING_STATES) DEPTH_CORNER_RADIUS else 0.dp }
 
-    val animatedDimAlpha by
+    val dimAlphaState =
         transition.animateFloat(
             transitionSpec = { tween(DEPTH_TRANSITION_MS, easing = DimBlurEasing) },
             label = "depthDimAlpha",
         ) { state -> if (canDim && state in RECEDING_STATES) dimAlpha else 0f }
 
-    val blurRadius by
+    val blurRadiusState =
         transition.animateDp(
             transitionSpec = { tween(DEPTH_TRANSITION_MS, easing = DimBlurEasing) },
             label = "depthBlurRadius",
         ) { state -> if (canBlur && state in RECEDING_STATES) DEPTH_BLUR_RADIUS else 0.dp }
 
-    val modifier = depthEffectModifier(cornerRadius, blurRadius)
-    return DepthEffect(contentModifier = modifier, dimAlpha = animatedDimAlpha)
+    // derivedStateOf so this only flips (and recomposes the caller) at the two moments dimming
+    // actually starts/stops, not on every intermediate frame the alpha value ticks through
+    val isDimVisible by remember { derivedStateOf { dimAlphaState.value > 0f } }
+
+    val modifier = depthEffectModifier(canRound, cornerRadiusState, blurRadiusState)
+    return DepthEffect(contentModifier = modifier, dimAlpha = dimAlphaState, isDimVisible = isDimVisible)
 }
 
 // plain tab-to-tab switching (the overwhelming majority of navigation) never rounds or blurs
@@ -130,19 +147,30 @@ fun AnimatedContentScope.rememberDepthEffect(
 // bottom edge clears the status bar (confirmed by forcing a much larger radius and watching it
 // appear) - nothing to fix there, but worth remembering next time this looks like it "isn't working"
 private fun depthEffectModifier(
-    cornerRadius: Dp,
-    blurRadius: Dp,
+    active: Boolean,
+    cornerRadiusState: State<Dp>,
+    blurRadiusState: State<Dp>,
 ): Modifier {
-    if (cornerRadius <= MIN_VISIBLE_RADIUS && blurRadius <= 0.dp) return Modifier
-    return Modifier
-        .let { if (cornerRadius > MIN_VISIBLE_RADIUS) it.clip(RoundedCornerShape(cornerRadius)) else it }
-        .graphicsLayer {
-            compositingStrategy = CompositingStrategy.Offscreen
-            renderEffect =
-                if (blurRadius > 0.dp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    BlurEffect(blurRadius.toPx(), blurRadius.toPx(), TileMode.Decal)
-                } else {
-                    null
-                }
+    if (!active) return Modifier
+    return Modifier.graphicsLayer {
+        // both reads happen HERE, inside the layer's own draw-phase lambda, not via `by` up in
+        // rememberDepthEffect - GraphicsLayerScope resets shape/clip/renderEffect/compositingStrategy
+        // to their defaults on every invocation, so simply not setting them below (once the radius
+        // has animated back to 0) already turns them back off correctly, no explicit reset needed
+        val cornerRadius = cornerRadiusState.value
+        if (cornerRadius > MIN_VISIBLE_RADIUS) {
+            shape = RoundedCornerShape(cornerRadius)
+            clip = true
         }
+        // CompositingStrategy.Offscreen forces an extra full-screen GPU render pass - genuinely
+        // needed for RenderEffect (blur) to work at all, but NOT for a plain clip(). Only ONE entry
+        // - the one directly behind the front - ever actually blurs (see shouldDim/canBlur above),
+        // so every other "just rounding" entry skips this and never pays for an offscreen layer it
+        // never uses
+        val blurRadius = blurRadiusState.value
+        if (blurRadius > 0.dp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            compositingStrategy = CompositingStrategy.Offscreen
+            renderEffect = BlurEffect(blurRadius.toPx(), blurRadius.toPx(), TileMode.Decal)
+        }
+    }
 }
