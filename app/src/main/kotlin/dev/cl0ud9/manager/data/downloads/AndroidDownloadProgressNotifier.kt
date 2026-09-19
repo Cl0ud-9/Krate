@@ -73,7 +73,11 @@ class AndroidDownloadProgressNotifier(
             clear(appId)
             return
         }
-        if (!hasNotificationPermission()) return
+        // checked inline, not via a helper function - lint's flow analysis for
+        // NotificationManagerCompat.notify() doesn't trace a permission check across a function
+        // boundary, matching UpdateNotifier's own notify() below
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+        if (granted != PackageManager.PERMISSION_GRANTED) return
 
         activeAppIds += appId
         val builder = progressBuilder(appId, "Downloading $appName")
@@ -96,7 +100,8 @@ class AndroidDownloadProgressNotifier(
             clear(appId)
             return
         }
-        if (!hasNotificationPermission()) return
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+        if (granted != PackageManager.PERMISSION_GRANTED) return
 
         activeAppIds += appId
         val builder =
@@ -114,7 +119,8 @@ class AndroidDownloadProgressNotifier(
         appName: String,
     ) {
         activeAppIds -= appId
-        if (isAppInForeground() || !hasNotificationPermission()) return
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+        if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
         val notification =
             terminalBuilder(appId, "$appName downloaded")
                 .setContentText("Ready to install. Tap to open.")
@@ -128,7 +134,8 @@ class AndroidDownloadProgressNotifier(
         reason: String,
     ) {
         activeAppIds -= appId
-        if (isAppInForeground() || !hasNotificationPermission()) return
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+        if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
         val notification =
             terminalBuilder(appId, "$appName download failed")
                 .setContentText(reason)
@@ -190,12 +197,6 @@ class AndroidDownloadProgressNotifier(
             .lifecycle
             .currentState
             .isAtLeast(Lifecycle.State.STARTED)
-
-    // notification permission is optional (amendment 44.4 - onboarding does not block on it), so a
-    // declined/never-granted permission means silently skipping the notification, matching UpdateNotifier
-    private fun hasNotificationPermission(): Boolean =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
 
     // spread out per app id so two concurrent downloads (a manual one plus Update All, or two
     // manual downloads in sequence before the first notification is dismissed) get distinct
