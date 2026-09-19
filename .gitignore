@@ -12,6 +12,7 @@
 *.aab
 *.jks
 *.keystore
+keystore.properties
 google-services.json
 /app/build/
 /app/release/

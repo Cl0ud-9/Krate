@@ -42,6 +42,38 @@ private data class GithubReleaseDto(
     @SerialName("html_url") val htmlUrl: String,
 )
 
+// dot-separated numeric comparison (1.4.10 vs 1.4.9) with a plain-inequality fallback for tags that
+// don't parse as numeric segments, rather than silently treating every mismatch as "newer". A
+// top-level function (not a private method on the checker) so it's directly unit-testable without
+// needing a Context or a network mock - the actual number comparison is the one part of this whole
+// feature that must never be wrong, since it decides whether users are told an update exists at all
+internal fun isNewerVersion(
+    latest: String,
+    installed: String,
+): Boolean {
+    val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
+    val installedParts = installed.split(".").mapNotNull { it.toIntOrNull() }
+    return if (latestParts.isEmpty() || installedParts.isEmpty()) {
+        latest != installed
+    } else {
+        compareVersionSegments(latestParts, installedParts) > 0
+    }
+}
+
+private fun compareVersionSegments(
+    latestParts: List<Int>,
+    installedParts: List<Int>,
+): Int {
+    val length = maxOf(latestParts.size, installedParts.size)
+    for (index in 0 until length) {
+        val latestSegment = latestParts.getOrElse(index) { 0 }
+        val installedSegment = installedParts.getOrElse(index) { 0 }
+        val comparison = latestSegment.compareTo(installedSegment)
+        if (comparison != 0) return comparison
+    }
+    return 0
+}
+
 private fun defaultHttpClient(): OkHttpClient =
     OkHttpClient
         .Builder()
@@ -58,6 +90,7 @@ private fun defaultHttpClient(): OkHttpClient =
 class ManagerUpdateChecker(
     context: Context,
     private val httpClient: OkHttpClient = defaultHttpClient(),
+    private val releasesApiUrl: String = RELEASES_API_URL,
 ) {
     private val appContext = context.applicationContext
     private val json = Json { ignoreUnknownKeys = true }
@@ -82,7 +115,7 @@ class ManagerUpdateChecker(
     ): ManagerUpdateStatus {
         if (release == null) return ManagerUpdateStatus.NoReleasePublished
         val latestVersion = release.tagName.removePrefix("v")
-        return if (isNewer(latestVersion, installedVersion)) {
+        return if (isNewerVersion(latestVersion, installedVersion)) {
             ManagerUpdateStatus.UpdateAvailable(latestVersion, release.htmlUrl)
         } else {
             ManagerUpdateStatus.UpToDate
@@ -92,7 +125,7 @@ class ManagerUpdateChecker(
     // GitHub returns releases newest-first, so the first entry that isn't the reserved manifest
     // release tag is the most recent genuine manager release, if any exists yet
     private fun fetchLatestAppRelease(): GithubReleaseDto? {
-        httpClient.newCall(Request.Builder().url(RELEASES_API_URL).build()).execute().use { response ->
+        httpClient.newCall(Request.Builder().url(releasesApiUrl).build()).execute().use { response ->
             check(response.isSuccessful) { "GitHub returned ${response.code}." }
             val body = response.body?.string() ?: error("Empty response.")
             val releases: List<GithubReleaseDto> = json.decodeFromString(body)
@@ -104,33 +137,4 @@ class ManagerUpdateChecker(
         runCatching {
             appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName
         }.getOrNull()
-
-    // dot-separated numeric comparison (1.4.10 vs 1.4.9) with a plain-inequality fallback for tags
-    // that don't parse as numeric segments, rather than silently treating every mismatch as "newer"
-    private fun isNewer(
-        latest: String,
-        installed: String,
-    ): Boolean {
-        val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
-        val installedParts = installed.split(".").mapNotNull { it.toIntOrNull() }
-        return if (latestParts.isEmpty() || installedParts.isEmpty()) {
-            latest != installed
-        } else {
-            compareSegments(latestParts, installedParts) > 0
-        }
-    }
-
-    private fun compareSegments(
-        latestParts: List<Int>,
-        installedParts: List<Int>,
-    ): Int {
-        val length = maxOf(latestParts.size, installedParts.size)
-        for (index in 0 until length) {
-            val latestSegment = latestParts.getOrElse(index) { 0 }
-            val installedSegment = installedParts.getOrElse(index) { 0 }
-            val comparison = latestSegment.compareTo(installedSegment)
-            if (comparison != 0) return comparison
-        }
-        return 0
-    }
 }

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     // no org.jetbrains.kotlin.android: AGP 9+ has built-in Kotlin support, that plugin is incompatible now
     alias(libs.plugins.android.application)
@@ -5,6 +7,17 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.baselineprofile)
 }
+
+// local-only, gitignored (see keystore.properties in .gitignore) - CI only ever builds the debug
+// variant, so a release build run there without this file present would fail fast rather than
+// silently fall back to an unsigned or debug-signed release artifact
+val keystoreProperties =
+    Properties().apply {
+        val propertiesFile = rootProject.file("keystore.properties")
+        if (propertiesFile.exists()) {
+            propertiesFile.inputStream().use(::load)
+        }
+    }
 
 android {
     namespace = "dev.cl0ud9.manager"
@@ -19,10 +32,24 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystoreProperties.isNotEmpty()) {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (keystoreProperties.isNotEmpty()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
