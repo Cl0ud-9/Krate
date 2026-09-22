@@ -10,7 +10,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -20,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.R
+import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
@@ -92,10 +92,13 @@ private fun RunningContent(state: UpdateAllUiState.Running) {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    LinearWavyProgressIndicator(
-        progress = { state.currentIndex / state.total.toFloat() },
-        modifier = Modifier.fillMaxWidth(),
-    )
+    // currentIndex/total is whole-app granularity (which app we're on), not real progress within
+    // it - for the common single-pending-app case that fraction is stuck at 0 for the entire run,
+    // which is why this rendered as a flat, non-wavy line rather than genuinely animating.
+    // Indeterminate matches every other in-progress state in the app (Installing/Verifying/
+    // Uninstalling all use this same shared component) instead of a determinate bar with nothing
+    // real to report
+    ManagerLinearProgress(progress = null)
 }
 
 @Composable

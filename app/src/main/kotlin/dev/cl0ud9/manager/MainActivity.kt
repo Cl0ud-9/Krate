@@ -72,12 +72,23 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    // clears the extras off the Intent itself, not just this function's local read of them -
+    // onNewIntent's setIntent(intent) below makes THIS Intent instance sticky for every future
+    // onCreate() the system replays after killing this process in the background (real, documented
+    // Android behavior, not hypothetical: a task's process can die at any point while backgrounded
+    // since this app runs no foreground service, and reopening it from Recents/the launcher then
+    // redelivers the same Intent that last updated the task - extras included). Without clearing
+    // them here, a single notification tap would force every later cold start back to that same
+    // deep-linked route permanently, with no way to actually reach Home again from the bottom nav
+    // that redirect keeps winning against
     private fun handleIntent(intent: Intent?) {
         val route =
             intent?.getStringExtra(EXTRA_TARGET_ROUTE)
                 ?: intent?.getStringExtra(EXTRA_APP_ID)?.let { "apps/$it" }
         if (!route.isNullOrEmpty()) {
             pendingRoute.value = route
+            intent?.removeExtra(EXTRA_TARGET_ROUTE)
+            intent?.removeExtra(EXTRA_APP_ID)
         }
     }
 }

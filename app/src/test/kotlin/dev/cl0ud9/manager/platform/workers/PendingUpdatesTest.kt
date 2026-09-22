@@ -11,7 +11,7 @@ import org.junit.Test
 
 class PendingUpdatesTest {
     @Test
-    fun `counts only apps whose installed version differs from the catalog's latest`() {
+    fun `counts only apps whose catalog latest is actually newer than what's installed`() {
         val upToDate = profile("up-to-date", latestVersionName = "1.0.0")
         val pending = profile("pending", latestVersionName = "2.0.0")
         val notInstalled = profile("not-installed", latestVersionName = "1.0.0")
@@ -26,6 +26,19 @@ class PendingUpdatesTest {
         val count = pendingUpdateCount(listOf(upToDate, pending, notInstalled), reader, hasGitHubToken = false)
 
         assertEquals(1, count)
+    }
+
+    // the real bug this covers: a package can end up ahead of the catalog entirely outside this
+    // app (MicroG RE's own in-app "hide icon" toggle installs its own beta build) - this must not
+    // count as a pending update, since Update would actually downgrade it back to the catalog's
+    // older release
+    @Test
+    fun `an installed version newer than the catalog is not a pending update`() {
+        val aheadOfCatalog = profile("ahead", latestVersionName = "7.1.1")
+        val reader =
+            FakeInstalledPackageReader(mapOf(aheadOfCatalog.packageName to InstalledVersion("7.2.1-dev.2", 1)))
+
+        assertEquals(0, pendingUpdateCount(listOf(aheadOfCatalog), reader, hasGitHubToken = false))
     }
 
     @Test

@@ -1,6 +1,7 @@
 package dev.cl0ud9.manager.platform.selfupdate
 
 import android.content.Context
+import dev.cl0ud9.manager.domain.version.isNewerVersion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -52,38 +53,6 @@ private data class GithubReleaseAssetDto(
     val name: String,
     @SerialName("browser_download_url") val browserDownloadUrl: String,
 )
-
-// dot-separated numeric comparison (1.4.10 vs 1.4.9) with a plain-inequality fallback for tags that
-// don't parse as numeric segments, rather than silently treating every mismatch as "newer". A
-// top-level function (not a private method on the checker) so it's directly unit-testable without
-// needing a Context or a network mock - the actual number comparison is the one part of this whole
-// feature that must never be wrong, since it decides whether users are told an update exists at all
-internal fun isNewerVersion(
-    latest: String,
-    installed: String,
-): Boolean {
-    val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
-    val installedParts = installed.split(".").mapNotNull { it.toIntOrNull() }
-    return if (latestParts.isEmpty() || installedParts.isEmpty()) {
-        latest != installed
-    } else {
-        compareVersionSegments(latestParts, installedParts) > 0
-    }
-}
-
-private fun compareVersionSegments(
-    latestParts: List<Int>,
-    installedParts: List<Int>,
-): Int {
-    val length = maxOf(latestParts.size, installedParts.size)
-    for (index in 0 until length) {
-        val latestSegment = latestParts.getOrElse(index) { 0 }
-        val installedSegment = installedParts.getOrElse(index) { 0 }
-        val comparison = latestSegment.compareTo(installedSegment)
-        if (comparison != 0) return comparison
-    }
-    return 0
-}
 
 private fun defaultHttpClient(): OkHttpClient =
     OkHttpClient

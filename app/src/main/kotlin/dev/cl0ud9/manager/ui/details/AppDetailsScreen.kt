@@ -49,6 +49,7 @@ import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.model.latestVersionName
+import dev.cl0ud9.manager.domain.version.isNewerVersion
 import dev.cl0ud9.manager.ui.components.AppIconAvatar
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.SupportStatusBadge
@@ -133,9 +134,18 @@ internal data class AppDetailsUiState(
 ) {
     // read by both the Idle and Failed branches of the download section - whether the installed
     // app already matches what's selected is independent of whatever the current download
-    // attempt's own status is, so a failed redownload shouldn't hide that the app is fine
+    // attempt's own status is, so a failed redownload shouldn't hide that the app is fine.
+    // "up to date" means the installed version is not OLDER than what's selected, not merely a
+    // string match - a package can end up ahead of the catalog entirely outside this app (MicroG
+    // RE's own in-app "hide icon" toggle installs its own beta build, for example), and a plain ==
+    // used to offer an "Update" button here that would have downgraded it back to the catalog's
+    // older release
     val isUpToDate: Boolean
-        get() = installedVersionName != null && installedVersionName == selectedArtifact?.versionName
+        get() {
+            val installed = installedVersionName ?: return false
+            val selected = selectedArtifact?.versionName ?: return false
+            return !isNewerVersion(selected, installed)
+        }
 }
 
 @Suppress("LongParameterList")
