@@ -7,6 +7,7 @@ import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.domain.model.isVisible
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
+import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.isUpdateAvailable
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
@@ -31,6 +32,7 @@ class HomeViewModel(
     activityLogRepository: ActivityLogRepository,
     private val managerUpdateChecker: ManagerUpdateChecker,
     private val githubCredentialStore: GitHubCredentialStore,
+    private val managerBaselineStore: ManagerBaselineStore,
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -55,12 +57,12 @@ class HomeViewModel(
     // installedVersion() is a real PackageManager Binder call per app - flowOn(IO) keeps this
     // (and installedCount below) off the main thread, same reasoning as Apps/Updates' identical fix
     val pendingUpdateCount: StateFlow<Int> =
-        refreshedApps
-            .map { apps ->
-                apps.count { app ->
-                    isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app)
-                }
-            }.flowOn(Dispatchers.IO)
+        combine(refreshedApps, managerBaselineStore.observeBaselines()) { apps, baselines ->
+            apps.count { app ->
+                val installed = installedPackageReader.installedVersion(app.packageName)
+                isUpdateAvailable(installed, app, baselines[app.packageName])
+            }
+        }.flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
     val installedCount: StateFlow<Int> =

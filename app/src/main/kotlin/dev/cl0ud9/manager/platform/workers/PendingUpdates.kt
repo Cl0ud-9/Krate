@@ -13,8 +13,9 @@ internal fun pendingUpdateCount(
     apps: List<AppProfile>,
     installedPackageReader: InstalledPackageReader,
     hasGitHubToken: Boolean,
+    baselines: Map<String, String>,
 ): Int =
     apps.count { app ->
         app.isVisible(hasGitHubToken) &&
-            isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app)
+            isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app, baselines[app.packageName])
     }

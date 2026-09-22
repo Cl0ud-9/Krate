@@ -49,6 +49,7 @@ import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.model.latestVersionName
+import dev.cl0ud9.manager.domain.repository.effectiveBaseline
 import dev.cl0ud9.manager.domain.version.isNewerVersion
 import dev.cl0ud9.manager.ui.components.AppIconAvatar
 import dev.cl0ud9.manager.ui.components.SectionHeader
@@ -77,6 +78,7 @@ fun AppDetailsScreen(
                 container.cleanInstallOrchestrator,
                 container.installedPackageReader,
                 container.activityLogRepository,
+                container.managerBaselineStore,
                 container.downloadProgressNotifier,
                 appId,
             )
@@ -84,6 +86,7 @@ fun AppDetailsScreen(
     RefreshOnResume(viewModel::refresh)
     val app by viewModel.app.collectAsStateWithLifecycle()
     val installedVersionName by viewModel.installedVersionName.collectAsStateWithLifecycle()
+    val managerBaseline by viewModel.managerBaseline.collectAsStateWithLifecycle()
     val dependencies by viewModel.dependencies.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
     val installStatus by viewModel.installStatus.collectAsStateWithLifecycle()
@@ -105,6 +108,7 @@ fun AppDetailsScreen(
                     AppDetailsUiState(
                         app = currentApp,
                         installedVersionName = installedVersionName,
+                        recordedBaseline = managerBaseline,
                         dependencies = dependencies,
                         downloadStatus = downloadStatus,
                         installStatus = installStatus,
@@ -127,27 +131,44 @@ fun AppDetailsScreen(
 internal data class AppDetailsUiState(
     val app: AppProfile,
     val installedVersionName: String?,
+    // the version the manager itself last installed, or null if it never has (see
+    // ManagerBaselineStore) - not the live installed version, and not necessarily catalog-known on
+    // its own; effectiveBaseline below is what actually gets compared against
+    val recordedBaseline: String?,
     val dependencies: List<DependencyInfo>,
     val downloadStatus: DownloadStatus,
     val installStatus: InstallStatus,
     val selectedArtifact: ArtifactInfo?,
 ) {
+    // the recorded baseline if the manager has one, otherwise its best guess - see
+    // ManagerBaselineStore.effectiveBaseline for the full reasoning
+    val effectiveBaseline: String?
+        get() = effectiveBaseline(recordedBaseline, app, installedVersionName)
+
     // read by both the Idle and Failed branches of the download section - whether the installed
     // app already matches what's selected is independent of whatever the current download
     // attempt's own status is, so a failed redownload shouldn't hide that the app is fine.
-    // "up to date" requires BOTH that the installed version is a build this catalog has actually
-    // published (app.artifacts) AND that it's not older than what's selected - a package can end
-    // up ahead of the catalog entirely outside this app (MicroG RE's own in-app "hide icon" toggle
-    // installs its own beta build, for example), and treating "ahead" as "up to date" would let it
-    // sit there indefinitely instead of steering back toward what this catalog actually tracks -
-    // deliberate policy, not just a safety fallback: an unrecognized build is always "behind",
-    // regardless of its own version number
+    // "up to date" compares the BASELINE against what's selected, not the live installed version -
+    // a package can end up ahead of the catalog entirely outside this app (MicroG RE's own in-app
+    // "hide icon" toggle installs its own beta build, for example), and by explicit product
+    // decision that divergence alone should never manufacture an "Update" that doesn't genuinely
+    // exist relative to what the manager last gave the user, nor hide one that does
     val isUpToDate: Boolean
         get() {
-            val installed = installedVersionName ?: return false
+            val baseline = effectiveBaseline ?: return false
             val selected = selectedArtifact?.versionName ?: return false
-            val isCatalogKnown = app.artifacts.any { it.versionName == installed }
-            return isCatalogKnown && !isNewerVersion(selected, installed)
+            return !isNewerVersion(selected, baseline)
+        }
+
+    // true when the live-installed version doesn't match the baseline - something changed this
+    // app's install outside the manager (that same MicroG RE toggle). Independent of isUpToDate:
+    // this can be true whether or not there's also a real pending update, and drives an
+    // informational note rather than any action of its own
+    val isDiverged: Boolean
+        get() {
+            val installed = installedVersionName ?: return false
+            val baseline = effectiveBaseline ?: return false
+            return installed != baseline
         }
 }
 

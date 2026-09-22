@@ -11,9 +11,18 @@ import org.junit.Test
 
 class PendingUpdatesTest {
     @Test
-    fun `counts only apps whose catalog latest is actually newer than what's installed`() {
+    fun `counts only apps whose baseline is actually behind the catalog's latest`() {
         val upToDate = profile("up-to-date", latestVersionName = "1.0.0")
-        val pending = profile("pending", latestVersionName = "2.0.0")
+        // installed's "1.0.0" needs to be catalog-known (a real retained older artifact) for this
+        // to exercise ordinary numeric comparison rather than the unrecognized-build fallback path
+        val pending =
+            profile("pending", latestVersionName = "2.0.0").copy(
+                artifacts =
+                    listOf(
+                        ArtifactInfo("2.0.0", "https://example.test/pending-2.apk", "sha", "cert"),
+                        ArtifactInfo("1.0.0", "https://example.test/pending-1.apk", "sha", "cert"),
+                    ),
+            )
         val notInstalled = profile("not-installed", latestVersionName = "1.0.0")
         val reader =
             FakeInstalledPackageReader(
@@ -23,51 +32,76 @@ class PendingUpdatesTest {
                 ),
             )
 
-        val count = pendingUpdateCount(listOf(upToDate, pending, notInstalled), reader, hasGitHubToken = false)
+        val count =
+            pendingUpdateCount(
+                listOf(upToDate, pending, notInstalled),
+                reader,
+                hasGitHubToken = false,
+                baselines = emptyMap(),
+            )
 
         assertEquals(1, count)
     }
 
-    // deliberate policy, not a bug: a build the catalog has never published (MicroG RE's own
-    // in-app "hide icon" toggle installs its own beta build, for example) always counts as
-    // pending, even though its own version number is numerically ahead of the catalog's latest -
-    // the point is to keep steering the user back toward what this catalog actually tracks,
-    // regardless of what an app's own self-update mechanism installed outside this app entirely
+    // deliberate policy, confirmed with the user: a build the catalog has never published (MicroG
+    // RE's own in-app "hide icon" toggle installs its own beta build, for example) should NOT be
+    // treated as pending just for being unrecognized - only once the catalog genuinely publishes
+    // something beyond the manager's baseline (here, the fallback guess, since none is recorded)
     @Test
-    fun `an unrecognized installed version is always pending, even if numerically ahead of the catalog`() {
+    fun `an unrecognized installed version is not pending while the catalog hasn't moved past the fallback baseline`() {
         val aheadOfCatalog = profile("ahead", latestVersionName = "7.1.1")
         val reader =
             FakeInstalledPackageReader(mapOf(aheadOfCatalog.packageName to InstalledVersion("7.2.1-dev.2", 1)))
 
-        assertEquals(1, pendingUpdateCount(listOf(aheadOfCatalog), reader, hasGitHubToken = false))
+        val count = pendingUpdateCount(listOf(aheadOfCatalog), reader, hasGitHubToken = false, baselines = emptyMap())
+
+        assertEquals(0, count)
     }
 
-    // once the catalog's own latest genuinely catches up to (or passes) a previously-unrecognized
-    // installed build, normal numeric comparison takes back over and correctly reports "up to date"
+    // once the catalog genuinely publishes something beyond the fallback baseline, it becomes
+    // pending again - regardless of the live-installed build's own (unrecognized) version number
     @Test
-    fun `an installed version matching the catalog's latest exactly is not pending`() {
-        val caughtUp = profile("caught-up", latestVersionName = "7.2.1-dev.2")
-        val reader =
-            FakeInstalledPackageReader(mapOf(caughtUp.packageName to InstalledVersion("7.2.1-dev.2", 1)))
-
-        assertEquals(0, pendingUpdateCount(listOf(caughtUp), reader, hasGitHubToken = false))
-    }
-
-    // a catalog-recognized but older retained version (not just the single latest artifact) still
-    // goes through ordinary numeric comparison, not the "unrecognized" path
-    @Test
-    fun `a catalog-known older version is pending via ordinary numeric comparison`() {
+    fun `an unrecognized installed version becomes pending once the catalog passes the fallback baseline`() {
         val app =
-            profile("multi-version", latestVersionName = "2.0.0").copy(
+            profile("ahead-then-caught-up", latestVersionName = "7.1.1").copy(
                 artifacts =
                     listOf(
-                        ArtifactInfo("2.0.0", "https://example.test/2.apk", "sha", "cert"),
-                        ArtifactInfo("1.0.0", "https://example.test/1.apk", "sha", "cert"),
+                        ArtifactInfo("7.1.2", "https://example.test/2.apk", "sha", "cert"),
+                        ArtifactInfo("7.1.1", "https://example.test/1.apk", "sha", "cert"),
                     ),
             )
-        val reader = FakeInstalledPackageReader(mapOf(app.packageName to InstalledVersion("1.0.0", 1)))
+        val reader = FakeInstalledPackageReader(mapOf(app.packageName to InstalledVersion("7.2.1-dev.2", 1)))
 
-        assertEquals(1, pendingUpdateCount(listOf(app), reader, hasGitHubToken = false))
+        val count = pendingUpdateCount(listOf(app), reader, hasGitHubToken = false, baselines = emptyMap())
+
+        assertEquals(1, count)
+    }
+
+    // an explicitly recorded baseline always wins over the fallback guess - this is what a real
+    // manager-driven install writes, and it must keep working correctly even while the live device
+    // has since diverged to something the catalog doesn't recognize
+    @Test
+    fun `a recorded baseline is used over the live installed version`() {
+        val app = profile("recorded", latestVersionName = "1.0.2")
+        val reader = FakeInstalledPackageReader(mapOf(app.packageName to InstalledVersion("1.0.0-custom", 1)))
+
+        val notPending =
+            pendingUpdateCount(
+                listOf(app),
+                reader,
+                hasGitHubToken = false,
+                baselines = mapOf(app.packageName to "1.0.2"),
+            )
+        val pending =
+            pendingUpdateCount(
+                listOf(app),
+                reader,
+                hasGitHubToken = false,
+                baselines = mapOf(app.packageName to "1.0.1"),
+            )
+
+        assertEquals(0, notPending)
+        assertEquals(1, pending)
     }
 
     @Test
@@ -75,7 +109,7 @@ class PendingUpdatesTest {
         val app = profile("app", latestVersionName = "1.0.0")
         val reader = FakeInstalledPackageReader(mapOf(app.packageName to InstalledVersion("1.0.0", 1)))
 
-        assertEquals(0, pendingUpdateCount(listOf(app), reader, hasGitHubToken = false))
+        assertEquals(0, pendingUpdateCount(listOf(app), reader, hasGitHubToken = false, baselines = emptyMap()))
     }
 
     @Test
@@ -83,7 +117,7 @@ class PendingUpdatesTest {
         val disabled = profile("disabled", latestVersionName = "2.0.0").copy(enabled = false)
         val reader = FakeInstalledPackageReader(mapOf(disabled.packageName to InstalledVersion("1.0.0", 1)))
 
-        assertEquals(0, pendingUpdateCount(listOf(disabled), reader, hasGitHubToken = false))
+        assertEquals(0, pendingUpdateCount(listOf(disabled), reader, hasGitHubToken = false, baselines = emptyMap()))
     }
 
     @Test
@@ -99,12 +133,22 @@ class PendingUpdatesTest {
                             certificateSha256 = "cert",
                             requiresAuth = true,
                         ),
+                        // catalog-known older artifact, same reasoning as the "pending" test above -
+                        // without this, installed "1.0.0" would hit the unrecognized-build fallback
+                        // path instead of exercising ordinary numeric comparison
+                        ArtifactInfo(
+                            versionName = "1.0.0",
+                            downloadUrl = "https://example.test/gated-1.apk",
+                            sha256 = "sha",
+                            certificateSha256 = "cert",
+                            requiresAuth = true,
+                        ),
                     ),
             )
         val reader = FakeInstalledPackageReader(mapOf(gated.packageName to InstalledVersion("1.0.0", 1)))
 
-        assertEquals(0, pendingUpdateCount(listOf(gated), reader, hasGitHubToken = false))
-        assertEquals(1, pendingUpdateCount(listOf(gated), reader, hasGitHubToken = true))
+        assertEquals(0, pendingUpdateCount(listOf(gated), reader, hasGitHubToken = false, baselines = emptyMap()))
+        assertEquals(1, pendingUpdateCount(listOf(gated), reader, hasGitHubToken = true, baselines = emptyMap()))
     }
 
     private fun profile(

@@ -7,8 +7,10 @@ import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.isVisible
+import dev.cl0ud9.manager.domain.model.latestVersionName
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
+import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.domain.updateall.UpdateAllEngine
 import dev.cl0ud9.manager.domain.updateall.UpdateAllOutcome
 import dev.cl0ud9.manager.domain.updateall.UpdateAllPlanner
@@ -26,7 +28,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -65,6 +66,7 @@ class UpdatesViewModel(
     private val updateAllEngine: UpdateAllEngine,
     private val activityLogRepository: ActivityLogRepository,
     private val githubCredentialStore: GitHubCredentialStore,
+    private val managerBaselineStore: ManagerBaselineStore,
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -85,8 +87,11 @@ class UpdatesViewModel(
     // call) once per catalog app - flowOn(IO) keeps that off the main thread, same reasoning as
     // AppsViewModel's identical fix
     val uiState: StateFlow<UpdatesUiState> =
-        combine(catalog, refreshTrigger.onStart { emit(Unit) }) { apps, _ -> apps }
-            .map { apps -> toUiState(apps) }
+        combine(
+            catalog,
+            refreshTrigger.onStart { emit(Unit) },
+            managerBaselineStore.observeBaselines(),
+        ) { apps, _, baselines -> toUiState(apps, baselines) }
             .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), UpdatesUiState.Loading)
 
@@ -140,7 +145,9 @@ class UpdatesViewModel(
     }
 
     // Update All only ever targets apps that already have a pending update (see toUiState below),
-    // so every successful outcome here is genuinely an UPDATED event, never a fresh install
+    // so every successful outcome here is genuinely an UPDATED event, never a fresh install. Also
+    // records the version actually installed as this app's new manager baseline - Update All always
+    // installs an app's latestArtifact, so that's what just became true on the device
     private suspend fun recordActivity(outcomes: List<UpdateAllOutcome>) {
         outcomes.filter { it.succeeded }.forEach { outcome ->
             activityLogRepository.record(
@@ -152,6 +159,9 @@ class UpdatesViewModel(
                     timestampMillis = System.currentTimeMillis(),
                 ),
             )
+            outcome.app.latestVersionName?.let { versionName ->
+                managerBaselineStore.recordInstall(outcome.app.packageName, versionName)
+            }
         }
     }
 
@@ -159,13 +169,20 @@ class UpdatesViewModel(
         mutableUpdateAllState.value = UpdateAllUiState.Idle
     }
 
-    private fun toUiState(apps: List<AppProfile>): UpdatesUiState {
+    private fun toUiState(
+        apps: List<AppProfile>,
+        baselines: Map<String, String>,
+    ): UpdatesUiState {
         val hasToken = githubCredentialStore.getToken() != null
         val pending =
             apps
                 .filter { it.isVisible(hasToken) }
                 .filter { app ->
-                    isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app)
+                    isUpdateAvailable(
+                        installedPackageReader.installedVersion(app.packageName),
+                        app,
+                        baselines[app.packageName],
+                    )
                 }
         return if (pending.isEmpty()) UpdatesUiState.UpToDate else UpdatesUiState.Content(pending)
     }

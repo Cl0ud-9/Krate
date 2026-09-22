@@ -70,6 +70,7 @@ fun HomeScreen(
                 container.activityLogRepository,
                 container.managerUpdateChecker,
                 container.githubCredentialStore,
+                container.managerBaselineStore,
             )
         }
     val catalogCount by viewModel.catalogCount.collectAsStateWithLifecycle()

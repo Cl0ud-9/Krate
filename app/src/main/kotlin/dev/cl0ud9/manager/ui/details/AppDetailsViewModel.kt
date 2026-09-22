@@ -17,6 +17,7 @@ import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
+import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -56,6 +57,7 @@ class AppDetailsViewModel(
     private val cleanInstallOrchestrator: CleanInstallOrchestrator,
     private val installedPackageReader: InstalledPackageReader,
     private val activityLogRepository: ActivityLogRepository,
+    private val managerBaselineStore: ManagerBaselineStore,
     private val downloadProgressNotifier: DownloadProgressNotifier,
     private val appId: String,
 ) : ViewModel() {
@@ -63,6 +65,14 @@ class AppDetailsViewModel(
         catalogRepository
             .observeApp(appId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    // the version the manager itself last installed for this app, or null if it never has - App
+    // Details reads this alongside installedVersionName (the live device state) to tell "up to
+    // date" from "diverged outside the manager", see AppDetailsUiState.effectiveBaseline
+    val managerBaseline: StateFlow<String?> =
+        combine(app, managerBaselineStore.observeBaselines()) { profile, baselines ->
+            profile?.let { baselines[it.packageName] }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     // installed state is device-local, so a resume-triggered refresh() re-checks it - a successful
     // install also refreshes immediately below, section 13 + 42.19 of the spec
@@ -256,6 +266,7 @@ class AppDetailsViewModel(
         // captured before the flow runs, not after: installedVersionName reflects the OLD device
         // state right now, which is exactly what decides whether this is an install or an update
         val action = if (installedVersionName.value != null) ActivityAction.UPDATED else ActivityAction.INSTALLED
+        val installedVersion = selectedArtifact.value?.versionName
         viewModelScope.launch {
             flow.collect { status ->
                 mutableInstallStatus.value = status
@@ -264,6 +275,11 @@ class AppDetailsViewModel(
                     // not deleted on failure, since a retry reuses this same file instead of re-downloading
                     readyDownload()?.let { artifactDownloader.deleteDownloadedFile(it.filePath) }
                     recordActivity(targetApp, action)
+                    // this is now genuinely what the manager installed, real fact overriding whatever
+                    // guess effectiveBaseline() would otherwise have made
+                    if (installedVersion != null) {
+                        managerBaselineStore.recordInstall(targetApp.packageName, installedVersion)
+                    }
                     refresh()
                 }
             }

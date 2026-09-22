@@ -169,47 +169,68 @@ private fun DownloadStatusContent(
     }
 }
 
-// installedVersionName already matching the catalog's latest means there is nothing pending - a
-// prominent "Download" button here would wrongly suggest otherwise. The primary action is "Open"
-// (like any app store's already-installed state); Redownload and Uninstall are both secondary, so
-// they sit side by side below it instead of each getting their own full-width row stacked one under
-// the other - three full-width controls in a column read as heavier/more repetitive than the same
-// two secondary actions paired in one row under the one action that actually matters
+// three real states, not two: up to date (Open + Redownload, unchanged), installed-but-behind
+// (Open stays available - there's a real working app right there - alongside the actual Update
+// action, matching how any app store pairs Open with a pending update instead of hiding one behind
+// the other), and genuinely not installed (plain Install button, nothing to open). A prominent
+// "Download" button for an app that's actually sitting on the device would wrongly suggest
+// otherwise - that used to be true for BOTH non-up-to-date cases, hiding Open even when something
+// installed and working was right there
 @Composable
 private fun IdleContent(
     state: AppDetailsUiState,
     onDownload: () -> Unit,
 ) {
     val selected = state.selectedArtifact
-    val upToDate = state.isUpToDate
+    val installed = state.installedVersionName != null
     val awaitingUninstallConfirm =
         state.installStatus is InstallStatus.WaitingForUser &&
             state.installStatus.step == WaitingForUserStep.UNINSTALL_CONFIRM
     val uninstalling = state.installStatus is InstallStatus.Uninstalling || awaitingUninstallConfirm
 
-    if (upToDate) {
-        // selected is necessarily non-null here: upToDate can only be true when its versionName
-        // matched a real installedVersionName
-        StatusRow(
-            icon = painterResource(R.drawable.ic_check_circle_rounded),
-            tint = MaterialTheme.colorScheme.tertiary,
-            text = "Up to date.",
+    when {
+        state.isUpToDate -> {
+            StatusRow(
+                icon = painterResource(R.drawable.ic_check_circle_rounded),
+                tint = MaterialTheme.colorScheme.tertiary,
+                text = "Up to date.",
+            )
+            if (uninstalling) {
+                UninstallingStatus(installStatus = state.installStatus)
+            } else {
+                UpToDateActions(packageName = state.app.packageName, onDownload = onDownload)
+            }
+        }
+
+        installed -> {
+            StatusRow(
+                icon = painterResource(R.drawable.ic_system_update_alt_rounded),
+                tint = MaterialTheme.colorScheme.primary,
+                text = "Update available.",
+            )
+            if (uninstalling) {
+                UninstallingStatus(installStatus = state.installStatus)
+            } else {
+                InstalledNotUpToDateActions(state = state, onDownload = onDownload)
+            }
+        }
+
+        else -> {
+            Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
+                Text("Install")
+            }
+            if (selected == null) {
+                HelperText("Not yet available for download.")
+            }
+        }
+    }
+    // independent of which branch above rendered - a real pending update and a diverged install
+    // aren't mutually exclusive, so this can appear alongside either "Up to date" or "Update available"
+    if (state.isDiverged) {
+        HelperText(
+            "Installed version changed from ${state.effectiveBaseline} to " +
+                "${state.installedVersionName} outside the manager.",
         )
-        if (uninstalling) {
-            UninstallingStatus(installStatus = state.installStatus)
-        } else {
-            UpToDateActions(packageName = state.app.packageName, onDownload = onDownload)
-        }
-    } else {
-        Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
-            Text("Download")
-        }
-        if (selected == null) {
-            HelperText("Not yet available for download.")
-        }
-        if (state.installedVersionName != null && uninstalling) {
-            UninstallingStatus(installStatus = state.installStatus)
-        }
     }
     if (!uninstalling && state.installStatus is InstallStatus.Failed) {
         StatusRow(
@@ -217,6 +238,22 @@ private fun IdleContent(
             tint = MaterialTheme.colorScheme.error,
             text = state.installStatus.reason,
         )
+    }
+}
+
+// Open stacked above the real Update/Install action - same pairing UpToDateActions uses for
+// Open+Redownload, just with the actual update CTA instead of a redownload of the same thing
+@Composable
+private fun InstalledNotUpToDateActions(
+    state: AppDetailsUiState,
+    onDownload: () -> Unit,
+) {
+    val selected = state.selectedArtifact
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        OpenAppButton(packageName = state.app.packageName)
+        Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
+            Text(actionLabelFor(selected?.versionName, state.installedVersionName))
+        }
     }
 }
 
