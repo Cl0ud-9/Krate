@@ -135,16 +135,19 @@ internal data class AppDetailsUiState(
     // read by both the Idle and Failed branches of the download section - whether the installed
     // app already matches what's selected is independent of whatever the current download
     // attempt's own status is, so a failed redownload shouldn't hide that the app is fine.
-    // "up to date" means the installed version is not OLDER than what's selected, not merely a
-    // string match - a package can end up ahead of the catalog entirely outside this app (MicroG
-    // RE's own in-app "hide icon" toggle installs its own beta build, for example), and a plain ==
-    // used to offer an "Update" button here that would have downgraded it back to the catalog's
-    // older release
+    // "up to date" requires BOTH that the installed version is a build this catalog has actually
+    // published (app.artifacts) AND that it's not older than what's selected - a package can end
+    // up ahead of the catalog entirely outside this app (MicroG RE's own in-app "hide icon" toggle
+    // installs its own beta build, for example), and treating "ahead" as "up to date" would let it
+    // sit there indefinitely instead of steering back toward what this catalog actually tracks -
+    // deliberate policy, not just a safety fallback: an unrecognized build is always "behind",
+    // regardless of its own version number
     val isUpToDate: Boolean
         get() {
             val installed = installedVersionName ?: return false
             val selected = selectedArtifact?.versionName ?: return false
-            return !isNewerVersion(selected, installed)
+            val isCatalogKnown = app.artifacts.any { it.versionName == installed }
+            return isCatalogKnown && !isNewerVersion(selected, installed)
         }
 }
 

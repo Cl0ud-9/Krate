@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.domain.model.isVisible
-import dev.cl0ud9.manager.domain.model.latestVersionName
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
@@ -59,7 +58,7 @@ class HomeViewModel(
         refreshedApps
             .map { apps ->
                 apps.count { app ->
-                    isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app.latestVersionName)
+                    isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app)
                 }
             }.flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)

@@ -28,17 +28,46 @@ class PendingUpdatesTest {
         assertEquals(1, count)
     }
 
-    // the real bug this covers: a package can end up ahead of the catalog entirely outside this
-    // app (MicroG RE's own in-app "hide icon" toggle installs its own beta build) - this must not
-    // count as a pending update, since Update would actually downgrade it back to the catalog's
-    // older release
+    // deliberate policy, not a bug: a build the catalog has never published (MicroG RE's own
+    // in-app "hide icon" toggle installs its own beta build, for example) always counts as
+    // pending, even though its own version number is numerically ahead of the catalog's latest -
+    // the point is to keep steering the user back toward what this catalog actually tracks,
+    // regardless of what an app's own self-update mechanism installed outside this app entirely
     @Test
-    fun `an installed version newer than the catalog is not a pending update`() {
+    fun `an unrecognized installed version is always pending, even if numerically ahead of the catalog`() {
         val aheadOfCatalog = profile("ahead", latestVersionName = "7.1.1")
         val reader =
             FakeInstalledPackageReader(mapOf(aheadOfCatalog.packageName to InstalledVersion("7.2.1-dev.2", 1)))
 
-        assertEquals(0, pendingUpdateCount(listOf(aheadOfCatalog), reader, hasGitHubToken = false))
+        assertEquals(1, pendingUpdateCount(listOf(aheadOfCatalog), reader, hasGitHubToken = false))
+    }
+
+    // once the catalog's own latest genuinely catches up to (or passes) a previously-unrecognized
+    // installed build, normal numeric comparison takes back over and correctly reports "up to date"
+    @Test
+    fun `an installed version matching the catalog's latest exactly is not pending`() {
+        val caughtUp = profile("caught-up", latestVersionName = "7.2.1-dev.2")
+        val reader =
+            FakeInstalledPackageReader(mapOf(caughtUp.packageName to InstalledVersion("7.2.1-dev.2", 1)))
+
+        assertEquals(0, pendingUpdateCount(listOf(caughtUp), reader, hasGitHubToken = false))
+    }
+
+    // a catalog-recognized but older retained version (not just the single latest artifact) still
+    // goes through ordinary numeric comparison, not the "unrecognized" path
+    @Test
+    fun `a catalog-known older version is pending via ordinary numeric comparison`() {
+        val app =
+            profile("multi-version", latestVersionName = "2.0.0").copy(
+                artifacts =
+                    listOf(
+                        ArtifactInfo("2.0.0", "https://example.test/2.apk", "sha", "cert"),
+                        ArtifactInfo("1.0.0", "https://example.test/1.apk", "sha", "cert"),
+                    ),
+            )
+        val reader = FakeInstalledPackageReader(mapOf(app.packageName to InstalledVersion("1.0.0", 1)))
+
+        assertEquals(1, pendingUpdateCount(listOf(app), reader, hasGitHubToken = false))
     }
 
     @Test

@@ -2,7 +2,6 @@ package dev.cl0ud9.manager.platform.workers
 
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.isVisible
-import dev.cl0ud9.manager.domain.model.latestVersionName
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.isUpdateAvailable
 
@@ -17,5 +16,5 @@ internal fun pendingUpdateCount(
 ): Int =
     apps.count { app ->
         app.isVisible(hasGitHubToken) &&
-            isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app.latestVersionName)
+            isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app)
     }
