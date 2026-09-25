@@ -26,6 +26,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -97,7 +98,7 @@ internal fun FeedbackRow(
             SettingsRowHeader(
                 icon = painterResource(R.drawable.ic_feedback_rounded),
                 title = "Feedback & bug reports",
-                subtitle = "Tell us what's wrong, optionally with a diagnostic report attached",
+                subtitle = "Describe the problem and send it from any app, like email or WhatsApp",
                 colors =
                     SettingsRowColors(
                         MaterialTheme.colorScheme.primaryContainer,
@@ -146,11 +147,20 @@ private fun FeedbackRowContent(
         DiagnosticReportPreview(report = report)
     }
 
+    // sent through the share sheet (email, WhatsApp, ...) - most people don't have a GitHub
+    // account, so a GitHub issue is the secondary route, not the only one
     Button(
+        onClick = { context.startActivity(shareFeedbackIntent(state.feedbackText, report)) },
+        enabled = state.feedbackText.isNotBlank() || report != null,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text("Send feedback")
+    }
+    TextButton(
         onClick = { context.startActivity(feedbackIntent(state.feedbackText, report)) },
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text("Send feedback on GitHub")
+        Text("Report on GitHub instead")
     }
 }
 
@@ -229,6 +239,26 @@ private fun feedbackIntent(
             "?title=${urlEncode("Feedback")}" +
             "&body=${urlEncode(body)}"
     return Intent(Intent.ACTION_VIEW, Uri.parse(url))
+}
+
+private fun shareFeedbackIntent(
+    feedbackText: String,
+    diagnosticReport: String?,
+): Intent {
+    val body =
+        buildString {
+            append(feedbackText.trim())
+            if (diagnosticReport != null) {
+                if (isNotEmpty()) append("\n\n")
+                append(diagnosticReport)
+            }
+        }
+    return Intent(Intent.ACTION_SEND)
+        .apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "App Manager feedback")
+            putExtra(Intent.EXTRA_TEXT, body)
+        }.let { Intent.createChooser(it, "Send feedback with") }
 }
 
 private fun shareTextIntent(text: String): Intent =

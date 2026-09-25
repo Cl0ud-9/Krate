@@ -25,6 +25,7 @@ import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.InstalledVersion
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -118,6 +119,8 @@ class AppDetailsViewModel(
             .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
+    private var downloadJob: Job? = null
+
     private val mutableDownloadStatus = MutableStateFlow<DownloadStatus>(DownloadStatus.Idle)
     val downloadStatus: StateFlow<DownloadStatus> = mutableDownloadStatus.asStateFlow()
 
@@ -188,29 +191,47 @@ class AppDetailsViewModel(
         // notification is actually worth showing (it no-ops while the app is in the foreground,
         // where App Details' own progress bar already covers this) and whether a finished result
         // is worth surfacing even after the app comes back to the foreground
-        viewModelScope.launch {
-            artifactDownloader.download(currentApp, artifact).collect { status ->
-                mutableDownloadStatus.value = status
-                when (status) {
-                    is DownloadStatus.Downloading ->
-                        downloadProgressNotifier.onDownloading(
-                            currentApp.id,
-                            currentApp.displayName,
-                            status.bytesDownloaded,
-                            status.totalBytes,
-                        )
+        downloadJob =
+            viewModelScope.launch {
+                collectDownload(currentApp, artifact)
+            }
+    }
 
-                    is DownloadStatus.Verifying ->
-                        downloadProgressNotifier.onVerifying(currentApp.id, currentApp.displayName)
+    // stops an in-flight download; the partial file is kept, so starting again resumes it
+    fun cancelDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        mutableDownloadStatus.value = DownloadStatus.Idle
+        downloadProgressNotifier.clear(appId)
+    }
 
-                    is DownloadStatus.ReadyToInstall ->
-                        downloadProgressNotifier.onComplete(currentApp.id, currentApp.displayName)
+    private suspend fun collectDownload(
+        currentApp: AppProfile,
+        artifact: ArtifactInfo,
+    ) {
+        artifactDownloader.download(currentApp, artifact).collect { status ->
+            mutableDownloadStatus.value = status
+            when (status) {
+                is DownloadStatus.Downloading ->
+                    downloadProgressNotifier.onDownloading(
+                        currentApp.id,
+                        currentApp.displayName,
+                        status.bytesDownloaded,
+                        status.totalBytes,
+                    )
 
-                    is DownloadStatus.Failed ->
-                        downloadProgressNotifier.onFailed(currentApp.id, currentApp.displayName, status.reason)
+                is DownloadStatus.Verifying ->
+                    downloadProgressNotifier.onVerifying(currentApp.id, currentApp.displayName)
 
-                    is DownloadStatus.Idle -> downloadProgressNotifier.clear(currentApp.id)
+                is DownloadStatus.ReadyToInstall ->
+                    downloadProgressNotifier.onComplete(currentApp.id, currentApp.displayName)
+
+                is DownloadStatus.Failed -> {
+                    downloadProgressNotifier.onFailed(currentApp.id, currentApp.displayName, status.reason)
+                    recordActivity(currentApp, ActivityAction.FAILED, "Download: ${status.reason}")
                 }
+
+                is DownloadStatus.Idle -> downloadProgressNotifier.clear(currentApp.id)
             }
         }
     }
@@ -304,6 +325,9 @@ class AppDetailsViewModel(
         viewModelScope.launch {
             flow.collect { status ->
                 mutableInstallStatus.value = status
+                if (status is InstallStatus.Failed && !status.userCancelled) {
+                    recordActivity(targetApp, ActivityAction.FAILED, "Install: ${status.reason}")
+                }
                 if (status is InstallStatus.Success) {
                     // the downloaded apk is redundant once PackageInstaller has actually committed it -
                     // not deleted on failure, since a retry reuses this same file instead of re-downloading
@@ -323,6 +347,7 @@ class AppDetailsViewModel(
     private suspend fun recordActivity(
         targetApp: AppProfile,
         action: ActivityAction,
+        detail: String? = null,
     ) {
         activityLogRepository.record(
             ActivityEntry(
@@ -331,6 +356,7 @@ class AppDetailsViewModel(
                 appName = targetApp.displayName,
                 action = action,
                 timestampMillis = System.currentTimeMillis(),
+                detail = detail,
             ),
         )
     }

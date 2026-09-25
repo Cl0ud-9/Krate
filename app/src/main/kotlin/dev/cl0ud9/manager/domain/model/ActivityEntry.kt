@@ -4,6 +4,9 @@ enum class ActivityAction {
     INSTALLED,
     UPDATED,
     UNINSTALLED,
+
+    // a download or install that didn't complete - detail says why
+    FAILED,
 }
 
 // a real local log of what the manager has actually done, backing the Home screen's Recent
@@ -14,4 +17,5 @@ data class ActivityEntry(
     val appName: String,
     val action: ActivityAction,
     val timestampMillis: Long,
+    val detail: String? = null,
 )

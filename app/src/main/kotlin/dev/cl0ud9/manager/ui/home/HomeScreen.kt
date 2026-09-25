@@ -32,15 +32,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
+import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.manager.ui.components.AnnouncementCard
 import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
 import dev.cl0ud9.manager.ui.components.ManagerUpdateAnnouncementDialog
@@ -74,6 +75,7 @@ fun HomeScreen(
                 container.githubCredentialStore,
                 container.managerBaselineStore,
                 container.announcementDismissalStore,
+                container.managerSelfUpdateInstaller,
             )
         }
     val catalogCount by viewModel.catalogCount.collectAsStateWithLifecycle()
@@ -82,10 +84,11 @@ fun HomeScreen(
     val recentActivity by viewModel.recentActivity.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val updateAnnouncement by viewModel.updateAnnouncement.collectAsStateWithLifecycle()
+    val selfUpdateState by viewModel.selfUpdateState.collectAsStateWithLifecycle()
     val announcements by viewModel.announcements.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
 
-    HomeUpdateAnnouncement(announcement = updateAnnouncement, onDismiss = viewModel::dismissUpdateAnnouncement)
+    ManagerUpdatePrompt(updateAnnouncement, selfUpdateState, viewModel)
 
     // the counts on this screen are derived from the same catalog data Apps/Updates show, so a stale
     // manifest shows up here first - refreshFromNetwork() shares its result with every other screen
@@ -131,19 +134,17 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeUpdateAnnouncement(
+private fun ManagerUpdatePrompt(
     announcement: ManagerUpdateStatus.UpdateAvailable?,
-    onDismiss: () -> Unit,
+    selfUpdateState: SelfUpdateState?,
+    viewModel: HomeViewModel,
 ) {
     if (announcement == null) return
-    val uriHandler = LocalUriHandler.current
     ManagerUpdateAnnouncementDialog(
-        latestVersion = announcement.latestVersion,
-        onDismiss = onDismiss,
-        onViewRelease = {
-            uriHandler.openUri(announcement.releaseUrl)
-            onDismiss()
-        },
+        status = announcement,
+        selfUpdateState = selfUpdateState,
+        onUpdate = viewModel::installManagerUpdate,
+        onDismiss = viewModel::dismissUpdateAnnouncement,
     )
 }
 
@@ -261,10 +262,13 @@ private fun ActivityRow(entry: ActivityEntry) {
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(text = entry.appName, style = MaterialTheme.typography.bodyLarge)
+            // a failure says why, not just that it happened
             Text(
-                text = presentation.label,
+                text = entry.detail?.let { "${presentation.label}. $it" } ?: presentation.label,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Text(
@@ -304,8 +308,16 @@ private fun activityPresentation(action: ActivityAction): ActivityPresentation =
         ActivityAction.UNINSTALLED ->
             ActivityPresentation(
                 rememberVectorPainter(Icons.Filled.Delete),
+                MaterialTheme.colorScheme.surfaceContainerHighest,
+                MaterialTheme.colorScheme.onSurfaceVariant,
+                "Uninstalled",
+            )
+
+        ActivityAction.FAILED ->
+            ActivityPresentation(
+                painterResource(R.drawable.ic_error_rounded),
                 MaterialTheme.colorScheme.errorContainer,
                 MaterialTheme.colorScheme.onErrorContainer,
-                "Uninstalled",
+                "Failed",
             )
     }

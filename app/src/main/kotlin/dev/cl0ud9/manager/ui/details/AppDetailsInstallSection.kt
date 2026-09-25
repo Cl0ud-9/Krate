@@ -24,6 +24,7 @@ import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import dev.cl0ud9.manager.ui.components.HelperText
 import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
+import dev.cl0ud9.manager.ui.components.ReopenPromptButton
 import dev.cl0ud9.manager.ui.components.StatusRow
 
 // section 16 of the spec: the ui shows Install, Update, Reinstall or Roll back based on real device
@@ -83,28 +84,12 @@ private fun InstallStatusContent(
     onRetryAsCleanInstall: () -> Unit,
 ) {
     when (installStatus) {
-        is InstallStatus.Idle -> {
-            val unmetDependencies = state.dependencies.filter { !it.installed }
-            Button(
-                onClick = onInstall,
-                enabled = unmetDependencies.isEmpty(),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(actionLabel)
-            }
-            if (unmetDependencies.isNotEmpty()) {
-                val names = unmetDependencies.joinToString(", ") { it.app.displayName }
-                HelperText("Install required dependencies first: $names.")
-            }
-            if (state.requiresUninstall) {
-                HelperText(UNINSTALL_FIRST_WARNING)
-            }
-        }
+        is InstallStatus.Idle -> ReadyToInstallContent(state = state, actionLabel = actionLabel, onInstall = onInstall)
 
         is InstallStatus.Failed -> {
             FailedInstallSection(
                 app = state.app,
-                actionLabel = actionLabel,
+                installed = state.installed != null,
                 failure = installStatus,
                 onInstall = onInstall,
                 onRetryAsCleanInstall = onRetryAsCleanInstall,
@@ -129,6 +114,7 @@ private fun InstallStatusContent(
         is InstallStatus.WaitingForUser -> {
             ManagerLinearProgress(progress = null)
             HelperText(waitingForUserMessage(installStatus.step))
+            ReopenPromptButton()
         }
 
         is InstallStatus.RollingBack -> {
@@ -163,35 +149,78 @@ private fun waitingForUserMessage(step: WaitingForUserStep): String =
 @Composable
 private fun FailedInstallSection(
     app: AppProfile,
-    actionLabel: String,
+    installed: Boolean,
     failure: InstallStatus.Failed,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
 ) {
     val reasonText = if (failure.rolledBack) "${failure.reason} The previous version was restored." else failure.reason
-    StatusRow(
-        icon = painterResource(R.drawable.ic_error_rounded),
-        tint = MaterialTheme.colorScheme.error,
-        text = reasonText,
-    )
+    FailureStatusRow(failure = failure, text = reasonText)
 
-    if (app.installationMode == InstallationMode.CLEAN_INSTALL) {
+    // reinstalling from scratch only means something for a real failure on an app that's already
+    // installed - not after the user said no, and not for a first install
+    val offerReinstall = installed && !failure.userCancelled && app.installationMode != InstallationMode.CLEAN_INSTALL
+    if (!offerReinstall) {
         Button(onClick = onInstall, modifier = Modifier.fillMaxWidth()) {
-            Text("Retry")
+            Text("Try again")
         }
         return
     }
 
     Button(onClick = onInstall, modifier = Modifier.fillMaxWidth()) {
-        Text("Retry $actionLabel")
+        Text("Try again")
     }
     HelperText(
-        "The application could not be updated normally. A clean installation can be attempted. " +
-            "This may remove the app's local data.",
+        "Reinstalling from scratch uninstalls the current version first, so the app's data on this " +
+            "device is erased.",
     )
     // outlined, not filled - this is a lossy fallback the user should have to notice is different
     // from the safe retry above, not a same-weight alternative
     OutlinedButton(onClick = onRetryAsCleanInstall, modifier = Modifier.fillMaxWidth()) {
-        Text("Try clean install")
+        Text("Reinstall from scratch")
+    }
+}
+
+// a failure in error red, a user's own cancel in a neutral tone - saying no isn't something to fix
+@Composable
+internal fun FailureStatusRow(
+    failure: InstallStatus.Failed,
+    text: String = failure.reason,
+) {
+    val cancelled = failure.userCancelled
+    StatusRow(
+        icon = painterResource(if (cancelled) R.drawable.ic_info_rounded else R.drawable.ic_error_rounded),
+        tint = if (cancelled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+        text = text,
+    )
+}
+
+// the download is done and verified - otherwise identical to the not-yet-downloaded screen, which
+// also shows a lone button, so it says so
+@Composable
+private fun ReadyToInstallContent(
+    state: AppDetailsUiState,
+    actionLabel: String,
+    onInstall: () -> Unit,
+) {
+    val unmetDependencies = state.dependencies.filter { !it.installed }
+    StatusRow(
+        icon = painterResource(R.drawable.ic_check_circle_rounded),
+        tint = MaterialTheme.colorScheme.tertiary,
+        text = "Downloaded and checked. Ready to install.",
+    )
+    Button(
+        onClick = onInstall,
+        enabled = unmetDependencies.isEmpty(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(actionLabel)
+    }
+    if (unmetDependencies.isNotEmpty()) {
+        val names = unmetDependencies.joinToString(", ") { it.app.displayName }
+        HelperText("Install required dependencies first: $names.")
+    }
+    if (state.requiresUninstall) {
+        HelperText(UNINSTALL_FIRST_WARNING)
     }
 }

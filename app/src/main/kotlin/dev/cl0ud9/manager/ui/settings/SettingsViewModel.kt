@@ -8,6 +8,7 @@ import dev.cl0ud9.manager.data.settings.DEFAULT_NAV_BAR_CORNER_RADIUS
 import dev.cl0ud9.manager.domain.model.LaunchTab
 import dev.cl0ud9.manager.domain.model.NavBarStyle
 import dev.cl0ud9.manager.domain.model.ThemeMode
+import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
@@ -16,6 +17,7 @@ import dev.cl0ud9.manager.platform.selfupdate.ManagerSelfUpdateInstaller
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
+import dev.cl0ud9.manager.ui.details.buildDescription
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -96,6 +98,12 @@ class SettingsViewModel(
     private val mutableSelfUpdateState = MutableStateFlow<SelfUpdateState?>(null)
     val selfUpdateState: StateFlow<SelfUpdateState?> = mutableSelfUpdateState.asStateFlow()
 
+    // checked as soon as Settings opens (a single small GitHub API call), so an available update is
+    // shown straight away instead of waiting for a tap on "Check for updates"
+    init {
+        checkForManagerUpdate()
+    }
+
     // never surfaces the token value itself back to the UI, only whether one is currently saved -
     // EncryptedSharedPreferences has no Flow of its own, so this is refreshed manually on set/clear
     private val mutableHasGitHubToken = MutableStateFlow(githubCredentialStore.getToken() != null)
@@ -125,10 +133,20 @@ class SettingsViewModel(
             mutableGeneratingReport.value = true
             val report =
                 withContext(Dispatchers.IO) {
-                    val apps = catalogRepository.observeApps().first()
-                    val installedCount = apps.count { installedPackageReader.installedVersion(it.packageName) != null }
+                    val apps =
+                        catalogRepository.observeApps().first().map { app ->
+                            ReportedApp(
+                                name = app.displayName,
+                                installedVersion =
+                                    installedPackageReader
+                                        .installedVersion(
+                                            app.packageName,
+                                        )?.versionName,
+                                latest = app.latestArtifact?.buildDescription(),
+                            )
+                        }
                     val recentActivity = activityLogRepository.observeRecent().first()
-                    formatDiagnosticReport(deviceSummary, apps.size, installedCount, recentActivity)
+                    formatDiagnosticReport(deviceSummary, apps, recentActivity)
                 }
             mutableDiagnosticReport.value = report
             mutableGeneratingReport.value = false
@@ -183,7 +201,8 @@ class SettingsViewModel(
     // opening the GitHub release page with. Guarded the same way checkForManagerUpdate() is: a
     // second tap while one is already running is a no-op rather than starting a duplicate download
     fun installManagerUpdate(downloadUrl: String) {
-        if (mutableSelfUpdateState.value is SelfUpdateState.Downloading) return
+        val current = mutableSelfUpdateState.value
+        if (current is SelfUpdateState.Downloading || current is SelfUpdateState.Installing) return
         viewModelScope.launch {
             managerSelfUpdateInstaller.downloadAndInstall(downloadUrl).collect { state ->
                 mutableSelfUpdateState.value = state

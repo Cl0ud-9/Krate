@@ -135,7 +135,7 @@ private fun Builder.appendWithInlineSpans(
                 append(remaining.substring(0, match.range.first))
                 val linkStyle = TextLinkStyles(style = SpanStyle(color = colors.link))
                 withLink(LinkAnnotation.Url(match.value, linkStyle)) {
-                    append(match.value)
+                    append(shortLinkText(match.value))
                 }
                 remaining = remaining.substring(match.range.last + 1)
             }
@@ -172,3 +172,13 @@ private val LINK_SYNTAX = Regex("\\[([^\\]]+)]\\(([^)]+)\\)")
 // excludes a trailing ')' from the match so "(see https://example.com/x)" doesn't swallow the
 // closing paren into the link - the same heuristic GitHub's own bare-URL autolinker uses
 private val BARE_URL = Regex("https?://[^\\s)]+")
+
+private val GITHUB_COMMIT_URL = Regex("^https://github\\.com/[^/]+/[^/]+/commit/([0-9a-f]{7})[0-9a-f]*$")
+private val GITHUB_NUMBERED_URL = Regex("^https://github\\.com/[^/]+/[^/]+/(?:pull|issues)/(\\d+)$")
+
+// a full commit or pull request URL in release notes is noise for a reader - GitHub itself shows
+// these as "a1b2c3d" and "#123", so do the same while keeping them tappable
+private fun shortLinkText(url: String): String =
+    GITHUB_COMMIT_URL.matchEntire(url)?.let { "commit ${it.groupValues[1]}" }
+        ?: GITHUB_NUMBERED_URL.matchEntire(url)?.let { "#${it.groupValues[1]}" }
+        ?: url

@@ -62,19 +62,19 @@ fun SettingsScreen(
     val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     val managerUpdateState by viewModel.managerUpdateState.collectAsStateWithLifecycle()
-    val selfUpdateState by viewModel.selfUpdateState.collectAsStateWithLifecycle()
     val hasGitHubToken by viewModel.hasGitHubToken.collectAsStateWithLifecycle()
     val feedbackState = rememberFeedbackUiState(viewModel)
     val deviceSummary = rememberDeviceSummary()
-    val versionName = rememberVersionName()
     // both actions are already idempotent in the ViewModel itself (a second call while one is
     // still running is a no-op) - this debounce is the UI-side half of that: the button itself goes
     // disabled for the cooldown, so a fast repeat tap can't stack a second ripple on top of the
     // first one still playing, on top of never reaching the ViewModel a second time either
     val clearCacheState = rememberDebouncedButtonState(onClick = viewModel::clearCache)
-    val checkForUpdateState = rememberDebouncedButtonState(onClick = viewModel::checkForManagerUpdate)
-    val updateActions =
-        ManagerUpdateActions(checkForUpdateState, selfUpdateState, viewModel::installManagerUpdate)
+    // while a manager update is waiting, About (with its Update now button) moves to the top of the
+    // list, so opening Settings from the update notification lands right on it
+    val updateWaiting =
+        (managerUpdateState as? ManagerUpdateUiState.Result)?.status is ManagerUpdateStatus.UpdateAvailable
+    val offset = if (updateWaiting) 1 else 0
 
     // one continuous grouped list (2dp seams, square-ish touching corners) instead of four
     // separately-floating cards - settingsGroupShape needs each row's position in the group.
@@ -89,38 +89,34 @@ fun SettingsScreen(
                 .padding(top = topContentPadding + DetailContentTopGap, start = 16.dp, end = 16.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        if (updateWaiting) SettingsAboutRow(viewModel, settingsGroupShape(0, SETTINGS_ROW_COUNT))
         AppearanceRow(
             onClick = onNavigateToAppearance,
-            shape = settingsGroupShape(APPEARANCE_ROW_INDEX, SETTINGS_ROW_COUNT),
+            shape = settingsGroupShape(APPEARANCE_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
         )
         AutomaticDownloadsRow(
             checked = automaticDownloads,
             onCheckedChange = viewModel::setAutomaticDownloads,
-            shape = settingsGroupShape(AUTOMATIC_DOWNLOADS_ROW_INDEX, SETTINGS_ROW_COUNT),
+            shape = settingsGroupShape(AUTOMATIC_DOWNLOADS_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
         )
         StorageRow(
             cacheClearedMessage = cacheClearedMessage,
             clearCacheState = clearCacheState,
-            shape = settingsGroupShape(STORAGE_ROW_INDEX, SETTINGS_ROW_COUNT),
+            shape = settingsGroupShape(STORAGE_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
         )
         GitHubAccessRow(
             hasToken = hasGitHubToken,
             onSaveToken = viewModel::setGitHubToken,
             onClearToken = viewModel::clearGitHubToken,
-            shape = settingsGroupShape(GITHUB_ACCESS_ROW_INDEX, SETTINGS_ROW_COUNT),
+            shape = settingsGroupShape(GITHUB_ACCESS_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
         )
         FeedbackRow(
             state = feedbackState,
             onFeedbackTextChange = viewModel::setFeedbackText,
             onGenerateReport = { viewModel.generateDiagnosticReport(deviceSummary) },
-            shape = settingsGroupShape(FEEDBACK_ROW_INDEX, SETTINGS_ROW_COUNT),
+            shape = settingsGroupShape(FEEDBACK_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
         )
-        AboutRow(
-            versionName = versionName,
-            managerUpdateState = managerUpdateState,
-            updateActions = updateActions,
-            shape = settingsGroupShape(ABOUT_ROW_INDEX, SETTINGS_ROW_COUNT),
-        )
+        if (!updateWaiting) SettingsAboutRow(viewModel, settingsGroupShape(ABOUT_ROW_INDEX, SETTINGS_ROW_COUNT))
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
@@ -163,7 +159,7 @@ private fun StorageRow(
             SettingsRowHeader(
                 icon = painterResource(R.drawable.ic_delete_sweep_rounded),
                 title = "Storage",
-                subtitle = "Downloaded apks are removed right after a successful install.",
+                subtitle = "Downloaded update files are deleted as soon as they're installed.",
                 colors =
                     SettingsRowColors(
                         MaterialTheme.colorScheme.tertiaryContainer,
@@ -180,7 +176,7 @@ private fun StorageRow(
 // that version is current, rather than a bare standalone "check for update" button floating on
 // its own. "Automatic downloads" above governs catalog-app download behavior, a separate concern
 @Composable
-private fun AboutRow(
+internal fun AboutRow(
     versionName: String,
     managerUpdateState: ManagerUpdateUiState,
     updateActions: ManagerUpdateActions,
@@ -210,7 +206,7 @@ private fun AboutRow(
 }
 
 @Composable
-private fun rememberVersionName(): String {
+internal fun rememberVersionName(): String {
     val context = LocalContext.current
     return remember {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
@@ -265,7 +261,7 @@ private fun ManagerUpdateSection(
                         icon = painterResource(R.drawable.ic_system_update_alt_rounded),
                         badgeColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        text = "Check GitHub for a newer release of the manager itself.",
+                        text = "Check for a newer version of App Manager.",
                     )
                     FilledTonalButton(
                         onClick = actions.checkForUpdateState.onClick,

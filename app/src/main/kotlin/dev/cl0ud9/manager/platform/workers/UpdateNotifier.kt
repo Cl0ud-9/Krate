@@ -50,18 +50,22 @@ object UpdateNotifier {
     // periodic check that finds the same updates still waiting stays quiet instead of buzzing again
     fun notifyPendingUpdates(
         context: Context,
-        count: Int,
+        appNames: List<String>,
         signature: String,
         downloaded: Boolean,
     ) {
         val prefs = state(context)
         if (prefs.getString(KEY_PENDING_SIGNATURE, null) == signature) return
         prefs.edit().putString(KEY_PENDING_SIGNATURE, signature).apply()
+        // names the apps instead of only counting them - "Videoapp (Patched) has an update" says what
+        // to do with it at a glance, a bare "1 update available" doesn't
+        val title = appNames.singleOrNull()?.let { "Update for $it" } ?: "${appNames.size} updates available"
+        val action = if (downloaded) "Downloaded and ready to install." else "Tap to review and install."
         notify(
             context = context,
             id = PENDING_UPDATES_NOTIFICATION_ID,
-            title = if (count == 1) "1 update available" else "$count updates available",
-            text = if (downloaded) "Downloaded and ready to install." else "Tap to see what's new.",
+            title = title,
+            text = if (appNames.size > 1) "${appNames.joinToString(", ")}. $action" else action,
             targetRoute = "updates",
         )
     }
@@ -85,9 +89,10 @@ object UpdateNotifier {
         notify(
             context = context,
             id = MANAGER_UPDATE_NOTIFICATION_ID,
-            title = "Manager update available",
-            text = "Version $version is available. Tap to update.",
-            targetRoute = "updates",
+            title = "App Manager $version is available",
+            text = "Tap to update now.",
+            // Settings checks on open and offers the in-app Update button right there
+            targetRoute = "settings",
         )
     }
 
@@ -106,15 +111,15 @@ object UpdateNotifier {
     ) {
         val title =
             when {
-                failed == 0 -> "All $succeeded app${if (succeeded == 1) "" else "s"} updated"
-                succeeded == 0 -> "Update all failed"
+                failed == 0 -> if (succeeded == 1) "App updated" else "All $succeeded apps updated"
+                succeeded == 0 -> if (failed == 1) "Update failed" else "$failed updates failed"
                 else -> "$succeeded updated, $failed failed"
             }
         notify(
             context = context,
             id = UPDATE_ALL_RESULT_NOTIFICATION_ID,
             title = title,
-            text = "Tap to see the details.",
+            text = if (failed == 0) "Everything is up to date." else "Tap to see what went wrong.",
             targetRoute = "updates",
         )
     }
@@ -150,9 +155,10 @@ object UpdateNotifier {
         val notification =
             NotificationCompat
                 .Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_stat_update)
                 .setContentTitle(title)
                 .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setContentIntent(openApp)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)

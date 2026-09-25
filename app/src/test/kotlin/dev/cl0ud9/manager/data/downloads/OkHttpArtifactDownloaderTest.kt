@@ -69,7 +69,7 @@ class OkHttpArtifactDownloaderTest {
 
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
-            assertTrue((failure as DownloadStatus.Failed).reason.contains("checksum"))
+            assertTrue((failure as DownloadStatus.Failed).reason.contains("damaged"))
         }
 
     @Test
@@ -83,7 +83,7 @@ class OkHttpArtifactDownloaderTest {
 
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
-            assertTrue((failure as DownloadStatus.Failed).reason.contains("certificate"))
+            assertTrue((failure as DownloadStatus.Failed).reason.contains("signed by the expected developer"))
         }
 
     @Test
@@ -97,7 +97,7 @@ class OkHttpArtifactDownloaderTest {
 
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
-            assertTrue((failure as DownloadStatus.Failed).reason.contains("package name"))
+            assertTrue((failure as DownloadStatus.Failed).reason.contains("isn't the one this page is for"))
         }
 
     @Test
@@ -119,11 +119,11 @@ class OkHttpArtifactDownloaderTest {
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
             val reason = (failure as DownloadStatus.Failed).reason
-            assertTrue(reason.contains("artifacts repo"))
+            assertTrue(reason.contains("access token"))
         }
 
     @Test
-    fun `a 403 without requiresAuth keeps the plain status message`() =
+    fun `a 403 without requiresAuth explains GitHub rate limiting, not the token`() =
         runBlocking {
             server.enqueue(MockResponse().setHeader("Content-Length", "0"))
             server.enqueue(MockResponse().setResponseCode(403))
@@ -135,8 +135,8 @@ class OkHttpArtifactDownloaderTest {
             val failure = statuses.last()
             assertTrue(failure is DownloadStatus.Failed)
             val reason = (failure as DownloadStatus.Failed).reason
-            assertTrue(reason.contains("403"))
-            assertTrue(!reason.contains("artifacts repo"))
+            assertTrue(reason.contains("limiting requests"))
+            assertTrue(!reason.contains("access token"))
         }
 
     @Test

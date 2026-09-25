@@ -27,8 +27,8 @@ android {
         applicationId = "dev.cl0ud9.manager"
         minSdk = 30
         targetSdk = 37
-        versionCode = 9
-        versionName = "0.2.2"
+        versionCode = 11
+        versionName = "0.2.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -45,7 +45,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 shrinking: the release APK drops from about 62 MB to a fraction of that, which is
+            // what every in-app manager update downloads
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (keystoreProperties.isNotEmpty()) {
                 signingConfig = signingConfigs.getByName("release")

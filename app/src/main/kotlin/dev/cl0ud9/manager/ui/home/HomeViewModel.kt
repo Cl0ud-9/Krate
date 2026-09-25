@@ -13,8 +13,10 @@ import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.isUpdateAvailable
+import dev.cl0ud9.manager.platform.selfupdate.ManagerSelfUpdateInstaller
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
+import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.manager.ui.util.withMinimumDuration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -39,6 +41,7 @@ class HomeViewModel(
     private val githubCredentialStore: GitHubCredentialStore,
     private val managerBaselineStore: ManagerBaselineStore,
     private val announcementDismissalStore: AnnouncementDismissalStore,
+    private val managerSelfUpdateInstaller: ManagerSelfUpdateInstaller,
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -119,6 +122,18 @@ class HomeViewModel(
 
     fun dismissAnnouncement(id: String) {
         viewModelScope.launch { announcementDismissalStore.dismiss(id) }
+    }
+
+    private val mutableSelfUpdateState = MutableStateFlow<SelfUpdateState?>(null)
+    val selfUpdateState: StateFlow<SelfUpdateState?> = mutableSelfUpdateState.asStateFlow()
+
+    // the same in-app download + system install prompt Settings offers, straight from the dialog
+    fun installManagerUpdate(downloadUrl: String) {
+        val current = mutableSelfUpdateState.value
+        if (current is SelfUpdateState.Downloading || current is SelfUpdateState.Installing) return
+        viewModelScope.launch {
+            managerSelfUpdateInstaller.downloadAndInstall(downloadUrl).collect { mutableSelfUpdateState.value = it }
+        }
     }
 
     fun dismissUpdateAnnouncement() {

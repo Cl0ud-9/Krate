@@ -26,6 +26,8 @@ class InstallResultReceiver : BroadcastReceiver() {
 
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             launchConfirmation(context, intent)
+        } else {
+            PendingConfirmation.clear()
         }
 
         InstallResultBus.emit(InstallResultEvent(requestKey = requestKey, status = status, message = message))
@@ -37,6 +39,7 @@ class InstallResultReceiver : BroadcastReceiver() {
     ) {
         val confirmationIntent = intent.parcelableExtraCompat<Intent>(Intent.EXTRA_INTENT) ?: return
         confirmationIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        PendingConfirmation.remember(confirmationIntent)
         context.startActivity(confirmationIntent)
     }
 
@@ -56,4 +59,28 @@ fun installResultPendingIntentFlags(): Int {
         flags = flags or PendingIntent.FLAG_MUTABLE
     }
     return flags
+}
+
+// the system install/uninstall prompt currently waiting on the user. Pressing Home while it's open
+// hides it with nothing on screen to bring it back, and the session keeps waiting - so the app keeps
+// the prompt's intent and offers to show it again
+object PendingConfirmation {
+    @Volatile
+    private var intent: Intent? = null
+
+    fun remember(confirmation: Intent) {
+        intent = confirmation
+    }
+
+    fun clear() {
+        intent = null
+    }
+
+    // false when there is no prompt to show, or Android no longer accepts it
+    fun reopen(context: Context): Boolean {
+        val confirmation = intent ?: return false
+        return runCatching {
+            context.startActivity(Intent(confirmation).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.isSuccess
+    }
 }

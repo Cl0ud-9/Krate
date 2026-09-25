@@ -122,8 +122,8 @@ class AndroidDownloadProgressNotifier(
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
         if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
         val notification =
-            terminalBuilder(appId, "$appName downloaded")
-                .setContentText("Ready to install. Tap to open.")
+            terminalBuilder(appId, "$appName downloaded", android.R.drawable.stat_sys_download_done)
+                .setContentText("Ready to install. Tap to install.")
                 .build()
         NotificationManagerCompat.from(context).notify(notificationIdFor(appId), notification)
     }
@@ -137,8 +137,9 @@ class AndroidDownloadProgressNotifier(
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
         if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
         val notification =
-            terminalBuilder(appId, "$appName download failed")
+            terminalBuilder(appId, "$appName download failed", android.R.drawable.stat_notify_error)
                 .setContentText(reason)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(reason))
                 .build()
         NotificationManagerCompat.from(context).notify(notificationIdFor(appId), notification)
     }
@@ -154,7 +155,9 @@ class AndroidDownloadProgressNotifier(
     ): NotificationCompat.Builder =
         NotificationCompat
             .Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            // the system's own animated download arrow - a status-bar icon has to be a single-color
+            // silhouette, and the full-color launcher icon rendered as a blank circle
+            .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle(title)
             .setContentIntent(openAppIntent(appId))
             .setOnlyAlertOnce(true)
@@ -167,10 +170,11 @@ class AndroidDownloadProgressNotifier(
     private fun terminalBuilder(
         appId: String,
         title: String,
+        smallIcon: Int,
     ): NotificationCompat.Builder =
         NotificationCompat
             .Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(smallIcon)
             .setContentTitle(title)
             .setContentIntent(openAppIntent(appId))
             .setAutoCancel(true)

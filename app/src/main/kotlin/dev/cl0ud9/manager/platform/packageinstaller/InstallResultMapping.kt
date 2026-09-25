@@ -26,6 +26,7 @@ fun interpretInstallResult(
                     WaitingForUserStep.UNINSTALL_CONFIRM -> "Uninstall cancelled."
                     WaitingForUserStep.INSTALL_CONFIRM -> "Installation cancelled."
                 },
+                userCancelled = true,
             )
 
         else -> InstallStatus.Failed(friendlyFailure(message))

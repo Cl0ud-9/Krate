@@ -18,6 +18,7 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
 
 private const val STREAM_BUFFER_SIZE = 8192
@@ -114,15 +115,20 @@ class OkHttpArtifactDownloader(
         return "${app.id}-${build.replace(UNSAFE_FILE_NAME_CHARS, "_")}"
     }
 
-    // returns a user-facing failure message, or null on success
+    // returns a user-facing failure message, or null on success. A cancellation (the user tapped
+    // Cancel, or left the screen) is rethrown rather than reported as a failed download
     private suspend fun runDownload(
         artifact: ArtifactInfo,
         token: String?,
         partFile: File,
         collector: FlowCollector<DownloadStatus>,
     ): String? =
-        runCatching { streamDownload(artifact, token, partFile, collector) }
-            .fold(onSuccess = { null }, onFailure = { "Download failed: ${it.message ?: "network error"}" })
+        try {
+            streamDownload(artifact, token, partFile, collector)
+            null
+        } catch (exception: IOException) {
+            friendlyNetworkError(exception)
+        }
 
     private fun checkStoragePreflight(
         artifact: ArtifactInfo,
@@ -134,7 +140,7 @@ class OkHttpArtifactDownloader(
         if (available < required) {
             val requiredMb = required / BYTES_PER_MB
             val availableMb = available / BYTES_PER_MB
-            return "Not enough storage: need about ${requiredMb}MB, ${availableMb}MB available."
+            return "Not enough storage. This needs about $requiredMb MB free and $availableMb MB is available."
         }
         return null
     }
@@ -177,9 +183,9 @@ class OkHttpArtifactDownloader(
         code: Int,
     ): String {
         val isAuthCode = code == HTTP_UNAUTHORIZED || code == HTTP_FORBIDDEN || code == HTTP_NOT_FOUND
-        if (!artifact.requiresAuth || !isAuthCode) return "Server returned HTTP $code"
-        return "GitHub rejected the download (HTTP $code). Check that your token in Settings > GitHub " +
-            "access is scoped to the artifacts repo you were invited to, and hasn't been revoked."
+        if (!artifact.requiresAuth || !isAuthCode) return friendlyHttpError(code)
+        return "GitHub didn't allow this download. Your access token in Settings > GitHub access may " +
+            "have expired or been removed - add a new one and try again."
     }
 
     // streams the response body to the part file, resuming from its existing length when the server allows it
@@ -195,9 +201,9 @@ class OkHttpArtifactDownloader(
             requestBuilder.header("Range", "bytes=$existingBytes-")
         }
         httpClient.newCall(requestBuilder.build()).execute().use { response ->
-            if (!response.isSuccessful) error(downloadFailureMessage(artifact, response.code))
+            if (!response.isSuccessful) throw UserFacingIOException(downloadFailureMessage(artifact, response.code))
             val resuming = response.code == HTTP_PARTIAL_CONTENT
-            val body = response.body ?: error("Empty response body")
+            val body = response.body ?: throw UserFacingIOException("The server sent an empty file. Try again.")
             val totalBytes = resolveTotalBytes(response, resuming, existingBytes, body.contentLength())
             val startingAt = if (resuming) existingBytes else 0L
             writeBody(body.byteStream(), partFile, append = resuming, startingAt = startingAt) { written ->
@@ -265,19 +271,19 @@ class OkHttpArtifactDownloader(
         val archiveInfo = archiveReader.read(file.absolutePath)
         return when {
             !hashMatches -> {
-                "Downloaded file does not match the expected checksum."
+                "The download was damaged or changed on the way, so it wasn't installed. Try downloading again."
             }
 
             archiveInfo == null -> {
-                "Downloaded file is not a valid APK."
+                "The downloaded file isn't a valid app package. Try downloading again."
             }
 
             archiveInfo.packageName != expectedPackageName -> {
-                "Downloaded package name does not match the catalog entry."
+                "The downloaded app isn't the one this page is for, so it wasn't installed."
             }
 
             !hashesMatch(artifact.certificateSha256, archiveInfo.certificateSha256Hex) -> {
-                "Signing certificate does not match the expected identity."
+                "The download isn't signed by the expected developer, so it wasn't installed for your safety."
             }
 
             else -> {

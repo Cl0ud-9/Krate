@@ -124,6 +124,7 @@ fun AppDetailsScreen(
                 onDownload = rememberDebouncedOnClick(onClick = viewModel::startDownload),
                 onInstall = rememberDebouncedOnClick(onClick = viewModel::startInstall),
                 onRetryAsCleanInstall = rememberDebouncedOnClick(onClick = viewModel::retryAsCleanInstall),
+                onCancelDownload = viewModel::cancelDownload,
                 onUninstall = rememberDebouncedOnClick(onClick = viewModel::startUninstall),
                 onSelectVersion = viewModel::selectVersion,
                 onNavigateToApp = onNavigateToApp,
@@ -217,6 +218,7 @@ private fun AppDetailsContent(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
+    onCancelDownload: () -> Unit,
     onUninstall: () -> Unit,
     onSelectVersion: (ArtifactInfo) -> Unit,
     onNavigateToApp: (String) -> Unit,
@@ -268,6 +270,7 @@ private fun AppDetailsContent(
             onDownload = onDownload,
             onInstall = onInstall,
             onRetryAsCleanInstall = onRetryAsCleanInstall,
+            onCancelDownload = onCancelDownload,
         )
 
         // only renders once more than one version is actually retained (see catalog-metadata.json's
@@ -420,11 +423,13 @@ private fun InstallationSection(
             AnnotatedString(
                 when (app.installationMode) {
                     InstallationMode.UPDATE -> {
-                        "Updates are attempted in place. If that fails, a clean install is offered."
+                        "Updates keep the app's data. If an update can't install normally, you can " +
+                            "reinstall it from scratch instead, which erases the app's data."
                     }
 
                     InstallationMode.CLEAN_INSTALL -> {
-                        "This app always uses a clean install: uninstall then install the new version."
+                        "Updates reinstall this app from scratch: it's uninstalled first, then the new " +
+                            "version is installed. The app's data is erased each time."
                     }
                 },
             ),

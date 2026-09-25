@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
@@ -15,7 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.manager.platform.packageinstaller.PendingConfirmation
 
 // shared across App Details' download/install sections and Settings - a generic icon+tint+text
 // row and a small helper caption, not specific to any one screen
@@ -63,4 +66,17 @@ internal fun StatusRow(
 @Composable
 internal fun HelperText(text: String) {
     Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+// shown while Android's install/uninstall prompt is waiting - brings it back if it got hidden
+// (Home pressed while it was open), since nothing else on screen can
+@Composable
+internal fun ReopenPromptButton() {
+    val context = LocalContext.current
+    FilledTonalButton(
+        onClick = { PendingConfirmation.reopen(context) },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text("Show the prompt again")
+    }
 }

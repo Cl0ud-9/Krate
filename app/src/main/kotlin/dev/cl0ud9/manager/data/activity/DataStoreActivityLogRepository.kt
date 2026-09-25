@@ -23,6 +23,7 @@ private data class ActivityEntryDto(
     val appName: String,
     val action: String,
     val timestampMillis: Long,
+    val detail: String? = null,
 )
 
 private fun ActivityEntryDto.toDomain(): ActivityEntry =
@@ -32,9 +33,11 @@ private fun ActivityEntryDto.toDomain(): ActivityEntry =
         appName = appName,
         action = runCatching { ActivityAction.valueOf(action) }.getOrDefault(ActivityAction.UPDATED),
         timestampMillis = timestampMillis,
+        detail = detail,
     )
 
-private fun ActivityEntry.toDto(): ActivityEntryDto = ActivityEntryDto(id, appId, appName, action.name, timestampMillis)
+private fun ActivityEntry.toDto(): ActivityEntryDto =
+    ActivityEntryDto(id, appId, appName, action.name, timestampMillis, detail)
 
 // a small local history of completed installs/updates/uninstalls, capped to MAX_ENTRIES newest-first
 // - backs the Home screen's Recent activity section with real data instead of a permanent placeholder

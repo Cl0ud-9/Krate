@@ -47,7 +47,7 @@ class InstallResultMappingTest {
                 "INSTALL_FAILED_ABORTED: User rejected permission",
                 WaitingForUserStep.INSTALL_CONFIRM,
             )
-        assertEquals(InstallStatus.Failed("Installation cancelled."), status)
+        assertEquals(InstallStatus.Failed("Installation cancelled.", userCancelled = true), status)
     }
 
     @Test
@@ -58,7 +58,7 @@ class InstallResultMappingTest {
                 "DELETE_FAILED_ABORTED: User rejected permission",
                 WaitingForUserStep.UNINSTALL_CONFIRM,
             )
-        assertEquals(InstallStatus.Failed("Uninstall cancelled."), status)
+        assertEquals(InstallStatus.Failed("Uninstall cancelled.", userCancelled = true), status)
     }
 
     @Test

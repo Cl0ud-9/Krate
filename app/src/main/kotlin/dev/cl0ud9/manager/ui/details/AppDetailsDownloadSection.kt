@@ -18,6 +18,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -32,6 +33,7 @@ import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import dev.cl0ud9.manager.ui.components.HelperText
 import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
+import dev.cl0ud9.manager.ui.components.ReopenPromptButton
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.StatusRow
 import dev.cl0ud9.manager.ui.theme.ShapeCache
@@ -42,6 +44,7 @@ internal fun DownloadSection(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
+    onCancelDownload: () -> Unit,
 ) {
     val status = state.downloadStatus
     val actionLabel = actionLabelFor(state)
@@ -75,6 +78,7 @@ internal fun DownloadSection(
                         onDownload = onDownload,
                         onInstall = onInstall,
                         onRetryAsCleanInstall = onRetryAsCleanInstall,
+                        onCancelDownload = onCancelDownload,
                     )
                 }
             }
@@ -93,6 +97,7 @@ private fun DownloadStatusContent(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
+    onCancelDownload: () -> Unit,
 ) {
     when (status) {
         is DownloadStatus.Idle -> IdleContent(state = state, onDownload = onDownload)
@@ -102,13 +107,21 @@ private fun DownloadStatusContent(
             val fraction = if (total != null && total > 0) status.bytesDownloaded / total.toFloat() else 0f
             ManagerLinearProgress(progress = if (total != null) fraction else null)
             HelperText(
-                "Downloading ${formatMb(status.bytesDownloaded)} of ${total?.let { formatMb(it) } ?: "?"} MB",
+                total?.let {
+                    "Downloading ${formatMb(status.bytesDownloaded)} of ${formatMb(it)} MB " +
+                        "(${(fraction * PERCENT).toInt()}%)"
+                } ?: "Downloading ${formatMb(status.bytesDownloaded)} MB",
             )
+            // a 170 MB download shouldn't be a commitment - the partial file is kept, so starting
+            // again later resumes it
+            OutlinedButton(onClick = onCancelDownload, modifier = Modifier.fillMaxWidth()) {
+                Text("Cancel")
+            }
         }
 
         is DownloadStatus.Verifying -> {
             ManagerLinearProgress(progress = null)
-            HelperText("Verifying checksum and signing certificate...")
+            HelperText("Checking the download is genuine...")
         }
 
         is DownloadStatus.ReadyToInstall -> {
@@ -146,7 +159,7 @@ private fun DownloadStatusContent(
                         ButtonDefaults.buttonColors()
                     },
             ) {
-                Text("Retry download")
+                Text("Try again")
             }
         }
     }
@@ -247,12 +260,9 @@ private fun IdleFootnotes(
                 "${state.installedVersionName} outside the manager.",
         )
     }
-    if (!uninstalling && state.installStatus is InstallStatus.Failed) {
-        StatusRow(
-            icon = painterResource(R.drawable.ic_error_rounded),
-            tint = MaterialTheme.colorScheme.error,
-            text = state.installStatus.reason,
-        )
+    val failure = state.installStatus as? InstallStatus.Failed
+    if (!uninstalling && failure != null) {
+        FailureStatusRow(failure = failure)
     }
 }
 
@@ -265,7 +275,7 @@ private fun InstalledNotUpToDateActions(
 ) {
     val selected = state.selectedArtifact
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        OpenAppButton(packageName = state.app.packageName)
+        OpenAppButton(packageName = state.app.packageName, secondary = true)
         Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
             Text(actionLabelFor(state))
         }
@@ -308,13 +318,30 @@ private fun UpToDateActions(
 // shared by UpToDateActions and the Failed branch above, plus InstallStatus.Success in
 // AppDetailsInstallSection.kt (same package) - renders nothing for a package with no launcher
 // activity (a pure library dependency, e.g. microG RE), same fallback every call site needs
+// secondary = tonal instead of filled, for when another action on the card is the main one
 @Composable
-internal fun OpenAppButton(packageName: String) {
+internal fun OpenAppButton(
+    packageName: String,
+    secondary: Boolean = false,
+) {
     val context = LocalContext.current
     val launchIntent =
         remember(packageName) { context.packageManager.getLaunchIntentForPackage(packageName) }
     if (launchIntent != null) {
-        Button(onClick = { context.startActivity(launchIntent) }, modifier = Modifier.fillMaxWidth()) {
+        val colors =
+            if (secondary) {
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            } else {
+                ButtonDefaults.buttonColors()
+            }
+        Button(
+            onClick = { context.startActivity(launchIntent) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = colors,
+        ) {
             Text("Open")
         }
     }
@@ -335,8 +362,11 @@ private fun UninstallingStatus(installStatus: InstallStatus) {
             "Confirm the uninstall in the system dialog."
         },
     )
+    if (installStatus is InstallStatus.WaitingForUser) ReopenPromptButton()
 }
 
 private const val BYTES_PER_MB = 1024 * 1024
 
 private fun formatMb(bytes: Long): String = "%.1f".format(bytes / BYTES_PER_MB.toFloat())
+
+private const val PERCENT = 100

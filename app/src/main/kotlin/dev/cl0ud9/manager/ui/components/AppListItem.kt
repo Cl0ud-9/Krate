@@ -60,7 +60,8 @@ fun AppListItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = app.displayName, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = app.latestVersionName?.let { "Version $it" } ?: "Version unknown",
+                    // the catalog's newest version - "Installed" below says whether it's on the device
+                    text = app.latestVersionName?.let { "Latest $it" } ?: "Not available yet",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

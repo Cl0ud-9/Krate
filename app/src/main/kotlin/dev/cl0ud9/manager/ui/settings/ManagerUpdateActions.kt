@@ -5,16 +5,21 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.manager.ui.components.HelperText
 import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
+import dev.cl0ud9.manager.ui.components.ReopenPromptButton
 import dev.cl0ud9.manager.ui.util.DebouncedButtonState
+import dev.cl0ud9.manager.ui.util.rememberDebouncedButtonState
 
 // split out of SettingsScreen.kt purely to keep that file under detekt's per-file function-count
 // threshold, same reasoning as AppDetailsInstallSection.kt's own split - this half owns everything
@@ -58,8 +63,11 @@ internal fun SelfUpdateAction(
         }
 
         is SelfUpdateState.Downloading -> {
-            ManagerLinearProgress(progress = null)
-            HelperText("Downloading the update...")
+            val fraction = selfUpdateState.fraction
+            ManagerLinearProgress(progress = fraction)
+            HelperText(
+                fraction?.let { "Downloading the update... ${(it * PERCENT).toInt()}%" } ?: "Downloading the update...",
+            )
         }
 
         is SelfUpdateState.Installing -> SelfUpdateInstallingContent(installStatus = selfUpdateState.installStatus)
@@ -75,7 +83,7 @@ private fun SelfUpdateStartButton(
     val downloadUrl = status.downloadUrl
     if (downloadUrl != null) {
         Button(onClick = { onInstallUpdate(downloadUrl) }, modifier = Modifier.fillMaxWidth()) {
-            Text(if (retrying) "Retry download" else "Download & install")
+            Text(if (retrying) "Try again" else "Update now")
         }
     } else {
         val uriHandler = LocalUriHandler.current
@@ -90,7 +98,8 @@ private fun SelfUpdateInstallingContent(installStatus: InstallStatus) {
     when (installStatus) {
         is InstallStatus.WaitingForUser -> {
             ManagerLinearProgress(progress = null)
-            HelperText("Confirm the update in the system dialog.")
+            HelperText("Confirm the update in the system dialog. App Manager restarts once it's installed.")
+            ReopenPromptButton()
         }
 
         is InstallStatus.Success -> {
@@ -119,4 +128,25 @@ private fun SelfUpdateInstallingContent(installStatus: InstallStatus) {
             HelperText("Installing...")
         }
     }
+}
+
+private const val PERCENT = 100
+
+// About with its manager-update section, reading that state itself so SettingsScreen only decides
+// where in the list it goes
+@Composable
+internal fun SettingsAboutRow(
+    viewModel: SettingsViewModel,
+    shape: Shape,
+) {
+    val managerUpdateState by viewModel.managerUpdateState.collectAsStateWithLifecycle()
+    val selfUpdateState by viewModel.selfUpdateState.collectAsStateWithLifecycle()
+    // idempotent in the ViewModel too - the debounce just stops a double tap reaching it at all
+    val checkForUpdateState = rememberDebouncedButtonState(onClick = viewModel::checkForManagerUpdate)
+    AboutRow(
+        versionName = rememberVersionName(),
+        managerUpdateState = managerUpdateState,
+        updateActions = ManagerUpdateActions(checkForUpdateState, selfUpdateState, viewModel::installManagerUpdate),
+        shape = shape,
+    )
 }

@@ -42,9 +42,11 @@ class UpdateAllEngine(
         onStatus: suspend (String) -> Unit,
     ): UpdateAllOutcome {
         onStatus("Downloading ${app.displayName}")
-        val downloaded =
-            downloadToReady(app, onStatus)
-                ?: return UpdateAllOutcome(app, succeeded = false, reason = "Download failed")
+        val downloaded = downloadToReady(app, onStatus)
+        if (downloaded !is DownloadStatus.ReadyToInstall) {
+            val reason = (downloaded as? DownloadStatus.Failed)?.reason ?: "The download didn't finish."
+            return UpdateAllOutcome(app, succeeded = false, reason = reason)
+        }
 
         val apkFile = File(downloaded.filePath)
         val installFlow =
@@ -75,10 +77,11 @@ class UpdateAllEngine(
         }
     }
 
+    // ReadyToInstall, or Failed with the reason the user should see
     private suspend fun downloadToReady(
         app: AppProfile,
         onStatus: suspend (String) -> Unit,
-    ): DownloadStatus.ReadyToInstall? {
+    ): DownloadStatus? {
         // Update All always targets the newest version, never an older retained one - that
         // picking is only ever an explicit, single-app choice made from App Details
         val artifact = app.latestArtifact ?: return null
@@ -91,14 +94,14 @@ class UpdateAllEngine(
         app: AppProfile,
         artifact: ArtifactInfo,
         onStatus: suspend (String) -> Unit,
-    ): DownloadStatus.ReadyToInstall? {
-        var result: DownloadStatus.ReadyToInstall? = null
+    ): DownloadStatus? {
+        var result: DownloadStatus? = null
         artifactDownloader.download(app, artifact).collect { status ->
             when (status) {
                 is DownloadStatus.Downloading -> onStatus("Downloading ${app.displayName}")
-                is DownloadStatus.Verifying -> onStatus("Verifying ${app.displayName}")
-                is DownloadStatus.ReadyToInstall -> result = status
-                is DownloadStatus.Failed, DownloadStatus.Idle -> Unit
+                is DownloadStatus.Verifying -> onStatus("Checking ${app.displayName}")
+                is DownloadStatus.ReadyToInstall, is DownloadStatus.Failed -> result = status
+                DownloadStatus.Idle -> Unit
             }
         }
         return result
@@ -106,7 +109,7 @@ class UpdateAllEngine(
 
     private fun installStatusLabel(status: InstallStatus): String =
         when (status) {
-            InstallStatus.PreparingRollback -> "Preserving the current version for rollback"
+            InstallStatus.PreparingRollback -> "Keeping a copy of the current version"
             InstallStatus.Uninstalling -> "Uninstalling the current version"
             InstallStatus.Installing -> "Installing"
             is InstallStatus.WaitingForUser ->

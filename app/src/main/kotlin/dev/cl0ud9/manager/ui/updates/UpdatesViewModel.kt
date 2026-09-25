@@ -150,6 +150,18 @@ class UpdatesViewModel(
     // records the version actually installed as this app's new manager baseline - Update All always
     // installs an app's latestArtifact, so that's what just became true on the device
     private suspend fun recordActivity(outcomes: List<UpdateAllOutcome>) {
+        outcomes.filterNot { it.succeeded }.forEach { outcome ->
+            activityLogRepository.record(
+                ActivityEntry(
+                    id = UUID.randomUUID().toString(),
+                    appId = outcome.app.id,
+                    appName = outcome.app.displayName,
+                    action = ActivityAction.FAILED,
+                    timestampMillis = System.currentTimeMillis(),
+                    detail = outcome.reason,
+                ),
+            )
+        }
         outcomes.filter { it.succeeded }.forEach { outcome ->
             activityLogRepository.record(
                 ActivityEntry(

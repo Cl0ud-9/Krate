@@ -62,8 +62,7 @@ private fun IdleContent(
     Text(
         text =
             if (pendingCount > 1) {
-                "Updates each app in dependency order. Clean-install apps may ask you to " +
-                    "confirm more than one system dialog along the way."
+                "Updates each app in turn, dependencies first. Android asks you to confirm each one."
             } else {
                 "Downloads and installs the pending update."
             },

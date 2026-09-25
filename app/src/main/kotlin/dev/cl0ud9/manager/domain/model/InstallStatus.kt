@@ -33,5 +33,7 @@ sealed interface InstallStatus {
         val reason: String,
         // whether a rollback to the previous apk was attempted and succeeded after this failure
         val rolledBack: Boolean = false,
+        // the user said no in Android's confirmation dialog - not something that went wrong
+        val userCancelled: Boolean = false,
     ) : InstallStatus
 }

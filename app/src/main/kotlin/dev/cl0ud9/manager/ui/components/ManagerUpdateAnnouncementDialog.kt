@@ -6,13 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,18 +28,24 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.R
+import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
+import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
+import dev.cl0ud9.manager.ui.settings.SelfUpdateAction
 import dev.cl0ud9.manager.ui.theme.ShapeCache
+import dev.cl0ud9.manager.ui.util.formatMarkdownLite
 
-// a proactive "here's what's new" card instead of a check tucked away in Settings that the user has
-// to remember to open, built on our own manager-update data. Shown at most once per app session (see
-// HomeViewModel) rather than persisted-dismissed forever, since re-announcing after a fresh launch is
-// a reasonable, honest trade-off against the added complexity of a per-version dismissal store
+private val NOTES_MAX_HEIGHT = 180.dp
+
+// a proactive "a new version is out" prompt on launch instead of a check tucked away in Settings.
+// Updates in place: Update now downloads the release and hands it to Android's installer, the same
+// flow Settings uses - no trip to GitHub. Shown at most once per app session (see HomeViewModel)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManagerUpdateAnnouncementDialog(
-    latestVersion: String,
+    status: ManagerUpdateStatus.UpdateAvailable,
+    selfUpdateState: SelfUpdateState?,
+    onUpdate: (String) -> Unit,
     onDismiss: () -> Unit,
-    onViewRelease: () -> Unit,
 ) {
     BasicAlertDialog(onDismissRequest = onDismiss) {
         Surface(
@@ -64,32 +71,33 @@ fun ManagerUpdateAnnouncementDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 AnnouncementHeader()
-
                 Text(
-                    text = "Version $latestVersion is ready",
+                    text = "Version ${status.latestVersion} is ready",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
-                Text(
-                    text = "A newer release of the manager itself is available on GitHub.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val notes = status.releaseNotes?.takeIf { it.isNotBlank() }
+                if (notes != null) {
+                    Text(
+                        text = notes.formatMarkdownLite(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.heightIn(max = NOTES_MAX_HEIGHT).verticalScroll(rememberScrollState()),
+                    )
+                } else {
+                    Text(
+                        text = "A newer version of App Manager is available.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                // primary action first, the quiet dismiss under it
+                SelfUpdateAction(status = status, selfUpdateState = selfUpdateState, onInstallUpdate = onUpdate)
+                val busy =
+                    selfUpdateState is SelfUpdateState.Downloading || selfUpdateState is SelfUpdateState.Installing
+                if (!busy) {
                     TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                         Text("Later")
-                    }
-                    Button(
-                        onClick = onViewRelease,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ),
-                    ) {
-                        Text("View release")
                     }
                 }
             }

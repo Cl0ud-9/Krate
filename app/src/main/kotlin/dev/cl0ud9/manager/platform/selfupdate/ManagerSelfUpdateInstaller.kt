@@ -1,6 +1,9 @@
 package dev.cl0ud9.manager.platform.selfupdate
 
 import android.content.Context
+import dev.cl0ud9.manager.data.downloads.UserFacingIOException
+import dev.cl0ud9.manager.data.downloads.friendlyHttpError
+import dev.cl0ud9.manager.data.downloads.friendlyNetworkError
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.InstallStatus
@@ -8,17 +11,24 @@ import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.SupportStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.concurrent.TimeUnit
 
 sealed interface SelfUpdateState {
-    data object Downloading : SelfUpdateState
+    // fraction is null until the size is known
+    data class Downloading(
+        val fraction: Float?,
+    ) : SelfUpdateState
 
     // reuses InstallStatus as-is (Installing/WaitingForUser/Success/Failed) rather than re-modeling
     // it - PackageInstallerEngine.install() only ever emits that subset for a plain UPDATE, the
@@ -33,6 +43,8 @@ sealed interface SelfUpdateState {
 }
 
 private const val DOWNLOAD_TIMEOUT_SECONDS = 60L
+private const val BUFFER_SIZE = 64 * 1024
+private const val PROGRESS_STEP_BYTES = 512 * 1024L
 
 private fun defaultHttpClient(): OkHttpClient =
     OkHttpClient
@@ -54,24 +66,55 @@ class ManagerSelfUpdateInstaller(
 ) {
     fun downloadAndInstall(downloadUrl: String): Flow<SelfUpdateState> =
         flow {
-            emit(SelfUpdateState.Downloading)
+            emit(SelfUpdateState.Downloading(null))
             val apkFile = File(context.cacheDir, "manager-update.apk")
-            val downloadResult = withContext(Dispatchers.IO) { runCatching { download(downloadUrl, apkFile) } }
-            if (downloadResult.isFailure) {
-                emit(SelfUpdateState.DownloadFailed(downloadResult.exceptionOrNull()?.message ?: "Download failed."))
+            val failure =
+                try {
+                    download(downloadUrl, apkFile)
+                    null
+                } catch (exception: IOException) {
+                    friendlyNetworkError(exception)
+                }
+            if (failure != null) {
+                emit(SelfUpdateState.DownloadFailed(failure))
                 return@flow
             }
             emitAll(installationEngine.install(selfProfile(), apkFile).map { SelfUpdateState.Installing(it) })
-        }
+        }.flowOn(Dispatchers.IO)
 
-    private fun download(
+    private suspend fun FlowCollector<SelfUpdateState>.download(
         url: String,
         destination: File,
     ) {
         httpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
-            check(response.isSuccessful) { "GitHub returned ${response.code}." }
-            val body = response.body ?: error("Empty response.")
-            destination.outputStream().use { out -> body.byteStream().copyTo(out) }
+            if (!response.isSuccessful) {
+                throw UserFacingIOException(friendlyHttpError(response.code))
+            }
+            val body = response.body ?: throw UserFacingIOException("The update download was empty. Try again.")
+            val total = body.contentLength().takeIf { it > 0 }
+            destination.outputStream().use { out ->
+                body.byteStream().use { input -> copyWithProgress(input, out, total) }
+            }
+        }
+    }
+
+    private suspend fun FlowCollector<SelfUpdateState>.copyWithProgress(
+        input: InputStream,
+        out: OutputStream,
+        total: Long?,
+    ) {
+        val buffer = ByteArray(BUFFER_SIZE)
+        var copied = 0L
+        var lastReported = 0L
+        var read = input.read(buffer)
+        while (read >= 0) {
+            out.write(buffer, 0, read)
+            copied += read
+            if (total != null && copied - lastReported >= PROGRESS_STEP_BYTES) {
+                lastReported = copied
+                emit(SelfUpdateState.Downloading(copied.toFloat() / total))
+            }
+            read = input.read(buffer)
         }
     }
 
