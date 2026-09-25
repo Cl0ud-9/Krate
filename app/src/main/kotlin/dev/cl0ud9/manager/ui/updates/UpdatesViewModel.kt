@@ -7,8 +7,9 @@ import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.isVisible
-import dev.cl0ud9.manager.domain.model.latestVersionName
+import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
+import dev.cl0ud9.manager.domain.repository.Baseline
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.domain.updateall.UpdateAllEngine
@@ -159,8 +160,8 @@ class UpdatesViewModel(
                     timestampMillis = System.currentTimeMillis(),
                 ),
             )
-            outcome.app.latestVersionName?.let { versionName ->
-                managerBaselineStore.recordInstall(outcome.app.packageName, versionName)
+            outcome.app.latestArtifact?.let { artifact ->
+                managerBaselineStore.recordInstall(outcome.app.packageName, artifact)
             }
         }
     }
@@ -171,7 +172,7 @@ class UpdatesViewModel(
 
     private fun toUiState(
         apps: List<AppProfile>,
-        baselines: Map<String, String>,
+        baselines: Map<String, Baseline>,
     ): UpdatesUiState {
         val hasToken = githubCredentialStore.getToken() != null
         val pending =

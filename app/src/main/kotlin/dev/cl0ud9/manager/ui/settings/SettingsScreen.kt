@@ -144,7 +144,7 @@ private fun AutomaticDownloadsRow(
             SettingsRowHeader(
                 icon = painterResource(R.drawable.ic_update_rounded),
                 title = "Automatic downloads",
-                subtitle = "Download updates in the background. Installing always needs your confirmation.",
+                subtitle = "Download updates in the background on Wi-Fi. Installing always needs your confirmation.",
                 colors = defaultSettingsRowColors(),
             ),
         shape = shape,

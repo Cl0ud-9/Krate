@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.R
+import dev.cl0ud9.manager.domain.model.AnnouncementItem
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.DownloadStatus
@@ -48,9 +49,11 @@ import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import dev.cl0ud9.manager.domain.model.latestArtifact
-import dev.cl0ud9.manager.domain.model.latestVersionName
+import dev.cl0ud9.manager.domain.repository.Baseline
 import dev.cl0ud9.manager.domain.repository.effectiveBaseline
-import dev.cl0ud9.manager.domain.version.isNewerVersion
+import dev.cl0ud9.manager.domain.repository.isNewerThan
+import dev.cl0ud9.manager.platform.packageinfo.InstalledVersion
+import dev.cl0ud9.manager.ui.components.AnnouncementCard
 import dev.cl0ud9.manager.ui.components.AppIconAvatar
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.SupportStatusBadge
@@ -80,12 +83,14 @@ fun AppDetailsScreen(
                 container.activityLogRepository,
                 container.managerBaselineStore,
                 container.downloadProgressNotifier,
+                container.announcementDismissalStore,
                 appId,
             )
         }
     RefreshOnResume(viewModel::refresh)
     val app by viewModel.app.collectAsStateWithLifecycle()
-    val installedVersionName by viewModel.installedVersionName.collectAsStateWithLifecycle()
+    val installedVersion by viewModel.installedVersion.collectAsStateWithLifecycle()
+    val announcements by viewModel.announcements.collectAsStateWithLifecycle()
     val managerBaseline by viewModel.managerBaseline.collectAsStateWithLifecycle()
     val dependencies by viewModel.dependencies.collectAsStateWithLifecycle()
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
@@ -107,13 +112,15 @@ fun AppDetailsScreen(
                 state =
                     AppDetailsUiState(
                         app = currentApp,
-                        installedVersionName = installedVersionName,
+                        installed = installedVersion,
                         recordedBaseline = managerBaseline,
                         dependencies = dependencies,
                         downloadStatus = downloadStatus,
                         installStatus = installStatus,
                         selectedArtifact = selectedArtifact,
+                        announcements = announcements,
                     ),
+                onDismissAnnouncement = viewModel::dismissAnnouncement,
                 onDownload = rememberDebouncedOnClick(onClick = viewModel::startDownload),
                 onInstall = rememberDebouncedOnClick(onClick = viewModel::startInstall),
                 onRetryAsCleanInstall = rememberDebouncedOnClick(onClick = viewModel::retryAsCleanInstall),
@@ -130,20 +137,33 @@ fun AppDetailsScreen(
 // bundles the screen's state so the composables below stay under the parameter-count limit
 internal data class AppDetailsUiState(
     val app: AppProfile,
-    val installedVersionName: String?,
-    // the version the manager itself last installed, or null if it never has (see
+    val installed: InstalledVersion?,
+    // the build the manager itself last installed, or null if it never has (see
     // ManagerBaselineStore) - not the live installed version, and not necessarily catalog-known on
     // its own; effectiveBaseline below is what actually gets compared against
-    val recordedBaseline: String?,
+    val recordedBaseline: Baseline?,
     val dependencies: List<DependencyInfo>,
     val downloadStatus: DownloadStatus,
     val installStatus: InstallStatus,
     val selectedArtifact: ArtifactInfo?,
+    val announcements: List<AnnouncementItem> = emptyList(),
 ) {
+    val installedVersionName: String?
+        get() = installed?.versionName
+
     // the recorded baseline if the manager has one, otherwise its best guess - see
     // ManagerBaselineStore.effectiveBaseline for the full reasoning
-    val effectiveBaseline: String?
-        get() = effectiveBaseline(recordedBaseline, app, installedVersionName)
+    val effectiveBaseline: Baseline?
+        get() = effectiveBaseline(recordedBaseline, app, installed)
+
+    // the user picked an older retained build in version history while something is installed
+    val isRollback: Boolean
+        get() = installed != null && selectedArtifact != null && selectedArtifact != app.latestArtifact
+
+    // see requiresUninstall - shown as a warning before, and used to route the install through the
+    // uninstall-first path
+    val requiresUninstall: Boolean
+        get() = requiresUninstall(installed, selectedArtifact)
 
     // read by both the Idle and Failed branches of the download section - whether the installed
     // app already matches what's selected is independent of whatever the current download
@@ -156,8 +176,8 @@ internal data class AppDetailsUiState(
     val isUpToDate: Boolean
         get() {
             val baseline = effectiveBaseline ?: return false
-            val selected = selectedArtifact?.versionName ?: return false
-            return !isNewerVersion(selected, baseline)
+            val selected = selectedArtifact ?: return false
+            return !selected.isNewerThan(baseline, app.artifacts)
         }
 
     // true when the live-installed version doesn't match the baseline - something changed this
@@ -168,14 +188,32 @@ internal data class AppDetailsUiState(
         get() {
             val installed = installedVersionName ?: return false
             val baseline = effectiveBaseline ?: return false
-            return installed != baseline
+            return installed != baseline.versionName
         }
+}
+
+// Android refuses an in-place install of a lower versionCode, so a build older than the installed
+// one can only go on after uninstalling it (which erases the app's data)
+internal fun requiresUninstall(
+    installed: InstalledVersion?,
+    artifact: ArtifactInfo?,
+): Boolean {
+    val versionCode = artifact?.versionCode ?: return false
+    return installed != null && versionCode < installed.versionCode
+}
+
+// "patches v6.2.1 on 20.40.45, Material You" for a patched app, where the patches release is what
+// tells builds apart; just the version otherwise
+internal fun ArtifactInfo.buildDescription(): String {
+    val patches = patchesVersionName ?: return listOfNotNull(versionName, label).joinToString(", ")
+    return listOfNotNull("patches $patches on $versionName", label).joinToString(", ")
 }
 
 @Suppress("LongParameterList")
 @Composable
 private fun AppDetailsContent(
     state: AppDetailsUiState,
+    onDismissAnnouncement: (String) -> Unit,
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
@@ -209,6 +247,10 @@ private fun AppDetailsContent(
             onUninstall = onUninstall,
         )
 
+        state.announcements.forEach { item ->
+            AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = onDismissAnnouncement)
+        }
+
         // shown before the user ever reaches the Install button - a required dependency missing
         // (e.g. microG RE for Videoapp Patched) means the app installs but silently fails to open,
         // so this is surfaced as early and as plainly as possible rather than only as a disabled
@@ -232,7 +274,8 @@ private fun AppDetailsContent(
         // retainVersions) - lets a broken newest build be worked around immediately instead of
         // waiting for the next release, by picking an older version to download/install instead
         VersionHistorySection(
-            artifacts = app.artifacts,
+            app = app,
+            installedBuild = state.effectiveBaseline?.takeIf { state.installed != null },
             selectedArtifact = state.selectedArtifact,
             onSelectVersion = onSelectVersion,
         )
@@ -255,7 +298,7 @@ private fun AppDetailsContent(
             DependenciesSection(dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
         }
 
-        ReleaseNotesSection(app = app)
+        ReleaseNotesSection(app = app, selectedArtifact = state.selectedArtifact)
     }
 }
 
@@ -303,7 +346,7 @@ private fun AppDetailsHeader(
                     ) {
                         SupportStatusBadge(status = app.supportStatus)
                         Text(
-                            text = app.latestVersionName?.let { "Latest $it" } ?: "Latest version unknown",
+                            text = app.latestArtifact?.versionName?.let { "Latest $it" } ?: "Latest version unknown",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -311,10 +354,11 @@ private fun AppDetailsHeader(
                     // only set for an artifact built by an intermediate tool (currently just
                     // Patched patches) - "Latest" above is always the app's own version (e.g.
                     // Videoapp's), so this is shown alongside it rather than instead of it, giving a
-                    // complete picture of both what was patched and what patched it
+                    // complete picture of both what was patched, how, and what patched it
                     app.latestArtifact?.patchesVersionName?.let { patchesVersion ->
+                        val label = app.latestArtifact?.label
                         Text(
-                            text = "Patches $patchesVersion",
+                            text = listOfNotNull(label, "Patches $patchesVersion").joinToString(", "),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -396,9 +440,14 @@ private fun InstallationSection(
 // distance for something most users only skim - collapsed to a few lines with an explicit expand
 // affordance keeps the information available without it dominating the page by default
 @Composable
-private fun ReleaseNotesSection(app: AppProfile) {
+private fun ReleaseNotesSection(
+    app: AppProfile,
+    selectedArtifact: ArtifactInfo?,
+) {
     var expanded by remember(app.id) { mutableStateOf(false) }
-    val body = (app.releaseNotes ?: "No release notes available.").formatMarkdownLite()
+    // the notes of whichever build is selected, so picking an older one shows what it contained
+    val notes = selectedArtifact?.releaseNotes ?: app.releaseNotes
+    val body = (notes ?: "No release notes available.").formatMarkdownLite()
 
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),

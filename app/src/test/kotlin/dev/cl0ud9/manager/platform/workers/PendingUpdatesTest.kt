@@ -4,6 +4,7 @@ import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.SupportStatus
+import dev.cl0ud9.manager.domain.repository.Baseline
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.InstalledVersion
 import org.junit.Assert.assertEquals
@@ -90,14 +91,14 @@ class PendingUpdatesTest {
                 listOf(app),
                 reader,
                 hasGitHubToken = false,
-                baselines = mapOf(app.packageName to "1.0.2"),
+                baselines = mapOf(app.packageName to Baseline("1.0.2")),
             )
         val pending =
             pendingUpdateCount(
                 listOf(app),
                 reader,
                 hasGitHubToken = false,
-                baselines = mapOf(app.packageName to "1.0.1"),
+                baselines = mapOf(app.packageName to Baseline("1.0.1")),
             )
 
         assertEquals(0, notPending)

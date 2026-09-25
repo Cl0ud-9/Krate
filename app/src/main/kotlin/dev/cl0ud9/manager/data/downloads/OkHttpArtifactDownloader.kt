@@ -31,6 +31,7 @@ private const val HTTP_NOT_FOUND = 404
 private const val STORAGE_SAFETY_MARGIN = 1.5
 private const val BYTES_PER_MB = 1024L * 1024L
 private const val DEFAULT_MIN_FREE_BYTES = 50L * BYTES_PER_MB
+private val UNSAFE_FILE_NAME_CHARS = Regex("[^A-Za-z0-9._-]")
 
 // streams the artifact to a resumable .part file, then verifies hash + certificate + package name before
 // handing back a ready-to-install path, section 19, 42.5, 42.6, 42.9 of the spec
@@ -102,13 +103,16 @@ class OkHttpArtifactDownloader(
         return if (readyFile.exists()) readyFile.absolutePath else null
     }
 
-    // versionName is part of the file name, not just app.id - a user can now pick an older retained
-    // version from App Details' version history, and without this a stale .part/.apk file from a
-    // previously-downloaded different version could look resumable/ready here
+    // the build (or, for manifests without build ids, the version) is part of the file name, not
+    // just app.id - otherwise a stale .part/.apk from a different version, or from an older build of
+    // the same version (a Patched rebuild keeps Videoapp's version), could look resumable/ready here
     private fun fileIdFor(
         app: AppProfile,
         artifact: ArtifactInfo,
-    ): String = "${app.id}-${artifact.versionName}"
+    ): String {
+        val build = artifact.buildId ?: artifact.versionName
+        return "${app.id}-${build.replace(UNSAFE_FILE_NAME_CHARS, "_")}"
+    }
 
     // returns a user-facing failure message, or null on success
     private suspend fun runDownload(

@@ -1,7 +1,10 @@
 package dev.cl0ud9.manager.data.catalog
 
 import android.content.Context
+import android.os.Build
+import dev.cl0ud9.manager.domain.model.Announcement
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.model.DeviceProfile
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.security.manifest.ManifestVerifier
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +33,32 @@ private const val CACHE_FILE_NAME = "manifest-cache.json"
 // bounds worst-case first-launch latency before falling back, section 32 never blocks the ui indefinitely
 private const val NETWORK_TIMEOUT_SECONDS = 8L
 
+private fun currentDevice(context: Context): DeviceProfile =
+    DeviceProfile(
+        sdkInt = Build.VERSION.SDK_INT,
+        supportedAbis = Build.SUPPORTED_ABIS.toList(),
+        managerVersionCode =
+            runCatching { context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode }
+                .getOrDefault(0L),
+    )
+
+private class ParsedManifest(
+    val apps: List<AppProfile>,
+    val announcements: List<Announcement>,
+)
+
+private fun parseManifest(
+    json: Json,
+    device: DeviceProfile,
+    bytes: ByteArray,
+): ParsedManifest {
+    val manifest = json.decodeFromString<ManifestDto>(bytes.decodeToString())
+    return ParsedManifest(
+        apps = manifest.apps.mapNotNull { it.toDomain(device) },
+        announcements = manifest.announcements.mapNotNull { it.toDomain(device) },
+    )
+}
+
 private fun defaultHttpClient(): OkHttpClient =
     OkHttpClient
         .Builder()
@@ -52,18 +81,22 @@ class RemoteCatalogRepository(
     private val fallback: CatalogRepository,
     private val httpClient: OkHttpClient = defaultHttpClient(),
     private val verifier: ManifestVerifier = ManifestVerifier(),
+    private val device: DeviceProfile = currentDevice(context),
 ) : CatalogRepository {
     private val json = Json { ignoreUnknownKeys = true }
     private val cacheFile = File(context.filesDir, CACHE_FILE_NAME)
     private val apps = MutableStateFlow<List<AppProfile>?>(null)
+    private val announcements = MutableStateFlow<List<Announcement>>(emptyList())
     private val loadMutex = Mutex()
 
     override fun observeApps(): Flow<List<AppProfile>> = apps.onSubscription { ensureLoaded() }.filterNotNull()
 
     override fun observeApp(id: String): Flow<AppProfile?> = observeApps().map { list -> list.find { it.id == id } }
 
+    override fun observeAnnouncements(): Flow<List<Announcement>> = announcements.onSubscription { ensureLoaded() }
+
     override suspend fun refresh() {
-        apps.value = loadApps()
+        publish(loadManifest())
     }
 
     // only the first subscriber (across the whole app) actually pays for a fetch - later ones, even on
@@ -74,23 +107,29 @@ class RemoteCatalogRepository(
         if (apps.value != null) return
         loadMutex.withLock {
             if (apps.value != null) return
-            apps.value = loadApps()
+            publish(loadManifest())
         }
     }
 
-    private suspend fun loadApps(): List<AppProfile> =
+    // announcements first, so a screen reacting to the new app list already sees its notices
+    private fun publish(manifest: ParsedManifest) {
+        announcements.value = manifest.announcements
+        apps.value = manifest.apps
+    }
+
+    private suspend fun loadManifest(): ParsedManifest =
         withContext(Dispatchers.IO) {
             val fromNetwork =
                 fetchVerifiedManifestBytes()?.let {
                     cacheFile.writeBytes(it)
-                    parseManifest(it)
+                    parseManifest(json, device, it)
                 }
-            fromNetwork ?: loadCachedManifest() ?: fallback.observeApps().first()
+            fromNetwork ?: loadCachedManifest() ?: ParsedManifest(fallback.observeApps().first(), emptyList())
         }
 
-    private fun loadCachedManifest(): List<AppProfile>? {
+    private fun loadCachedManifest(): ParsedManifest? {
         val cached = runCatching { cacheFile.takeIf { it.exists() }?.readBytes() }.getOrNull() ?: return null
-        return runCatching { parseManifest(cached) }.getOrNull()
+        return runCatching { parseManifest(json, device, cached) }.getOrNull()
     }
 
     private suspend fun fetchVerifiedManifestBytes(): ByteArray? =
@@ -107,7 +146,4 @@ class RemoteCatalogRepository(
                 if (response.isSuccessful) response.body?.bytes() else null
             }
         }.getOrNull()
-
-    private fun parseManifest(bytes: ByteArray): List<AppProfile> =
-        json.decodeFromString<ManifestDto>(bytes.decodeToString()).apps.map { it.toDomain() }
 }

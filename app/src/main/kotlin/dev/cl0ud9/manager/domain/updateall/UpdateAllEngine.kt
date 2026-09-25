@@ -4,6 +4,7 @@ import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
 import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
@@ -81,6 +82,16 @@ class UpdateAllEngine(
         // Update All always targets the newest version, never an older retained one - that
         // picking is only ever an explicit, single-app choice made from App Details
         val artifact = app.latestArtifact ?: return null
+        // already fetched and verified earlier (Settings > Automatic downloads, or App Details)
+        return artifactDownloader.existingReadyFile(app, artifact)?.let { DownloadStatus.ReadyToInstall(it) }
+            ?: downloadFresh(app, artifact, onStatus)
+    }
+
+    private suspend fun downloadFresh(
+        app: AppProfile,
+        artifact: ArtifactInfo,
+        onStatus: suspend (String) -> Unit,
+    ): DownloadStatus.ReadyToInstall? {
         var result: DownloadStatus.ReadyToInstall? = null
         artifactDownloader.download(app, artifact).collect { status ->
             when (status) {

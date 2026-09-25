@@ -24,21 +24,30 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.R
+import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.ArtifactInfo
+import dev.cl0ud9.manager.domain.model.latestArtifact
+import dev.cl0ud9.manager.domain.repository.Baseline
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.pressScale
+import java.text.DateFormat
+import java.util.Date
 
-// only renders when more than one version is currently retained - a single-artifact app (the
-// common case) has nothing to pick between, so this section simply doesn't exist for it rather
-// than showing a list of one
+// only renders when more than one build is currently retained - a single-artifact app has nothing
+// to pick between. The point is recovery: if the newest build misbehaves, any of the previous
+// ones can be installed from here (a withdrawn build is listed but can't be picked). For a patched
+// app each row is a patches release, each on the newest app version it supported
 @Composable
 internal fun VersionHistorySection(
-    artifacts: List<ArtifactInfo>,
+    app: AppProfile,
+    installedBuild: Baseline?,
     selectedArtifact: ArtifactInfo?,
     onSelectVersion: (ArtifactInfo) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val artifacts = app.artifacts
+    val latestArtifact = app.latestArtifact
     if (artifacts.size <= 1) return
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -47,10 +56,15 @@ internal fun VersionHistorySection(
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(title = "Version history", icon = rememberVectorPainter(Icons.Filled.History))
-            Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 artifacts.forEach { artifact ->
                     VersionRow(
                         artifact = artifact,
+                        tags =
+                            listOfNotNull(
+                                "Latest".takeIf { artifact == latestArtifact },
+                                "Installed".takeIf { installedBuild != null && artifact.matches(installedBuild) },
+                            ),
                         isSelected = artifact == selectedArtifact,
                         onClick = { onSelectVersion(artifact) },
                     )
@@ -60,9 +74,15 @@ internal fun VersionHistorySection(
     }
 }
 
+// a baseline recorded before builds had ids only knows its version, which is enough for apps that
+// publish one build per version
+private fun ArtifactInfo.matches(baseline: Baseline): Boolean =
+    if (baseline.buildId != null) buildId == baseline.buildId else versionName == baseline.versionName
+
 @Composable
 private fun VersionRow(
     artifact: ArtifactInfo,
+    tags: List<String>,
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -73,7 +93,7 @@ private fun VersionRow(
                 .fillMaxWidth()
                 .pressScale(interactionSource)
                 .clickable(
-                    enabled = !isSelected,
+                    enabled = !isSelected && !artifact.withdrawn,
                     interactionSource = interactionSource,
                     indication = LocalIndication.current,
                     onClick = onClick,
@@ -81,12 +101,50 @@ private fun VersionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = artifact.versionName,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
-        if (isSelected) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            val patches = artifact.patchesVersionName
+            Text(
+                text = if (patches != null) "Patches $patches" else artifact.versionName,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            val details =
+                listOfNotNull(
+                    patches?.let { "Version ${artifact.versionName}" },
+                    artifact.label,
+                    artifact.publishedAtMillis?.let { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it)) },
+                ) + tags
+            if (details.isNotEmpty()) {
+                Text(
+                    text = details.joinToString(", "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            val note = if (artifact.withdrawn) artifact.withdrawnReason ?: "Withdrawn" else artifact.note
+            if (note != null) {
+                Text(
+                    text = if (artifact.withdrawn && artifact.withdrawnReason != null) "Withdrawn: $note" else note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color =
+                        if (artifact.withdrawn) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                )
+            }
+        }
+        VersionRowTrailing(isSelected = isSelected, withdrawn = artifact.withdrawn)
+    }
+}
+
+@Composable
+private fun VersionRowTrailing(
+    isSelected: Boolean,
+    withdrawn: Boolean,
+) {
+    when {
+        isSelected -> {
             Icon(
                 painterResource(R.drawable.ic_check_circle_rounded),
                 contentDescription = null,
@@ -98,12 +156,13 @@ private fun VersionRow(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.tertiary,
             )
-        } else {
+        }
+
+        !withdrawn ->
             Text(
                 text = "Use this version",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
-        }
     }
 }

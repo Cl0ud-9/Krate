@@ -9,5 +9,11 @@ class PackageManagerInstalledPackageReader(
     override fun installedVersion(packageName: String): InstalledVersion? =
         runCatching { context.packageManager.getPackageInfo(packageName, 0) }
             .getOrNull()
-            ?.let { InstalledVersion(versionName = it.versionName, versionCode = it.longVersionCode) }
+            ?.let {
+                InstalledVersion(
+                    versionName = it.versionName,
+                    versionCode = it.longVersionCode,
+                    lastUpdateTimeMillis = it.lastUpdateTime,
+                )
+            }
 }

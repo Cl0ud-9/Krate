@@ -41,6 +41,7 @@ import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
+import dev.cl0ud9.manager.ui.components.AnnouncementCard
 import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
 import dev.cl0ud9.manager.ui.components.ManagerUpdateAnnouncementDialog
 import dev.cl0ud9.manager.ui.components.SectionHeader
@@ -61,6 +62,7 @@ private const val MAX_ACTIVITY_ROWS = 5
 fun HomeScreen(
     onNavigateToApps: () -> Unit,
     onNavigateToUpdates: () -> Unit,
+    onNavigateToApp: (String) -> Unit,
 ) {
     val viewModel =
         managerViewModel { container ->
@@ -71,6 +73,7 @@ fun HomeScreen(
                 container.managerUpdateChecker,
                 container.githubCredentialStore,
                 container.managerBaselineStore,
+                container.announcementDismissalStore,
             )
         }
     val catalogCount by viewModel.catalogCount.collectAsStateWithLifecycle()
@@ -79,6 +82,7 @@ fun HomeScreen(
     val recentActivity by viewModel.recentActivity.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val updateAnnouncement by viewModel.updateAnnouncement.collectAsStateWithLifecycle()
+    val announcements by viewModel.announcements.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
 
     HomeUpdateAnnouncement(announcement = updateAnnouncement, onDismiss = viewModel::dismissUpdateAnnouncement)
@@ -99,6 +103,11 @@ fun HomeScreen(
                     .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            // above the status hero - these only exist when something needs the user's attention
+            announcements.forEach { item ->
+                AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = viewModel::dismissAnnouncement)
+            }
+
             StatusHeroCard(pendingUpdateCount = pendingUpdateCount, onViewUpdates = onNavigateToUpdates)
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

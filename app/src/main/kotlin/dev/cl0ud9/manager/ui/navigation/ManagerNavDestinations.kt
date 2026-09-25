@@ -35,6 +35,7 @@ internal fun NavGraphBuilder.tabDestinations(navController: NavHostController) {
             HomeScreen(
                 onNavigateToApps = { navController.navigateToTab(ManagerDestination.APPS.route) },
                 onNavigateToUpdates = { navController.navigateToTab(ManagerDestination.UPDATES.route) },
+                onNavigateToApp = { appId -> navController.navigate("apps/$appId") },
             )
         }
     }

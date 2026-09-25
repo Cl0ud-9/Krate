@@ -26,6 +26,24 @@ import dev.cl0ud9.manager.ui.components.HelperText
 import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
 import dev.cl0ud9.manager.ui.components.StatusRow
 
+// section 16 of the spec: the ui shows Install, Update, Reinstall or Roll back based on real device
+// state compared against whichever build is currently selected (App Details' version history lets
+// that be an older retained one, not always the latest), not just the installation mode. "Reinstall"
+// when the selected build is no newer than what the manager last installed - there is nothing to
+// update to. Mode doesn't drive the label at all: the Installation card below already explains the
+// clean-install mechanics separately, so this only needs to answer "is there something new"
+internal fun actionLabelFor(state: AppDetailsUiState): String =
+    when {
+        state.installed == null -> "Install"
+        state.isRollback -> "Roll back"
+        state.isUpToDate -> "Reinstall"
+        else -> "Update"
+    }
+
+internal const val UNINSTALL_FIRST_WARNING =
+    "This is older than the installed version, so Android needs the app uninstalled first. " +
+        "Its data on this device will be erased."
+
 // split out of AppDetailsDownloadSection.kt purely to keep that file under detekt's per-file
 // function-count threshold - this half owns everything that happens once a download has reached
 // ReadyToInstall, the other half owns the download itself
@@ -78,6 +96,9 @@ private fun InstallStatusContent(
                 val names = unmetDependencies.joinToString(", ") { it.app.displayName }
                 HelperText("Install required dependencies first: $names.")
             }
+            if (state.requiresUninstall) {
+                HelperText(UNINSTALL_FIRST_WARNING)
+            }
         }
 
         is InstallStatus.Failed -> {
@@ -119,7 +140,7 @@ private fun InstallStatusContent(
             StatusRow(
                 icon = painterResource(R.drawable.ic_check_circle_rounded),
                 tint = MaterialTheme.colorScheme.primary,
-                text = "$actionLabel complete.",
+                text = "Installed.",
             )
             // previously nothing followed this message - the app was reachable again only after
             // leaving and re-entering App Details (which re-derives downloadStatus back to Idle and

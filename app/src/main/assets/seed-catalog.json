@@ -8,8 +8,7 @@
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
       "dependencyIds": [],
-      "latestVersionName": "5.1.0",
-      "releaseNotes": "Seed entry from github.com/MDP43140/LTECleanerFOSS. Real release notes arrive with manifest ingestion in phase 2.",
+      "releaseNotes": "Connect to the internet once to load the catalog and see available versions.",
       "enabled": true
     },
     {
@@ -19,8 +18,7 @@
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
       "dependencyIds": [],
-      "latestVersionName": "2.3.0",
-      "releaseNotes": "Seed entry from github.com/bmx666/android-appcachecleaner. Real release notes arrive with manifest ingestion in phase 2.",
+      "releaseNotes": "Connect to the internet once to load the catalog and see available versions.",
       "enabled": true
     },
     {
@@ -30,19 +28,7 @@
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
       "dependencyIds": [],
-      "latestVersionName": "7.0.0",
-      "releaseNotes": "Seed entry from github.com/MorpheApp/MicroG-RE, pinned to the latest stable (non pre-release) tag. Real release notes arrive with manifest ingestion in phase 2.",
-      "enabled": true
-    },
-    {
-      "id": "demo-clean-install-app",
-      "displayName": "Demo Clean-Install App",
-      "packageName": "dev.cl0ud9.example.cleaninstall",
-      "supportStatus": "BETA",
-      "installationMode": "CLEAN_INSTALL",
-      "dependencyIds": [],
-      "latestVersionName": "2.0.1",
-      "releaseNotes": "Placeholder standing in for Videoapp Patched until its patch source and upstream APK acquisition are settled.",
+      "releaseNotes": "Connect to the internet once to load the catalog and see available versions.",
       "enabled": true
     }
   ]

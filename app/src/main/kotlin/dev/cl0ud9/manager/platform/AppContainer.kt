@@ -2,6 +2,7 @@ package dev.cl0ud9.manager.platform
 
 import android.content.Context
 import dev.cl0ud9.manager.data.activity.DataStoreActivityLogRepository
+import dev.cl0ud9.manager.data.announcements.DataStoreAnnouncementDismissalStore
 import dev.cl0ud9.manager.data.auth.EncryptedGitHubCredentialStore
 import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.data.baseline.DataStoreManagerBaselineStore
@@ -15,6 +16,7 @@ import dev.cl0ud9.manager.data.settings.DataStoreSettingsRepository
 import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
+import dev.cl0ud9.manager.domain.repository.AnnouncementDismissalStore
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
@@ -56,4 +58,6 @@ class AppContainer(
     val managerSelfUpdateInstaller = ManagerSelfUpdateInstaller(context.applicationContext, installationEngine)
     val activityLogRepository: ActivityLogRepository = DataStoreActivityLogRepository(context.applicationContext)
     val managerBaselineStore: ManagerBaselineStore = DataStoreManagerBaselineStore(context.applicationContext)
+    val announcementDismissalStore: AnnouncementDismissalStore =
+        DataStoreAnnouncementDismissalStore(context.applicationContext)
 }

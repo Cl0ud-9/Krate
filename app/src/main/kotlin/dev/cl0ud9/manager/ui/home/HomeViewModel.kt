@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.domain.model.ActivityEntry
+import dev.cl0ud9.manager.domain.model.AnnouncementItem
+import dev.cl0ud9.manager.domain.model.isActive
 import dev.cl0ud9.manager.domain.model.isVisible
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
+import dev.cl0ud9.manager.domain.repository.AnnouncementDismissalStore
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
@@ -26,6 +29,8 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+// each collaborator is a distinct shared singleton from AppContainer, not worth bundling just for the count
+@Suppress("LongParameterList")
 class HomeViewModel(
     private val catalogRepository: CatalogRepository,
     private val installedPackageReader: InstalledPackageReader,
@@ -33,6 +38,7 @@ class HomeViewModel(
     private val managerUpdateChecker: ManagerUpdateChecker,
     private val githubCredentialStore: GitHubCredentialStore,
     private val managerBaselineStore: ManagerBaselineStore,
+    private val announcementDismissalStore: AnnouncementDismissalStore,
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -71,6 +77,27 @@ class HomeViewModel(
             .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
+    // general notices, plus ones about a specific app only while that app is installed here - a
+    // notice like "this app was discontinued, here is an alternative" matters to people who have it
+    val announcements: StateFlow<List<AnnouncementItem>> =
+        combine(
+            catalogRepository.observeAnnouncements(),
+            announcementDismissalStore.observeDismissed(),
+            catalogRepository.observeApps(),
+            refreshTrigger.onStart { emit(Unit) },
+        ) { announcements, dismissed, apps, _ ->
+            val now = System.currentTimeMillis()
+            val installedIds =
+                apps.filter { installedPackageReader.installedVersion(it.packageName) != null }.map { it.id }.toSet()
+            announcements
+                .filter { it.isActive(now) && it.id !in dismissed }
+                .filter { it.appIds.isEmpty() || it.appIds.any { id -> id in installedIds } }
+                .map { announcement ->
+                    AnnouncementItem(announcement, apps.find { it.id == announcement.actionAppId }?.displayName)
+                }
+        }.flowOn(Dispatchers.IO)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
     val recentActivity: StateFlow<List<ActivityEntry>> =
         activityLogRepository
             .observeRecent()
@@ -88,6 +115,10 @@ class HomeViewModel(
                 mutableUpdateAnnouncement.value = status
             }
         }
+    }
+
+    fun dismissAnnouncement(id: String) {
+        viewModelScope.launch { announcementDismissalStore.dismiss(id) }
     }
 
     fun dismissUpdateAnnouncement() {

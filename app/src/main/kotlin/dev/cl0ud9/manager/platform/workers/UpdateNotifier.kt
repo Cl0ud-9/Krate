@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -26,6 +27,9 @@ private const val CHANNEL_ID = "updates_v2"
 private const val PENDING_UPDATES_NOTIFICATION_ID = 1001
 private const val MANAGER_UPDATE_NOTIFICATION_ID = 1002
 private const val UPDATE_ALL_RESULT_NOTIFICATION_ID = 1003
+private const val STATE_PREFS = "update_notifier"
+private const val KEY_PENDING_SIGNATURE = "pending_signature"
+private const val KEY_MANAGER_VERSION = "manager_version"
 
 // local notifications for update-related events the user might not be watching the app for -
 // a pending catalog update found by ManifestCheckWorker (section 24 + 44.4 of the spec), a manager
@@ -42,33 +46,53 @@ object UpdateNotifier {
         manager?.createNotificationChannel(channel)
     }
 
+    // only alerts when the set of pending builds differs from the one last notified about - a
+    // periodic check that finds the same updates still waiting stays quiet instead of buzzing again
     fun notifyPendingUpdates(
         context: Context,
         count: Int,
+        signature: String,
+        downloaded: Boolean,
     ) {
+        val prefs = state(context)
+        if (prefs.getString(KEY_PENDING_SIGNATURE, null) == signature) return
+        prefs.edit().putString(KEY_PENDING_SIGNATURE, signature).apply()
         notify(
             context = context,
             id = PENDING_UPDATES_NOTIFICATION_ID,
             title = if (count == 1) "1 update available" else "$count updates available",
-            text = "Tap to see what's new.",
+            text = if (downloaded) "Downloaded and ready to install." else "Tap to see what's new.",
             targetRoute = "updates",
         )
     }
 
+    // nothing pending anymore (installed, or the catalog withdrew it) - a leftover notification
+    // would point at updates that no longer exist, and the next real one should alert again
+    fun clearPendingUpdates(context: Context) {
+        state(context).edit().remove(KEY_PENDING_SIGNATURE).apply()
+        NotificationManagerCompat.from(context).cancel(PENDING_UPDATES_NOTIFICATION_ID)
+    }
+
     // amendment 44.2: the periodic background check also compares the manager's own version now
-    // that ManagerUpdateChecker exists, instead of only ever checking catalog apps
+    // that ManagerUpdateChecker exists, instead of only ever checking catalog apps. Once per version
     fun notifyManagerUpdateAvailable(
         context: Context,
         version: String,
     ) {
+        val prefs = state(context)
+        if (prefs.getString(KEY_MANAGER_VERSION, null) == version) return
+        prefs.edit().putString(KEY_MANAGER_VERSION, version).apply()
         notify(
             context = context,
             id = MANAGER_UPDATE_NOTIFICATION_ID,
             title = "Manager update available",
-            text = "Version $version is ready on GitHub.",
+            text = "Version $version is available. Tap to update.",
             targetRoute = "updates",
         )
     }
+
+    private fun state(context: Context): SharedPreferences =
+        context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
 
     // Update All can run for a while across several apps - if the user backgrounds the app partway
     // through, the on-screen result summary (UpdateAllBar's Done state) goes unseen, so this is the
@@ -131,6 +155,7 @@ object UpdateNotifier {
                 .setContentText(text)
                 .setContentIntent(openApp)
                 .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setCategory(NotificationCompat.CATEGORY_EVENT)

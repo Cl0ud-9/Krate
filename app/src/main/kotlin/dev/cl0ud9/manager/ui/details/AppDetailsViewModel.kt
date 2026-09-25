@@ -9,16 +9,21 @@ import dev.cl0ud9.manager.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.manager.domain.installer.InstallationEngine
 import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
+import dev.cl0ud9.manager.domain.model.AnnouncementItem
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.domain.model.InstallationMode
+import dev.cl0ud9.manager.domain.model.isActive
 import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
+import dev.cl0ud9.manager.domain.repository.AnnouncementDismissalStore
+import dev.cl0ud9.manager.domain.repository.Baseline
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
+import dev.cl0ud9.manager.platform.packageinfo.InstalledVersion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -42,7 +47,7 @@ data class DependencyInfo(
     val installed: Boolean,
 )
 
-// seven collaborators plus the screen's own appId argument - each one is a distinct, already-shared
+// nine collaborators plus the screen's own appId argument - each one is a distinct, already-shared
 // singleton from AppContainer (not something to bundle into an artificial "dependencies" wrapper
 // purely to dodge this count). TooManyFunctions is similarly a real but justified count: this is the
 // one class that owns every distinct user-facing operation on this screen (refresh, select a
@@ -59,6 +64,7 @@ class AppDetailsViewModel(
     private val activityLogRepository: ActivityLogRepository,
     private val managerBaselineStore: ManagerBaselineStore,
     private val downloadProgressNotifier: DownloadProgressNotifier,
+    private val announcementDismissalStore: AnnouncementDismissalStore,
     private val appId: String,
 ) : ViewModel() {
     val app: StateFlow<AppProfile?> =
@@ -66,10 +72,10 @@ class AppDetailsViewModel(
             .observeApp(appId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
-    // the version the manager itself last installed for this app, or null if it never has - App
-    // Details reads this alongside installedVersionName (the live device state) to tell "up to
-    // date" from "diverged outside the manager", see AppDetailsUiState.effectiveBaseline
-    val managerBaseline: StateFlow<String?> =
+    // the build the manager itself last installed for this app, or null if it never has - App
+    // Details reads this alongside installedVersion (the live device state) to tell "up to date"
+    // from "diverged outside the manager", see AppDetailsUiState.effectiveBaseline
+    val managerBaseline: StateFlow<Baseline?> =
         combine(app, managerBaselineStore.observeBaselines()) { profile, baselines ->
             profile?.let { baselines[it.packageName] }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
@@ -81,14 +87,29 @@ class AppDetailsViewModel(
     // installedVersion() is a real PackageManager Binder call, not free - flowOn(IO) keeps it off
     // the main thread, which otherwise blocked right during this screen's own enter transition
     // (collapsing header, depth-blur) every single time it opened
-    val installedVersionName: StateFlow<String?> =
+    val installedVersion: StateFlow<InstalledVersion?> =
         combine(app, refreshTrigger.onStart { emit(Unit) }) { profile, _ -> profile }
-            .map { profile -> profile?.let { installedPackageReader.installedVersion(it.packageName)?.versionName } }
+            .map { profile -> profile?.let { installedPackageReader.installedVersion(it.packageName) } }
             .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
+    // notices from the catalog about this app (see catalog/announcements.json)
+    val announcements: StateFlow<List<AnnouncementItem>> =
+        combine(
+            catalogRepository.observeAnnouncements(),
+            announcementDismissalStore.observeDismissed(),
+            catalogRepository.observeApps(),
+        ) { announcements, dismissed, catalog ->
+            val now = System.currentTimeMillis()
+            announcements
+                .filter { appId in it.appIds && it.isActive(now) && it.id !in dismissed }
+                .map { announcement ->
+                    AnnouncementItem(announcement, catalog.find { it.id == announcement.actionAppId }?.displayName)
+                }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
     // direct dependencies with real install state, section 14 + 42.11 of the spec - most apps have
-    // none. Same flowOn(IO) reasoning as installedVersionName above - resolveDependencies() calls
+    // none. Same flowOn(IO) reasoning as installedVersion above - resolveDependencies() calls
     // installedPackageReader once per dependency
     val dependencies: StateFlow<List<DependencyInfo>> =
         combine(app, catalogRepository.observeApps(), refreshTrigger.onStart { emit(Unit) }) { profile, catalog, _ ->
@@ -117,7 +138,7 @@ class AppDetailsViewModel(
     // forcing a redundant "Redownload" the user shouldn't have to do. Only ever moves Idle ->
     // ReadyToInstall, never overwrites a real in-flight Downloading/Verifying/Failed status.
     // existingReadyFile() is a real (if small) blocking File.exists() call - withContext(IO) keeps
-    // it off the main thread, same reasoning as installedVersionName/dependencies above
+    // it off the main thread, same reasoning as installedVersion/dependencies above
     init {
         viewModelScope.launch {
             combine(app.filterNotNull(), selectedArtifact.filterNotNull()) { profile, artifact ->
@@ -197,15 +218,22 @@ class AppDetailsViewModel(
         downloadProgressNotifier.clear(appId)
     }
 
-    // videoapp patched (CLEAN_INSTALL) always goes through the orchestrator, section 16, 42.12 of the spec.
-    // normal UPDATE apps attempt an in-place install/update first
+    fun dismissAnnouncement(id: String) {
+        viewModelScope.launch { announcementDismissalStore.dismiss(id) }
+    }
+
+    // a CLEAN_INSTALL app always goes through the orchestrator, section 16, 42.12 of the spec, and so
+    // does installing an older build than the one on the device (a rollback) - Android refuses a
+    // lower versionCode as an in-place update. Everything else attempts an in-place install first
     fun startInstall() {
         val currentApp = app.value
         val readyStatus = readyDownload()
         if (currentApp == null || readyStatus == null || isBusy()) return
         val apkFile = File(readyStatus.filePath)
         val flow =
-            if (currentApp.installationMode == InstallationMode.CLEAN_INSTALL) {
+            if (currentApp.installationMode == InstallationMode.CLEAN_INSTALL ||
+                requiresUninstall(installedVersion.value, selectedArtifact.value)
+            ) {
                 cleanInstallOrchestrator.cleanInstall(currentApp, apkFile)
             } else {
                 installationEngine.install(currentApp, apkFile)
@@ -226,12 +254,13 @@ class AppDetailsViewModel(
     // confirmation-dialog flow (WaitingForUser(UNINSTALL_CONFIRM) -> Uninstalling -> Success/Failed)
     fun startUninstall() {
         val currentApp = app.value
-        if (currentApp == null || installedVersionName.value == null || isBusy()) return
+        if (currentApp == null || installedVersion.value == null || isBusy()) return
         viewModelScope.launch {
             installationEngine.uninstall(currentApp.packageName).collect { status ->
                 mutableInstallStatus.value = status
                 if (status is InstallStatus.Success) {
                     recordActivity(currentApp, ActivityAction.UNINSTALLED)
+                    managerBaselineStore.clear(currentApp.packageName)
                     refresh()
                 }
             }
@@ -263,10 +292,10 @@ class AppDetailsViewModel(
         flow: Flow<InstallStatus>,
         targetApp: AppProfile,
     ) {
-        // captured before the flow runs, not after: installedVersionName reflects the OLD device
-        // state right now, which is exactly what decides whether this is an install or an update
-        val action = if (installedVersionName.value != null) ActivityAction.UPDATED else ActivityAction.INSTALLED
-        val installedVersion = selectedArtifact.value?.versionName
+        // captured before the flow runs, not after: installedVersion reflects the OLD device state
+        // right now, which is exactly what decides whether this is an install or an update
+        val action = if (installedVersion.value != null) ActivityAction.UPDATED else ActivityAction.INSTALLED
+        val installedArtifact = selectedArtifact.value
         viewModelScope.launch {
             flow.collect { status ->
                 mutableInstallStatus.value = status
@@ -277,8 +306,8 @@ class AppDetailsViewModel(
                     recordActivity(targetApp, action)
                     // this is now genuinely what the manager installed, real fact overriding whatever
                     // guess effectiveBaseline() would otherwise have made
-                    if (installedVersion != null) {
-                        managerBaselineStore.recordInstall(targetApp.packageName, installedVersion)
+                    if (installedArtifact != null) {
+                        managerBaselineStore.recordInstall(targetApp.packageName, installedArtifact)
                     }
                     refresh()
                 }

@@ -1,8 +1,8 @@
 package dev.cl0ud9.manager.domain.model
 
 // one downloadable build of an app, section 9 of the spec - AppProfile.artifacts holds every
-// version currently retained (newest first), not just the latest, so a broken newest build still
-// leaves older versions installable
+// build currently retained that fits this device (newest first), not just the latest, so a broken
+// newest build still leaves older ones installable
 // requiresAuth is true only for artifacts hosted as a private GitHub release asset (the
 // Patched-style apps, kept off public releases) - downloadUrl is then a
 // api.github.com/repos/.../releases/assets/{id} URL rather than a plain browser_download_url, and
@@ -10,6 +10,8 @@ package dev.cl0ud9.manager.domain.model
 // patchesVersionName is the version of the *tool* that built this artifact (e.g. the Patched
 // patches bundle), distinct from versionName (the app's own version, e.g. Videoapp's) - null for
 // artifacts with no such intermediate build tool
+// buildId tells apart two builds of the same versionName (a Patched rebuild with newer patches
+// keeps Videoapp's own version), and is null only in manifests older than schema 2
 data class ArtifactInfo(
     val versionName: String,
     val downloadUrl: String,
@@ -17,6 +19,14 @@ data class ArtifactInfo(
     val certificateSha256: String,
     val requiresAuth: Boolean = false,
     val patchesVersionName: String? = null,
+    val versionCode: Long? = null,
+    val buildId: String? = null,
+    val label: String? = null,
+    val note: String? = null,
+    val releaseNotes: String? = null,
+    val publishedAtMillis: Long? = null,
+    val withdrawn: Boolean = false,
+    val withdrawnReason: String? = null,
 )
 
 // curated catalog entry, section 7 of the spec
@@ -29,16 +39,17 @@ data class AppProfile(
     val dependencyIds: List<String>,
     val releaseNotes: String?,
     val enabled: Boolean,
-    // newest first; empty for a local seed/demo entry with nothing real to download yet
+    // newest first; empty for a local seed entry with nothing real to download yet
     val artifacts: List<ArtifactInfo>,
 )
 
+// a withdrawn build stays listed in version history but is never the one offered as the update
 val AppProfile.latestArtifact: ArtifactInfo?
-    get() = artifacts.firstOrNull()
+    get() = artifacts.firstOrNull { !it.withdrawn }
 
 // kept as a computed property (not a stored field) so there is exactly one source of truth for
-// "the app's newest version" - every call site that used to read a separately-tracked
-// latestVersionName field now reads this instead, and it can never drift out of sync with artifacts
+// "the app's newest version" - every call site reads this instead, and it can never drift out of
+// sync with artifacts
 val AppProfile.latestVersionName: String?
     get() = latestArtifact?.versionName
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,24 +36,6 @@ import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.StatusRow
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
-// section 16 of the spec: the ui shows Install, Update, or Reinstall based on real device state
-// compared against whichever version is currently selected (App Details' version history lets
-// that be an older retained one, not always the latest), not just the installation mode - a bare
-// "Update" whenever anything at all was installed (the old logic) is wrong once the installed
-// version already matches the selected one: there is nothing to update to, so this now says
-// "Reinstall" instead. Mode no longer drives the label at all: the Installation card below
-// already explains the clean-install mechanics separately, so this only needs to answer "is there
-// something new"
-private fun actionLabelFor(
-    selectedVersionName: String?,
-    installedVersionName: String?,
-): String =
-    when {
-        installedVersionName == null -> "Install"
-        installedVersionName == selectedVersionName -> "Reinstall"
-        else -> "Update"
-    }
-
 @Composable
 internal fun DownloadSection(
     state: AppDetailsUiState,
@@ -61,7 +44,7 @@ internal fun DownloadSection(
     onRetryAsCleanInstall: () -> Unit,
 ) {
     val status = state.downloadStatus
-    val actionLabel = actionLabelFor(state.selectedArtifact?.versionName, state.installedVersionName)
+    val actionLabel = actionLabelFor(state)
     // boxed in a card like every other detail section, instead of sitting bare on the screen background
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -189,6 +172,8 @@ private fun IdleContent(
     val uninstalling = state.installStatus is InstallStatus.Uninstalling || awaitingUninstallConfirm
 
     when {
+        state.isRollback -> RollbackContent(state = state, uninstalling = uninstalling, onDownload = onDownload)
+
         state.isUpToDate -> {
             StatusRow(
                 icon = painterResource(R.drawable.ic_check_circle_rounded),
@@ -206,7 +191,7 @@ private fun IdleContent(
             StatusRow(
                 icon = painterResource(R.drawable.ic_system_update_alt_rounded),
                 tint = MaterialTheme.colorScheme.primary,
-                text = "Update available.",
+                text = "Update available: ${selected?.buildDescription()}.",
             )
             if (uninstalling) {
                 UninstallingStatus(installStatus = state.installStatus)
@@ -224,11 +209,41 @@ private fun IdleContent(
             }
         }
     }
-    // independent of which branch above rendered - a real pending update and a diverged install
-    // aren't mutually exclusive, so this can appear alongside either "Up to date" or "Update available"
+    IdleFootnotes(state = state, uninstalling = uninstalling)
+}
+
+// an older retained build picked in version history - Open stays available, the action rolls back
+@Composable
+private fun RollbackContent(
+    state: AppDetailsUiState,
+    uninstalling: Boolean,
+    onDownload: () -> Unit,
+) {
+    StatusRow(
+        icon = rememberVectorPainter(Icons.Filled.History),
+        tint = MaterialTheme.colorScheme.primary,
+        text = "Older version selected: ${state.selectedArtifact?.buildDescription()}.",
+    )
+    if (uninstalling) {
+        UninstallingStatus(installStatus = state.installStatus)
+    } else {
+        InstalledNotUpToDateActions(state = state, onDownload = onDownload)
+    }
+    if (state.requiresUninstall) {
+        HelperText(UNINSTALL_FIRST_WARNING)
+    }
+}
+
+// independent of which branch rendered - a real pending update and a diverged install aren't
+// mutually exclusive, so this can appear alongside either "Up to date" or "Update available"
+@Composable
+private fun IdleFootnotes(
+    state: AppDetailsUiState,
+    uninstalling: Boolean,
+) {
     if (state.isDiverged) {
         HelperText(
-            "Installed version changed from ${state.effectiveBaseline} to " +
+            "Installed version changed from ${state.effectiveBaseline?.versionName} to " +
                 "${state.installedVersionName} outside the manager.",
         )
     }
@@ -241,8 +256,8 @@ private fun IdleContent(
     }
 }
 
-// Open stacked above the real Update/Install action - same pairing UpToDateActions uses for
-// Open+Redownload, just with the actual update CTA instead of a redownload of the same thing
+// Open stacked above the real Update/Roll back action - same pairing UpToDateActions uses for
+// Open+Redownload, just with the actual CTA instead of a redownload of the same thing
 @Composable
 private fun InstalledNotUpToDateActions(
     state: AppDetailsUiState,
@@ -252,7 +267,7 @@ private fun InstalledNotUpToDateActions(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         OpenAppButton(packageName = state.app.packageName)
         Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
-            Text(actionLabelFor(selected?.versionName, state.installedVersionName))
+            Text(actionLabelFor(state))
         }
     }
 }
