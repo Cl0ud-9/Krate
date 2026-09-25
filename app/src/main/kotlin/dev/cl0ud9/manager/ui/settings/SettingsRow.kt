@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -125,8 +126,7 @@ internal fun SettingsRow(
 
 // the first row in a group is square-round outside/nearly-square inside, the last is the mirror,
 // everything in between is nearly square on all sides, and a lone row is fully rounded all around.
-// Reads the smooth-corners toggle itself (not cached like ShapeCache's fixed sizes) since it's only
-// rebuilt when the group's own position or that setting changes, not on every recomposition
+// Remembered per corner set and smooth-corners setting, so a recomposition reuses the same shape
 @Composable
 internal fun settingsGroupShape(
     index: Int,
@@ -151,18 +151,22 @@ private fun groupCorners(
     topEnd: Dp,
     bottomStart: Dp,
     bottomEnd: Dp,
-): Shape =
-    if (LocalUseSmoothCorners.current) {
-        AbsoluteSmoothCornerShape(
-            cornerRadiusTL = topStart,
-            smoothnessAsPercentTL = GROUP_SMOOTHNESS,
-            cornerRadiusTR = topEnd,
-            smoothnessAsPercentTR = GROUP_SMOOTHNESS,
-            cornerRadiusBL = bottomStart,
-            smoothnessAsPercentBL = GROUP_SMOOTHNESS,
-            cornerRadiusBR = bottomEnd,
-            smoothnessAsPercentBR = GROUP_SMOOTHNESS,
-        )
-    } else {
-        RoundedCornerShape(topStart = topStart, topEnd = topEnd, bottomStart = bottomStart, bottomEnd = bottomEnd)
+): Shape {
+    val useSmoothCorners = LocalUseSmoothCorners.current
+    return remember(topStart, topEnd, bottomStart, bottomEnd, useSmoothCorners) {
+        if (useSmoothCorners) {
+            AbsoluteSmoothCornerShape(
+                cornerRadiusTL = topStart,
+                smoothnessAsPercentTL = GROUP_SMOOTHNESS,
+                cornerRadiusTR = topEnd,
+                smoothnessAsPercentTR = GROUP_SMOOTHNESS,
+                cornerRadiusBL = bottomStart,
+                smoothnessAsPercentBL = GROUP_SMOOTHNESS,
+                cornerRadiusBR = bottomEnd,
+                smoothnessAsPercentBR = GROUP_SMOOTHNESS,
+            )
+        } else {
+            RoundedCornerShape(topStart = topStart, topEnd = topEnd, bottomStart = bottomStart, bottomEnd = bottomEnd)
+        }
     }
+}

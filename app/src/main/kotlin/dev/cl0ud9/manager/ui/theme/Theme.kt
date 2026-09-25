@@ -118,9 +118,6 @@ private val DarkColors =
         surfaceContainerLowest = DarkSurfaceContainerLowest,
     )
 
-// requires material3 1.5.0-alpha (see gradle/libs.versions.toml) - MaterialExpressiveTheme and
-// MotionScheme are Kotlin `internal` on the 1.4.x stable line this project used until now, so this
-// wasn't reachable at all until that pin landed, not merely gated behind the opt-in below
 // the resolved light/dark boolean behind the theme mode setting - shared with MainActivity so the
 // system status/navigation bar icon color can track the same decision instead of only ever
 // following the raw system setting (which drifts from an explicit in-app Light/Dark override)
@@ -132,20 +129,20 @@ fun ThemeMode.resolveDarkTheme(): Boolean =
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
 
+// MaterialExpressiveTheme and MotionScheme need material3 1.5.0-alpha (see gradle/libs.versions.toml)
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ManagerTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
-    dynamicColor: Boolean = true,
     useSmoothCorners: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = themeMode.resolveDarkTheme()
 
-    // dynamic color needs Android 12+, minSdk is 30 so fall back below that
+    // wallpaper colors on Android 12+, the brand scheme below that (minSdk is 30)
     val colorScheme =
         when {
-            dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
                 val context = LocalContext.current
                 if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             }

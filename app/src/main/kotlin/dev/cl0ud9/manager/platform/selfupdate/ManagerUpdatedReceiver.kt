@@ -27,13 +27,16 @@ class ManagerUpdatedReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        // set right before the downloaded update is handed to Android's installer
+        // set right before the downloaded update is handed to Android's installer. commit(), not
+        // apply(): the installer kills this process to replace it, and apply()'s background write
+        // has no guarantee of reaching disk first - seen on device, the flag was missing afterwards.
+        // Always called off the main thread (the self-update flow runs on Dispatchers.IO)
         fun markSelfUpdatePending(context: Context) {
             context
                 .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean(KEY_PENDING, true)
-                .apply()
+                .commit()
         }
     }
 }

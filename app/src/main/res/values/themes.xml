@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Manager" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- the launch window matches the app's own background so there's no light flash before the UI draws -->
+    <style name="Theme.Manager" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

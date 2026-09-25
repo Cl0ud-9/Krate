@@ -1,7 +1,10 @@
 package dev.cl0ud9.manager
 
 import android.app.Activity
+import android.app.UiModeManager
+import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import dev.cl0ud9.manager.domain.model.ThemeMode
 import dev.cl0ud9.manager.platform.appContainer
 import dev.cl0ud9.manager.ui.navigation.ManagerNavHost
@@ -24,6 +28,8 @@ import dev.cl0ud9.manager.ui.onboarding.OnboardingScreen
 import dev.cl0ud9.manager.ui.theme.ManagerTheme
 import dev.cl0ud9.manager.ui.theme.resolveDarkTheme
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 const val EXTRA_TARGET_ROUTE = "target_route"
 const val EXTRA_APP_ID = "appId"
@@ -35,6 +41,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
         enableEdgeToEdge()
+        lifecycleScope.launch {
+            appContainer().settingsRepository.observeThemeMode().distinctUntilChanged().collect {
+                applyLaunchNightMode(
+                    it,
+                )
+            }
+        }
         setContent {
             val context = LocalContext.current
             val settingsRepository = remember { context.appContainer().settingsRepository }
@@ -91,6 +104,18 @@ class MainActivity : ComponentActivity() {
             intent?.removeExtra(EXTRA_APP_ID)
         }
     }
+}
+
+// the system draws the launch screen before our code runs, so it only follows an in-app Light/Dark choice once told
+private fun Context.applyLaunchNightMode(mode: ThemeMode) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    val nightMode =
+        when (mode) {
+            ThemeMode.LIGHT -> UiModeManager.MODE_NIGHT_NO
+            ThemeMode.DARK -> UiModeManager.MODE_NIGHT_YES
+            ThemeMode.SYSTEM -> UiModeManager.MODE_NIGHT_AUTO
+        }
+    getSystemService(UiModeManager::class.java).setApplicationNightMode(nightMode)
 }
 
 // "is_benchmark" intent extra, set only by the :baselineprofile module's own generator - never

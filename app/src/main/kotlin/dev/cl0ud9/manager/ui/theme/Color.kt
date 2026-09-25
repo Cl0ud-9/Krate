@@ -3,10 +3,10 @@ package dev.cl0ud9.manager.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Brand seed. Every color below is derived from this one value - never hand-edit a role individually,
-// regenerate the whole block instead (see the note above ManagerLightColors).
+// regenerate the whole block instead (see the generation note below).
 val BrandPrimary = Color(0xFF3B5BFF)
 
-// Full M3 tonal-palette fallback for when dynamic color isn't available (Android <12, or disabled) -
+// Full M3 tonal-palette fallback for when wallpaper colors aren't available (Android 11) -
 // section 41 of the spec targets Android 11+, so this isn't an edge case, it's the baseline experience
 // for a real slice of supported devices. Without this, lightColorScheme(primary = BrandPrimary) /
 // darkColorScheme(primary = BrandPrimaryDark) only override the `primary` role and leave every other

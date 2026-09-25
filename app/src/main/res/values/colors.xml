@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#1B1F3B</color>
+    <!-- the brand scheme's surface, used when wallpaper colors aren't available -->
+    <color name="window_background">#FBF8FF</color>
 </resources>
