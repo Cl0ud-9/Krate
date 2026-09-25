@@ -1,4 +1,28 @@
 {
   "_comment": "Shown in manager only while listed here and not past expiresAt. Fields: id (unique, never reused - a dismissal is remembered by id), severity (INFO, WARNING or CRITICAL), title, message, appIds (empty = shown on Home, otherwise on those apps' pages and on Home), actionAppId (optional catalog app to open, e.g. a temporary alternative), expiresAt (ISO 8601, optional), dismissible (default true), minManagerVersionCode / maxManagerVersionCode (optional).",
-  "announcements": []
+  "announcements": [
+    {
+      "id": "test-2026-09-25-general",
+      "severity": "INFO",
+      "title": "Test: Videoapp Music is available",
+      "message": "Testing a general announcement with a shortcut to another app.",
+      "appIds": [],
+      "actionAppId": "videoapp-music-patched",
+      "expiresAt": "2026-09-25T14:07:45Z",
+      "dismissible": true,
+      "minManagerVersionCode": 8
+    },
+    {
+      "id": "test-2026-09-25-videoapp",
+      "severity": "WARNING",
+      "title": "Test: Videoapp notice",
+      "message": "Testing an announcement about one app: shown on its page, and on Home while it is installed.",
+      "appIds": [
+        "videoapp-patched"
+      ],
+      "expiresAt": "2026-09-25T14:07:45Z",
+      "dismissible": true,
+      "minManagerVersionCode": 8
+    }
+  ]
 }
