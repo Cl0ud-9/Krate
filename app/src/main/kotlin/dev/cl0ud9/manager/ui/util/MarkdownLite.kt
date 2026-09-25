@@ -48,7 +48,8 @@ fun String.formatMarkdownLite(): AnnotatedString {
             codeBackground = MaterialTheme.colorScheme.surfaceContainerHighest,
         )
     return buildAnnotatedString {
-        val lines = trimEnd().lines()
+        // "( https://... )" -> "(https://...)": release notes often space a trailing link out
+        val lines = trimEnd().replace(SPACED_PAREN_URL, "($1)").lines()
         var previousWasBlank = true // no separating blank line needed before the very first line
         lines.forEachIndexed { index, line ->
             if (index > 0) append('\n')
@@ -166,6 +167,8 @@ private fun Builder.appendWithInlineSpans(
         }
     }
 }
+
+private val SPACED_PAREN_URL = Regex("""\(\s+(https?://\S+?)\s+\)""")
 
 private val LINK_SYNTAX = Regex("\\[([^\\]]+)]\\(([^)]+)\\)")
 

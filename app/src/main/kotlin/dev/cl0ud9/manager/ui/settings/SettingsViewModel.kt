@@ -11,13 +11,13 @@ import dev.cl0ud9.manager.domain.model.ThemeMode
 import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.repository.ActivityLogRepository
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
+import dev.cl0ud9.manager.domain.repository.ManagerBaselineStore
 import dev.cl0ud9.manager.domain.repository.SettingsRepository
 import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.selfupdate.ManagerSelfUpdateInstaller
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
-import dev.cl0ud9.manager.ui.details.buildDescription
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,6 +48,7 @@ class SettingsViewModel(
     private val catalogRepository: CatalogRepository,
     private val installedPackageReader: InstalledPackageReader,
     private val activityLogRepository: ActivityLogRepository,
+    private val managerBaselineStore: ManagerBaselineStore,
 ) : ViewModel() {
     val automaticDownloads: StateFlow<Boolean> =
         settingsRepository
@@ -133,6 +134,7 @@ class SettingsViewModel(
             mutableGeneratingReport.value = true
             val report =
                 withContext(Dispatchers.IO) {
+                    val baselines = managerBaselineStore.observeBaselines().first()
                     val apps =
                         catalogRepository.observeApps().first().map { app ->
                             ReportedApp(
@@ -142,7 +144,8 @@ class SettingsViewModel(
                                         .installedVersion(
                                             app.packageName,
                                         )?.versionName,
-                                latest = app.latestArtifact?.buildDescription(),
+                                latest = app.latestArtifact?.let { it.buildId ?: it.versionName },
+                                installedByManager = baselines[app.packageName]?.let { it.buildId ?: it.versionName },
                             )
                         }
                     val recentActivity = activityLogRepository.observeRecent().first()

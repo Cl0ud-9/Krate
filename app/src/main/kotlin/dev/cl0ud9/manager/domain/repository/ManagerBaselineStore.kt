@@ -50,9 +50,28 @@ fun effectiveBaseline(
         recordedBaseline != null -> recordedBaseline
         installed == null -> null
         installedVersionName != null && app.artifacts.any { it.versionName == installedVersionName } ->
-            Baseline(installedVersionName)
+            matchingBuild(app, installedVersionName, installed.lastUpdateTimeMillis)
         else -> guessFromCatalog(app, installed.lastUpdateTimeMillis)
     }
+}
+
+// the installed version is one the catalog knows, but several builds can share a version (Patched
+// rebuilds with newer patches) - the one it is, is the newest of them already published when it was
+// installed. Without publish dates there's no telling, so the build stays unknown
+private fun matchingBuild(
+    app: AppProfile,
+    versionName: String,
+    installedAtMillis: Long,
+): Baseline {
+    val build =
+        app.artifacts.firstOrNull { artifact ->
+            val published = artifact.publishedAtMillis
+            artifact.versionName == versionName &&
+                published != null &&
+                installedAtMillis > 0 &&
+                published <= installedAtMillis
+        }
+    return Baseline(versionName, build?.buildId)
 }
 
 private fun guessFromCatalog(

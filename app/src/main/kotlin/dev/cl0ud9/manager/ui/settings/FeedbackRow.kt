@@ -75,6 +75,7 @@ internal fun rememberSettingsViewModel(): SettingsViewModel =
             container.catalogRepository,
             container.installedPackageReader,
             container.activityLogRepository,
+            container.managerBaselineStore,
         )
     }
 

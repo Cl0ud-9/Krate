@@ -1,6 +1,5 @@
 package dev.cl0ud9.manager.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,7 +22,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,23 +49,13 @@ fun ManagerUpdateAnnouncementDialog(
         Surface(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
             shape = ShapeCache.smooth28,
+            // a plain neutral surface - a gradient from the primary/tertiary containers plus tonal
+            // elevation (which tints toward primary) read as an off blue wash rather than a dialog
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 8.dp,
+            tonalElevation = 0.dp,
         ) {
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(
-                            brush =
-                                Brush.verticalGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
-                                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.20f),
-                                        MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    ),
-                                ),
-                        ).padding(horizontal = 20.dp, vertical = 18.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 22.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 AnnouncementHeader()

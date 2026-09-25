@@ -370,6 +370,7 @@ private fun ManagerNavGraph(
         tabDestinations(navController)
         settingsDestination(navController)
         appearanceDestination(navController)
+        settingsPageDestinations(navController)
         appDetailsDestination(navController)
     }
 }

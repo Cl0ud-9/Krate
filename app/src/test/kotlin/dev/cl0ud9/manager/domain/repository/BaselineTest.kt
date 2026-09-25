@@ -65,6 +65,30 @@ class BaselineTest {
         assertFalse(isUpdateAvailable(installed, public, Baseline("20.40.45")))
     }
 
+    // no record (data cleared, or installed before records existed): the installed build is taken to
+    // be the newest one already published when it was installed, not assumed to be out of date
+    @Test
+    fun `without a record, an install after the latest build was published counts as that build`() {
+        val app =
+            app(
+                build("20.40.45", "p2", requiresAuth = true, publishedAt = 2_000),
+                build("20.37.48", "p1", requiresAuth = true, publishedAt = 1_000),
+            )
+
+        assertFalse(isUpdateAvailable(InstalledVersion("20.40.45", 1, lastUpdateTimeMillis = 3_000), app, null))
+    }
+
+    @Test
+    fun `without a record, a newer build published after the install is an update`() {
+        val app =
+            app(
+                build("20.40.45", "p3", requiresAuth = true, publishedAt = 4_000),
+                build("20.40.45", "p2", requiresAuth = true, publishedAt = 2_000),
+            )
+
+        assertTrue(isUpdateAvailable(InstalledVersion("20.40.45", 1, lastUpdateTimeMillis = 3_000), app, null))
+    }
+
     @Test
     fun `a withdrawn build is never offered as the latest`() {
         val app =

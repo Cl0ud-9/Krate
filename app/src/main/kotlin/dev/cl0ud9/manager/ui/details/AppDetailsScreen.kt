@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -33,10 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,7 +43,6 @@ import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.ArtifactInfo
 import dev.cl0ud9.manager.domain.model.DownloadStatus
 import dev.cl0ud9.manager.domain.model.InstallStatus
-import dev.cl0ud9.manager.domain.model.InstallationMode
 import dev.cl0ud9.manager.domain.model.WaitingForUserStep
 import dev.cl0ud9.manager.domain.model.latestArtifact
 import dev.cl0ud9.manager.domain.repository.Baseline
@@ -283,23 +279,7 @@ private fun AppDetailsContent(
             onSelectVersion = onSelectVersion,
         )
 
-        // Installation and Dependencies are both short, glanceable facts - side by side when
-        // Dependencies has nothing to list (the common case) makes better use of the available width;
-        // an app with actual pending dependencies needs the full row width for readable name/status/chevron,
-        // so that case stays stacked instead of cramming into half the screen
-        if (state.dependencies.isEmpty()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                InstallationSection(app = app, modifier = Modifier.weight(1f))
-                DependenciesSection(
-                    dependencies = state.dependencies,
-                    onNavigateToApp = onNavigateToApp,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        } else {
-            InstallationSection(app = app)
-            DependenciesSection(dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
-        }
+        AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
 
         ReleaseNotesSection(app = app, selectedArtifact = state.selectedArtifact)
     }
@@ -410,32 +390,6 @@ private fun InstalledStatusRow(installedVersionName: String?) {
     }
 }
 
-@Composable
-private fun InstallationSection(
-    app: AppProfile,
-    modifier: Modifier = Modifier,
-) {
-    DetailSection(
-        title = "Installation",
-        icon = rememberVectorPainter(Icons.Filled.Build),
-        modifier = modifier,
-        body =
-            AnnotatedString(
-                when (app.installationMode) {
-                    InstallationMode.UPDATE -> {
-                        "Updates keep the app's data. If an update can't install normally, you can " +
-                            "reinstall it from scratch instead, which erases the app's data."
-                    }
-
-                    InstallationMode.CLEAN_INSTALL -> {
-                        "Updates reinstall this app from scratch: it's uninstalled first, then the new " +
-                            "version is installed. The app's data is erased each time."
-                    }
-                },
-            ),
-    )
-}
-
 // long release notes used to push the primary action further down the page and add a lot of scroll
 // distance for something most users only skim - collapsed to a few lines with an explicit expand
 // affordance keeps the information available without it dominating the page by default
@@ -483,24 +437,3 @@ private fun ReleaseNotesSection(
 }
 
 private const val COLLAPSED_RELEASE_NOTES_LINES = 4
-
-// only ever used with the default badge colors now that Release notes has its own tertiary-tinted
-// Card above - keeping it to title/icon/body/modifier avoids an unused customization surface
-@Composable
-private fun DetailSection(
-    title: String,
-    icon: Painter,
-    body: AnnotatedString,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth16,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionHeader(title = title, icon = icon)
-            Text(text = body, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}

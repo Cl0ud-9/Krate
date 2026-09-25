@@ -1,6 +1,9 @@
 package dev.cl0ud9.manager.ui.navigation
 
+import androidx.compose.foundation.ScrollState
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -10,7 +13,12 @@ import dev.cl0ud9.manager.ui.apps.AppsScreen
 import dev.cl0ud9.manager.ui.components.HomeChangelogAction
 import dev.cl0ud9.manager.ui.details.AppDetailsScreen
 import dev.cl0ud9.manager.ui.home.HomeScreen
+import dev.cl0ud9.manager.ui.settings.AboutPage
 import dev.cl0ud9.manager.ui.settings.AppearanceRoute
+import dev.cl0ud9.manager.ui.settings.DownloadsStoragePage
+import dev.cl0ud9.manager.ui.settings.FeedbackPage
+import dev.cl0ud9.manager.ui.settings.GitHubAccessPage
+import dev.cl0ud9.manager.ui.settings.SettingsPageRoute
 import dev.cl0ud9.manager.ui.settings.SettingsScreen
 import dev.cl0ud9.manager.ui.settings.SettingsShortcutAction
 import dev.cl0ud9.manager.ui.updates.UpdatesScreen
@@ -80,27 +88,54 @@ internal fun NavGraphBuilder.settingsDestination(navController: NavHostControlle
             SettingsScreen(
                 scrollState = scrollState,
                 topContentPadding = topContentPadding,
-                onNavigateToAppearance = { navController.navigate(APPEARANCE_ROUTE) },
+                onNavigate = { route -> navController.navigate(route) { launchSingleTop = true } },
             )
         }
     }
 }
 
 internal fun NavGraphBuilder.appearanceDestination(navController: NavHostController) {
+    settingsPageDestination(navController, APPEARANCE_ROUTE, "Appearance") { scrollState, topContentPadding ->
+        AppearanceRoute(scrollState = scrollState, topContentPadding = topContentPadding)
+    }
+}
+
+// the pages behind Settings' category rows - pushed and popped like App Details
+internal fun NavGraphBuilder.settingsPageDestinations(navController: NavHostController) {
+    settingsPageDestination(navController, SettingsPageRoute.DOWNLOADS, "Downloads & storage") { scroll, top ->
+        DownloadsStoragePage(scrollState = scroll, topContentPadding = top)
+    }
+    settingsPageDestination(navController, SettingsPageRoute.GITHUB, "GitHub access") { scroll, top ->
+        GitHubAccessPage(scrollState = scroll, topContentPadding = top)
+    }
+    settingsPageDestination(navController, SettingsPageRoute.FEEDBACK, "Feedback") { scroll, top ->
+        FeedbackPage(scrollState = scroll, topContentPadding = top)
+    }
+    settingsPageDestination(navController, SettingsPageRoute.ABOUT, "About") { scroll, top ->
+        AboutPage(scrollState = scroll, topContentPadding = top)
+    }
+}
+
+private fun NavGraphBuilder.settingsPageDestination(
+    navController: NavHostController,
+    route: String,
+    title: String,
+    content: @Composable (ScrollState, Dp) -> Unit,
+) {
     composable(
-        route = APPEARANCE_ROUTE,
+        route = route,
         enterTransition = { detailsEnterTransition() },
         exitTransition = { detailsExitTransition() },
         popEnterTransition = { detailsPopEnterTransition() },
         popExitTransition = { detailsPopExitTransition() },
     ) { entry ->
         DetailScreen(
-            title = "Appearance",
+            title = title,
             navController = navController,
             entry = entry,
             onBack = { navController.popBackStack() },
         ) { scrollState, topContentPadding ->
-            AppearanceRoute(scrollState = scrollState, topContentPadding = topContentPadding)
+            content(scrollState, topContentPadding)
         }
     }
 }

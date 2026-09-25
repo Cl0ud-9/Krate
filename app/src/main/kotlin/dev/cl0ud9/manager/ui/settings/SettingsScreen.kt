@@ -11,13 +11,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -42,95 +37,82 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import dev.cl0ud9.manager.ui.components.ManagerSwitch
-import dev.cl0ud9.manager.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.DebouncedButtonState
-import dev.cl0ud9.manager.ui.util.rememberDebouncedButtonState
 
-// a flowing list of icon-badged category rows (badge + title + subtitle, expanding into the row's
-// own controls) instead of plain text blocks inside flat cards, so settings feel
-// considered rather than default-Material-boilerplate. our settings surface is small (three groupings),
-// so this keeps that honest scale rather than inventing categories we don't have
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+// an index of categories, each opening its own page - a short list you can take in at a glance,
+// grouped under section labels, instead of every control stacked on one long page. A waiting
+// manager update gets a banner at the top that leads to About, where the Update button is
 @Composable
 fun SettingsScreen(
     scrollState: ScrollState,
     topContentPadding: Dp,
-    onNavigateToAppearance: () -> Unit,
+    onNavigate: (String) -> Unit,
 ) {
     val viewModel = rememberSettingsViewModel()
-    val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
-    val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     val managerUpdateState by viewModel.managerUpdateState.collectAsStateWithLifecycle()
     val hasGitHubToken by viewModel.hasGitHubToken.collectAsStateWithLifecycle()
-    val feedbackState = rememberFeedbackUiState(viewModel)
-    val deviceSummary = rememberDeviceSummary()
-    // both actions are already idempotent in the ViewModel itself (a second call while one is
-    // still running is a no-op) - this debounce is the UI-side half of that: the button itself goes
-    // disabled for the cooldown, so a fast repeat tap can't stack a second ripple on top of the
-    // first one still playing, on top of never reaching the ViewModel a second time either
-    val clearCacheState = rememberDebouncedButtonState(onClick = viewModel::clearCache)
-    // while a manager update is waiting, About (with its Update now button) moves to the top of the
-    // list, so opening Settings from the update notification lands right on it
-    val updateWaiting =
-        (managerUpdateState as? ManagerUpdateUiState.Result)?.status is ManagerUpdateStatus.UpdateAvailable
-    val offset = if (updateWaiting) 1 else 0
-
-    // one continuous grouped list (2dp seams, square-ish touching corners) instead of four
-    // separately-floating cards - settingsGroupShape needs each row's position in the group.
-    // scrollState/topContentPadding come from the shared collapsing header this screen is hosted
-    // in - without that top space, the heading would sit on top of the Appearance row instead of
-    // sliding away above it
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(top = topContentPadding + DetailContentTopGap, start = 16.dp, end = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        if (updateWaiting) SettingsAboutRow(viewModel, settingsGroupShape(0, SETTINGS_ROW_COUNT))
-        AppearanceRow(
-            onClick = onNavigateToAppearance,
-            shape = settingsGroupShape(APPEARANCE_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
+    val update = (managerUpdateState as? ManagerUpdateUiState.Result)?.status as? ManagerUpdateStatus.UpdateAvailable
+    SettingsPage(scrollState, topContentPadding) {
+        if (update != null) ManagerUpdateBanner(update.latestVersion) { onNavigate(SettingsPageRoute.ABOUT) }
+        SettingsSectionLabel("General", first = update == null)
+        AppearanceRow(shape = settingsGroupShape(0, 2), onClick = { onNavigate(SettingsPageRoute.APPEARANCE) })
+        SettingsNavRow(
+            icon = painterResource(R.drawable.ic_update_rounded),
+            title = "Downloads & storage",
+            subtitle = "Automatic downloads, download cache",
+            colors = defaultSettingsRowColors(),
+            shape = settingsGroupShape(1, 2),
+            onClick = { onNavigate(SettingsPageRoute.DOWNLOADS) },
         )
-        AutomaticDownloadsRow(
-            checked = automaticDownloads,
-            onCheckedChange = viewModel::setAutomaticDownloads,
-            shape = settingsGroupShape(AUTOMATIC_DOWNLOADS_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
+        SettingsSectionLabel("Account")
+        SettingsNavRow(
+            icon = painterResource(R.drawable.ic_key_rounded),
+            title = "GitHub access",
+            subtitle = if (hasGitHubToken) "Token saved" else "Needed for a few private apps",
+            colors =
+                SettingsRowColors(
+                    MaterialTheme.colorScheme.tertiaryContainer,
+                    MaterialTheme.colorScheme.onTertiaryContainer,
+                ),
+            shape = settingsGroupShape(0, 1),
+            onClick = { onNavigate(SettingsPageRoute.GITHUB) },
         )
-        StorageRow(
-            cacheClearedMessage = cacheClearedMessage,
-            clearCacheState = clearCacheState,
-            shape = settingsGroupShape(STORAGE_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
+        SettingsSectionLabel("Support")
+        SettingsNavRow(
+            icon = painterResource(R.drawable.ic_feedback_rounded),
+            title = "Feedback & bug reports",
+            subtitle = "Report a problem or suggest something",
+            colors = defaultSettingsRowColors(),
+            shape = settingsGroupShape(0, 2),
+            onClick = { onNavigate(SettingsPageRoute.FEEDBACK) },
         )
-        GitHubAccessRow(
-            hasToken = hasGitHubToken,
-            onSaveToken = viewModel::setGitHubToken,
-            onClearToken = viewModel::clearGitHubToken,
-            shape = settingsGroupShape(GITHUB_ACCESS_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
+        SettingsNavRow(
+            icon = painterResource(R.drawable.ic_info_rounded),
+            title = "About",
+            subtitle = "Version ${rememberVersionName()}, updates, what's new",
+            colors =
+                SettingsRowColors(
+                    MaterialTheme.colorScheme.secondaryContainer,
+                    MaterialTheme.colorScheme.onSecondaryContainer,
+                ),
+            shape = settingsGroupShape(1, 2),
+            onClick = { onNavigate(SettingsPageRoute.ABOUT) },
         )
-        FeedbackRow(
-            state = feedbackState,
-            onFeedbackTextChange = viewModel::setFeedbackText,
-            onGenerateReport = { viewModel.generateDiagnosticReport(deviceSummary) },
-            shape = settingsGroupShape(FEEDBACK_ROW_INDEX + offset, SETTINGS_ROW_COUNT),
-        )
-        if (!updateWaiting) SettingsAboutRow(viewModel, settingsGroupShape(ABOUT_ROW_INDEX, SETTINGS_ROW_COUNT))
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
-private const val APPEARANCE_ROW_INDEX = 0
-private const val AUTOMATIC_DOWNLOADS_ROW_INDEX = 1
-private const val STORAGE_ROW_INDEX = 2
-private const val GITHUB_ACCESS_ROW_INDEX = 3
-private const val FEEDBACK_ROW_INDEX = 4
-private const val ABOUT_ROW_INDEX = 5
-private const val SETTINGS_ROW_COUNT = 6
+// routes of the pages Settings' rows open
+object SettingsPageRoute {
+    const val APPEARANCE = "settings/appearance"
+    const val DOWNLOADS = "settings/downloads"
+    const val GITHUB = "settings/github"
+    const val FEEDBACK = "settings/feedback"
+    const val ABOUT = "settings/about"
+}
 
 @Composable
-private fun AutomaticDownloadsRow(
+internal fun AutomaticDownloadsRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     shape: Shape,
@@ -149,7 +131,7 @@ private fun AutomaticDownloadsRow(
 }
 
 @Composable
-private fun StorageRow(
+internal fun StorageRow(
     cacheClearedMessage: String?,
     clearCacheState: DebouncedButtonState,
     shape: Shape,
@@ -185,9 +167,9 @@ internal fun AboutRow(
     SettingsRow(
         header =
             SettingsRowHeader(
-                icon = painterResource(R.drawable.ic_info_rounded),
-                title = "About",
-                subtitle = "Version $versionName",
+                icon = painterResource(R.drawable.ic_system_update_alt_rounded),
+                title = "App Manager updates",
+                subtitle = "Installed version $versionName",
                 colors =
                     SettingsRowColors(
                         MaterialTheme.colorScheme.secondaryContainer,
@@ -196,11 +178,6 @@ internal fun AboutRow(
             ),
         shape = shape,
     ) {
-        Text(
-            text = "Manager updates",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         ManagerUpdateSection(state = managerUpdateState, actions = updateActions)
     }
 }

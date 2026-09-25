@@ -15,6 +15,8 @@ internal data class ReportedApp(
     val name: String,
     val installedVersion: String?,
     val latest: String?,
+    // the build App Manager itself last installed - what update detection compares against
+    val installedByManager: String?,
 )
 
 // device/package facts read via Context, gathered here rather than in SettingsViewModel - matching
@@ -53,6 +55,7 @@ internal fun formatDiagnosticReport(
         apps.forEach { app ->
             val installed = app.installedVersion?.let { "installed $it" } ?: "not installed"
             appendLine("- ${app.name}: $installed, latest ${app.latest ?: "unknown"}")
+            appendLine("    installed by App Manager: ${app.installedByManager ?: "no record"}")
         }
         val recent = recentActivity.take(RECENT_ACTIVITY_LIMIT)
         if (recent.isNotEmpty()) {
