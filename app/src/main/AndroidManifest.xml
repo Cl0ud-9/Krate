@@ -40,6 +40,13 @@
         <receiver
             android:name=".platform.packageinstaller.InstallResultReceiver"
             android:exported="false" />
+        <receiver
+            android:name=".platform.selfupdate.ManagerUpdatedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

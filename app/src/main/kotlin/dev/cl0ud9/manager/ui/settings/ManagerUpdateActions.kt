@@ -98,7 +98,11 @@ private fun SelfUpdateInstallingContent(installStatus: InstallStatus) {
     when (installStatus) {
         is InstallStatus.WaitingForUser -> {
             ManagerLinearProgress(progress = null)
-            HelperText("Confirm the update in the system dialog. App Manager restarts once it's installed.")
+            HelperText(
+                "Confirm the update in the system dialog. Android may run a Play Protect check first, which " +
+                    "is normal for apps from outside the Play Store. App Manager closes to finish updating; a " +
+                    "notification lets you open it again.",
+            )
             ReopenPromptButton()
         }
 

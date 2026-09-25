@@ -79,6 +79,7 @@ class ManagerSelfUpdateInstaller(
                 emit(SelfUpdateState.DownloadFailed(failure))
                 return@flow
             }
+            ManagerUpdatedReceiver.markSelfUpdatePending(context)
             emitAll(installationEngine.install(selfProfile(), apkFile).map { SelfUpdateState.Installing(it) })
         }.flowOn(Dispatchers.IO)
 

@@ -27,6 +27,7 @@ private const val CHANNEL_ID = "updates_v2"
 private const val PENDING_UPDATES_NOTIFICATION_ID = 1001
 private const val MANAGER_UPDATE_NOTIFICATION_ID = 1002
 private const val UPDATE_ALL_RESULT_NOTIFICATION_ID = 1003
+private const val MANAGER_UPDATED_NOTIFICATION_ID = 1004
 private const val STATE_PREFS = "update_notifier"
 private const val KEY_PENDING_SIGNATURE = "pending_signature"
 private const val KEY_MANAGER_VERSION = "manager_version"
@@ -93,6 +94,21 @@ object UpdateNotifier {
             text = "Tap to update now.",
             // Settings checks on open and offers the in-app Update button right there
             targetRoute = "settings",
+        )
+    }
+
+    // after an in-app self-update Android has closed the app - this is the way back in
+    fun notifyManagerUpdated(
+        context: Context,
+        version: String?,
+    ) {
+        NotificationManagerCompat.from(context).cancel(MANAGER_UPDATE_NOTIFICATION_ID)
+        notify(
+            context = context,
+            id = MANAGER_UPDATED_NOTIFICATION_ID,
+            title = version?.let { "App Manager updated to $it" } ?: "App Manager updated",
+            text = "Tap to open.",
+            targetRoute = "home",
         )
     }
 
