@@ -285,25 +285,35 @@ def artifacts_from_private_source(app, source, cache, releases_by_repo):
                 "publishedAt": release.get("published_at"),
             }
         )
-    # newest app versions first, then the newest build of each - the same order prune uses
+    # one build per patches release, newest patches first, the same rule prune uses: every build
+    # targets the newest app version its patches support, so the history users roll back through
+    # is the last few patches releases. A patches release built more than once keeps the build for
+    # the newest app version, then the most recent one
     artifacts.sort(key=lambda a: a["publishedAt"] or "", reverse=True)
     artifacts.sort(key=lambda a: version_key(a["versionName"]), reverse=True)
-    kept, seen_versions = [], []
+    artifacts.sort(key=lambda a: version_key(a["patchesVersionName"] or ""), reverse=True)
+    kept, seen_patches = [], set()
     for artifact in artifacts:
-        if artifact["versionName"] not in seen_versions:
-            if len(seen_versions) == retain:
-                continue
-            seen_versions.append(artifact["versionName"])
+        if artifact["patchesVersionName"] in seen_patches:
+            continue
+        seen_patches.add(artifact["patchesVersionName"])
         kept.append(artifact)
+    kept = kept[:retain]
     if not kept:
         raise RuntimeError(f"no finished releases for prefix {source['tagPrefix']!r} in {repo}")
     return kept
 
 
+def release_key(artifact):
+    """What "newer" means for the version history: the patches release for a patched app (a new
+    patches release is an update even on the same app version), the app's own version otherwise."""
+    return version_key(artifact["patchesVersionName"] or artifact["versionName"])
+
+
 def build_artifacts(app, cache, releases_by_repo):
-    """Every source's artifacts merged, newest app version first. Within one app version, sources
-    keep their catalog order (so the preferred build of a version comes first - an older manager
-    that ignores minSdk/maxSdk then still picks it) and each source's newer builds come first."""
+    """Every source's artifacts merged, newest release first. Within one release, sources keep
+    their catalog order (so the preferred build comes first - an older manager that ignores
+    minSdk/maxSdk then still picks it), then the newest app version and newest build first."""
     sources = app.get("sources") or [app["source"]]
     merged = []
     for index, source in enumerate(sources):
@@ -313,8 +323,9 @@ def build_artifacts(app, cache, releases_by_repo):
             found = artifacts_from_public_source(app, source, cache)
         merged += [(index, artifact) for artifact in found]
     merged.sort(key=lambda pair: pair[1]["publishedAt"] or "", reverse=True)
-    merged.sort(key=lambda pair: pair[0])
     merged.sort(key=lambda pair: version_key(pair[1]["versionName"]), reverse=True)
+    merged.sort(key=lambda pair: pair[0])
+    merged.sort(key=lambda pair: release_key(pair[1]), reverse=True)
     return [artifact for _index, artifact in merged]
 
 
