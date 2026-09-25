@@ -55,7 +55,9 @@
       "packageName": "app.patched.android.videoapp",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
-      "dependencyIds": ["microg-re"],
+      "dependencyIds": [
+        "microg-re"
+      ],
       "enabled": true,
       "sources": [
         {
@@ -82,14 +84,24 @@
       "packageName": "app.patched.android.apps.videoapp.music",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
-      "dependencyIds": ["microg-re"],
+      "dependencyIds": [
+        "microg-re"
+      ],
       "enabled": true,
       "sources": [
         {
           "type": "private_release",
           "repo": "Cl0ud-9/manager-artifacts",
-          "tagPrefix": "videoapp-music-patched-",
-          "assetPattern": "^videoapp-music-patched-.*\\.apk$",
+          "tagPrefix": "videoapp-music-patched-modern-",
+          "assetPattern": "^videoapp-music-patched-modern-.*\\.apk$",
+          "retainVersions": 3,
+          "expectedCertificateSha256": "17238efb5db5a12b23cc8c838f57587abd80313eae0dfc35338f3f203f8f8c18"
+        },
+        {
+          "type": "private_release",
+          "repo": "Cl0ud-9/manager-artifacts",
+          "tagPrefix": "videoapp-music-patched-legacy-",
+          "assetPattern": "^videoapp-music-patched-legacy-.*\\.apk$",
           "retainVersions": 3,
           "expectedCertificateSha256": "17238efb5db5a12b23cc8c838f57587abd80313eae0dfc35338f3f203f8f8c18"
         }
