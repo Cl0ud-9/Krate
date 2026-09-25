@@ -173,12 +173,15 @@ class AppDetailsViewModel(
     fun startDownload() {
         val currentApp = app.value
         val artifact = selectedArtifact.value
-        if (currentApp == null || artifact == null) return
+        if (currentApp == null || artifact == null || isBusy()) return
         if (mutableDownloadStatus.value is DownloadStatus.Downloading ||
             mutableDownloadStatus.value is DownloadStatus.Verifying
         ) {
             return
         }
+        // a new download starts a new install attempt - a finished earlier one (an uninstall's
+        // Success, say) would otherwise show as "Installed." once this download is ready
+        mutableInstallStatus.value = InstallStatus.Idle
         // this keeps running for as long as the ViewModel itself is alive, which backgrounding the
         // app via Home does not affect - only leaving this screen (clearing the ViewModel) or the
         // process actually dying does. downloadProgressNotifier decides on its own whether a
@@ -261,6 +264,8 @@ class AppDetailsViewModel(
                 if (status is InstallStatus.Success) {
                     recordActivity(currentApp, ActivityAction.UNINSTALLED)
                     managerBaselineStore.clear(currentApp.packageName)
+                    // not shown as its own state: the page simply turns back into "Install"
+                    mutableInstallStatus.value = InstallStatus.Idle
                     refresh()
                 }
             }

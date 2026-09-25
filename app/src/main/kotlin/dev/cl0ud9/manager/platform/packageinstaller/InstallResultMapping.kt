@@ -28,5 +28,18 @@ fun interpretInstallResult(
                 },
             )
 
-        else -> InstallStatus.Failed(message ?: "Installation failed.")
+        else -> InstallStatus.Failed(friendlyFailure(message))
+    }
+
+// the two failures a user can actually act on get plain wording - both are fixed by the clean install
+// App Details offers next to them. Anything else keeps Android's own message
+private fun friendlyFailure(message: String?): String =
+    when {
+        message == null -> "Installation failed."
+        "INSTALL_FAILED_UPDATE_INCOMPATIBLE" in message ->
+            "The installed app is signed with a different key, so it can't be updated in place. " +
+                "A clean install replaces it."
+        "INSTALL_FAILED_VERSION_DOWNGRADE" in message ->
+            "The installed version is newer, so Android won't install this one over it. A clean install replaces it."
+        else -> message
     }

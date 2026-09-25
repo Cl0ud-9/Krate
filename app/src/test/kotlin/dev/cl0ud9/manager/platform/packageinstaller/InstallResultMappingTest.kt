@@ -80,4 +80,31 @@ class InstallResultMappingTest {
         assertTrue(status is InstallStatus.Failed)
         assertEquals("Installation failed.", (status as InstallStatus.Failed).reason)
     }
+
+    // seen live: a Videoapp installed from elsewhere, signed with a different key
+    @Test
+    fun `a signing key mismatch gets a plain explanation instead of the raw system text`() {
+        val status =
+            interpretInstallResult(
+                PackageInstaller.STATUS_FAILURE_CONFLICT,
+                "INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package app.patched.android.videoapp signatures " +
+                    "do not match newer version; ignoring!",
+                WaitingForUserStep.INSTALL_CONFIRM,
+            )
+        val reason = (status as InstallStatus.Failed).reason
+        assertTrue(reason.startsWith("The installed app is signed with a different key"))
+    }
+
+    @Test
+    fun `a downgrade gets a plain explanation instead of the raw system text`() {
+        val status =
+            interpretInstallResult(
+                PackageInstaller.STATUS_FAILURE_CONFLICT,
+                "INSTALL_FAILED_VERSION_DOWNGRADE: Downgrade detected: Update version code 108 is " +
+                    "older than current 109",
+                WaitingForUserStep.INSTALL_CONFIRM,
+            )
+        val reason = (status as InstallStatus.Failed).reason
+        assertTrue(reason.startsWith("The installed version is newer"))
+    }
 }
