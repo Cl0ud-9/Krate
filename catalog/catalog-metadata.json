@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "apps": [
     {
       "id": "ltecleaner-foss",
@@ -12,7 +12,9 @@
       "source": {
         "repo": "MDP43140/LTECleanerFOSS",
         "assetPattern": "^app-release\\.apk$",
-        "includePrerelease": false
+        "includePrerelease": false,
+        "retainVersions": 3,
+        "expectedCertificateSha256": "7a40d5ce5dc4fb80addc9399c1fadbd77cf89b71a45812d12b9ff9e911299549"
       }
     },
     {
@@ -26,7 +28,9 @@
       "source": {
         "repo": "bmx666/android-appcachecleaner",
         "assetPattern": "^app-release\\.apk$",
-        "includePrerelease": false
+        "includePrerelease": false,
+        "retainVersions": 3,
+        "expectedCertificateSha256": "28fa393354f1d13d70c2f1f5298cdd455ffdbc2c17939cbc8f053ddc5e152da8"
       }
     },
     {
@@ -40,7 +44,9 @@
       "source": {
         "repo": "MorpheApp/MicroG-RE",
         "assetPattern": "^microg-[0-9.]+-arm64-v8a\\.apk$",
-        "includePrerelease": false
+        "includePrerelease": false,
+        "retainVersions": 3,
+        "expectedCertificateSha256": "0b6c9515afb195fac59601696ba0a7907a0b217ccf720b43148427ccf64343e7"
       }
     },
     {
@@ -48,16 +54,46 @@
       "displayName": "Videoapp (Patched)",
       "packageName": "app.patched.android.videoapp",
       "supportStatus": "SUPPORTED",
-      "installationMode": "CLEAN_INSTALL",
+      "installationMode": "UPDATE",
       "dependencyIds": ["microg-re"],
       "enabled": true,
-      "source": {
-        "type": "private_release",
-        "repo": "Cl0ud-9/manager-artifacts",
-        "tagPrefix": "videoapp-patched-",
-        "assetPattern": "^videoapp-patched-.*\\.apk$",
-        "retainVersions": 3
-      }
+      "sources": [
+        {
+          "type": "private_release",
+          "repo": "Cl0ud-9/manager-artifacts",
+          "tagPrefix": "videoapp-patched-modern-",
+          "assetPattern": "^videoapp-patched-modern-.*\\.apk$",
+          "retainVersions": 3,
+          "expectedCertificateSha256": "17238efb5db5a12b23cc8c838f57587abd80313eae0dfc35338f3f203f8f8c18"
+        },
+        {
+          "type": "private_release",
+          "repo": "Cl0ud-9/manager-artifacts",
+          "tagPrefix": "videoapp-patched-legacy-",
+          "assetPattern": "^videoapp-patched-legacy-.*\\.apk$",
+          "retainVersions": 3,
+          "expectedCertificateSha256": "17238efb5db5a12b23cc8c838f57587abd80313eae0dfc35338f3f203f8f8c18"
+        }
+      ]
+    },
+    {
+      "id": "videoapp-music-patched",
+      "displayName": "Videoapp Music (Patched)",
+      "packageName": "app.patched.android.apps.videoapp.music",
+      "supportStatus": "SUPPORTED",
+      "installationMode": "UPDATE",
+      "dependencyIds": ["microg-re"],
+      "enabled": true,
+      "sources": [
+        {
+          "type": "private_release",
+          "repo": "Cl0ud-9/manager-artifacts",
+          "tagPrefix": "videoapp-music-patched-",
+          "assetPattern": "^videoapp-music-patched-.*\\.apk$",
+          "retainVersions": 3,
+          "expectedCertificateSha256": "17238efb5db5a12b23cc8c838f57587abd80313eae0dfc35338f3f203f8f8c18"
+        }
+      ]
     }
   ]
 }

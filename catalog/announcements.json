@@ -1,0 +1,4 @@
+{
+  "_comment": "Shown in manager only while listed here and not past expiresAt. Fields: id (unique, never reused - a dismissal is remembered by id), severity (INFO, WARNING or CRITICAL), title, message, appIds (empty = shown on Home, otherwise on those apps' pages and on Home), actionAppId (optional catalog app to open, e.g. a temporary alternative), expiresAt (ISO 8601, optional), dismissible (default true), minManagerVersionCode / maxManagerVersionCode (optional).",
+  "announcements": []
+}

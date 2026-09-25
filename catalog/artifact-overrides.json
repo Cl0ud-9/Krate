@@ -1,0 +1,4 @@
+{
+  "_comment": "Per-build adjustments without touching the release itself. Each entry: appId plus buildId (a release tag) or versionName, then any of withdrawn (true = still listed, never offered as the update), reason (shown with a withdrawn build), label, notes.",
+  "overrides": []
+}

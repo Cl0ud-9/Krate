@@ -20,3 +20,7 @@ google-services.json
 .kotlin/
 __pycache__/
 *.pyc
+
+# local catalog generator output (catalog/scripts/generate_manifest.py)
+/manifest.json
+/manifest-work/
