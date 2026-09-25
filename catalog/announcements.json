@@ -1,16 +1,4 @@
 {
   "_comment": "Shown in manager only while listed here and not past expiresAt. Fields: id (unique, never reused - a dismissal is remembered by id), severity (INFO, WARNING or CRITICAL), title, message, appIds (empty = shown on Home, otherwise on those apps' pages and on Home), actionAppId (optional catalog app to open, e.g. a temporary alternative), expiresAt (ISO 8601, optional), dismissible (default true), minManagerVersionCode / maxManagerVersionCode (optional).",
-  "announcements": [
-    {
-      "id": "patched-checks-failed-dialog",
-      "severity": "INFO",
-      "title": "A \"Checks failed\" warning is expected",
-      "message": "The first two times you open this app, Patched may warn that it wasn't patched on this phone. That's because it was built for you ahead of time - App Manager already checks that every download is the genuine build. Wait a few seconds for Ignore to appear, then tap it.",
-      "appIds": [
-        "videoapp-patched",
-        "videoapp-music-patched"
-      ],
-      "dismissible": true
-    }
-  ]
+  "announcements": []
 }
