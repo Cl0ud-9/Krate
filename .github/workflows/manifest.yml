@@ -33,6 +33,14 @@ jobs:
           key: manifest-asset-cache-${{ github.run_id }}
           restore-keys: manifest-asset-cache-
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # Pillow and resvg render each app's launcher icon into the manifest (catalog/scripts/apk_icon.py)
+      - name: Install Python dependencies
+        run: pip install pillow resvg_py
+
       - name: Generate manifest
         env:
           GH_TOKEN: ${{ github.token }}

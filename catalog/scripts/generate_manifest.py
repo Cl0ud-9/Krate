@@ -7,6 +7,7 @@ and per-build overrides from catalog/announcements.json and catalog/artifact-ove
 Real errors abort the run (exit non-zero) rather than publishing a partial or fabricated
 manifest - section 34 of the spec: never silently claim success.
 """
+import base64
 import datetime
 import hashlib
 import json
@@ -18,6 +19,8 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+from apk_icon import icon_png
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_DIR = REPO_ROOT / "catalog"
@@ -155,15 +158,31 @@ def badging(apk_path):
     }
 
 
+def launcher_icon(apk_path):
+    """The launcher icon as base64 PNG, or None - never fatal, an app without one just keeps the
+    manager's lettered placeholder."""
+    try:
+        png = icon_png(find_build_tool("aapt2"), apk_path)
+    except Exception as exc:  # noqa: BLE001 - an icon is cosmetic, see docstring
+        print(f"Could not render the icon of {apk_path}: {exc}", file=sys.stderr)
+        return None
+    return base64.b64encode(png).decode("ascii") if png else None
+
+
 def inspect_apk(cache, asset, url, authenticated, token):
-    """sha256, signing certificate and badging for one release asset, from the cache when this
-    exact asset was already inspected on an earlier run."""
+    """sha256, signing certificate, badging and launcher icon for one release asset, from the cache
+    when this exact asset was already inspected on an earlier run."""
     key = str(asset["id"])
-    if key in cache:
+    if key in cache and "icon" in cache[key]:
         return cache[key]
     apk_path = WORK_DIR / f"asset-{asset['id']}.apk"
     download(url, apk_path, authenticated=authenticated, token=token)
-    facts = {"sha256": sha256_of(apk_path), "certificateSha256": certificate_sha256(apk_path), **badging(apk_path)}
+    facts = {
+        "sha256": sha256_of(apk_path),
+        "certificateSha256": certificate_sha256(apk_path),
+        **badging(apk_path),
+        "icon": launcher_icon(apk_path),
+    }
     apk_path.unlink()
     cache[key] = facts
     return facts
@@ -229,6 +248,7 @@ def artifacts_from_public_source(app, source, cache):
                 "label": None,
                 "releaseNotes": release_notes(release),
                 "publishedAt": release.get("published_at"),
+                "_icon": facts.get("icon"),
             }
         )
         if len(artifacts) == retain:
@@ -283,6 +303,7 @@ def artifacts_from_private_source(app, source, cache, releases_by_repo):
                 "label": metadata.get("profileLabel"),
                 "releaseNotes": release_notes(release),
                 "publishedAt": release.get("published_at"),
+                "_icon": facts.get("icon"),
             }
         )
     # one build per patches release, newest patches first, the same rule prune uses: every build
@@ -408,6 +429,9 @@ def main():
 
         apply_overrides(app["id"], artifacts, overrides)
         newest = next((a for a in artifacts if not a.get("withdrawn")), artifacts[0])
+        icon = newest.get("_icon") or next((a["_icon"] for a in artifacts if a.get("_icon")), None)
+        for artifact in artifacts:
+            artifact.pop("_icon", None)
         apps_out.append(
             {
                 "id": app["id"],
@@ -420,6 +444,8 @@ def main():
                 # app-level notes are the newest build's, kept for managers that predate per-build notes
                 "releaseNotes": newest.get("releaseNotes"),
                 "enabled": app["enabled"],
+                # shown until the app is installed and its real icon can be read on the device
+                "iconPng": icon,
             }
         )
 
