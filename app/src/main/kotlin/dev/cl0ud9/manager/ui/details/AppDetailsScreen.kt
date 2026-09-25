@@ -324,12 +324,7 @@ private fun AppDetailsHeader(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        AppIconAvatar(
-                            displayName = app.displayName,
-                            seed = app.id,
-                            size = 56.dp,
-                            packageName = app.packageName,
-                        )
+                        AppIconAvatar(app = app, size = 56.dp)
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(text = app.displayName, style = MaterialTheme.typography.headlineSmall)
                             Text(

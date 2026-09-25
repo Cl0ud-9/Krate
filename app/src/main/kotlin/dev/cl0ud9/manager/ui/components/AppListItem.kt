@@ -55,7 +55,7 @@ fun AppListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AppIconAvatar(displayName = app.displayName, seed = app.id, packageName = app.packageName)
+            AppIconAvatar(app = app)
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = app.displayName, style = MaterialTheme.typography.titleMedium)

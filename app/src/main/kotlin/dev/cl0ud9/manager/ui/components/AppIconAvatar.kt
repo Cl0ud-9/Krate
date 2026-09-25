@@ -1,6 +1,8 @@
 package dev.cl0ud9.manager.ui.components
 
+import android.graphics.BitmapFactory
 import android.graphics.drawable.Drawable
+import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -24,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import dev.cl0ud9.manager.domain.model.AppProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -43,28 +46,29 @@ private val AvatarPalette =
         Color(0xFFD81B60),
     )
 
-// shows the app's real launcher icon when it's installed on this device (or a catalog artifact has
-// been fetched into PackageManager's cache), and falls back to a lettered avatar otherwise - most of
-// the catalog's own apps are installed, so a wall of identical generic icons was misleading
+// shows the app's real launcher icon when it's installed on this device, else the icon the catalog
+// ships for it (rendered from its APK), and only falls back to a lettered avatar when neither exists
 @Composable
 fun AppIconAvatar(
-    displayName: String,
-    seed: String,
+    app: AppProfile,
     modifier: Modifier = Modifier,
     size: Dp = DEFAULT_AVATAR_SIZE,
-    packageName: String? = null,
 ) {
+    val displayName = app.displayName
+    val seed = app.id
+    val packageName = app.packageName
+    val catalogIconPng = app.iconPng
     val context = LocalContext.current
     val realIcon by
-        produceState<ImageBitmap?>(initialValue = null, packageName) {
+        produceState<ImageBitmap?>(initialValue = null, packageName, catalogIconPng) {
             value =
-                packageName?.let { pkg ->
-                    withContext(Dispatchers.IO) {
-                        runCatching { context.packageManager.getApplicationIcon(pkg) }
+                withContext(Dispatchers.IO) {
+                    val installed =
+                        runCatching { context.packageManager.getApplicationIcon(packageName) }
                             .getOrNull()
                             ?.let(Drawable::toBitmap)
                             ?.asImageBitmap()
-                    }
+                    installed ?: catalogIconPng?.let(::decodeCatalogIcon)
                 }
         }
 
@@ -108,3 +112,9 @@ fun AppIconAvatar(
 }
 
 private const val CONTRAST_LUMINANCE_THRESHOLD = 0.5f
+
+private fun decodeCatalogIcon(base64Png: String): ImageBitmap? =
+    runCatching {
+        val bytes = Base64.decode(base64Png, Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }.getOrNull()

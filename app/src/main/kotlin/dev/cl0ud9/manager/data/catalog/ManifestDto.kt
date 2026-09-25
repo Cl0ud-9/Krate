@@ -54,6 +54,7 @@ data class ManifestAppDto(
     val artifacts: List<ManifestArtifactDto> = emptyList(),
     val releaseNotes: String? = null,
     val enabled: Boolean = true,
+    val iconPng: String? = null,
 )
 
 @Serializable
@@ -112,6 +113,7 @@ fun ManifestAppDto.toDomain(device: DeviceProfile): AppProfile? {
         releaseNotes = releaseNotes,
         enabled = enabled,
         artifacts = artifacts.filter { it.fitsDevice(device) }.map { it.toDomain() },
+        iconPng = iconPng,
     )
 }
 

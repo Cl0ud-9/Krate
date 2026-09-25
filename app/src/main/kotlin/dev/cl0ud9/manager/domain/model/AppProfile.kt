@@ -41,6 +41,8 @@ data class AppProfile(
     val enabled: Boolean,
     // newest first; empty for a local seed entry with nothing real to download yet
     val artifacts: List<ArtifactInfo>,
+    // launcher icon from the catalog (base64 PNG), shown until the app is installed on the device
+    val iconPng: String? = null,
 )
 
 // a withdrawn build stays listed in version history but is never the one offered as the update
