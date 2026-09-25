@@ -37,6 +37,8 @@ import dev.cl0ud9.manager.ui.components.ReopenPromptButton
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.StatusRow
 import dev.cl0ud9.manager.ui.theme.ShapeCache
+import dev.cl0ud9.manager.voice.Moment
+import dev.cl0ud9.manager.voice.rememberKrateLine
 
 @Composable
 internal fun DownloadSection(
@@ -137,7 +139,7 @@ private fun DownloadStatusContent(
             StatusRow(
                 icon = painterResource(R.drawable.ic_error_rounded),
                 tint = MaterialTheme.colorScheme.error,
-                text = status.reason,
+                text = "${rememberKrateLine(Moment.DOWNLOAD_FAILED, key = status.reason)} ${status.reason}",
             )
             // a failed redownload attempt used to hide the Open button entirely, even when the
             // already-installed app is perfectly fine - isUpToDate here is the same check IdleContent

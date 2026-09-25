@@ -100,7 +100,7 @@ private fun SelfUpdateInstallingContent(installStatus: InstallStatus) {
             ManagerLinearProgress(progress = null)
             HelperText(
                 "Confirm the update in the system dialog. Android may run a Play Protect check first, which " +
-                    "is normal for apps from outside the Play Store. App Manager closes to finish updating; a " +
+                    "is normal for apps from outside the Play Store. Krate closes to finish updating; a " +
                     "notification lets you open it again.",
             )
             ReopenPromptButton()

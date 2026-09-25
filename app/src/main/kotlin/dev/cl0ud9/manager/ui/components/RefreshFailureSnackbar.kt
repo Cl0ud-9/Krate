@@ -17,11 +17,11 @@ import kotlinx.coroutines.flow.Flow
 @Composable
 fun BoxScope.RefreshFailureSnackbar(
     refreshFailed: Flow<Unit>,
-    message: String,
+    message: () -> String,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(refreshFailed) {
-        refreshFailed.collect { snackbarHostState.showSnackbar(message) }
+        refreshFailed.collect { snackbarHostState.showSnackbar(message()) }
     }
     SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
 }

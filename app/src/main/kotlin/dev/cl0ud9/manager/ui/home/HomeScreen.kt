@@ -51,6 +51,8 @@ import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.formatRelativeTime
 import dev.cl0ud9.manager.ui.util.managerViewModel
+import dev.cl0ud9.manager.voice.Moment
+import dev.cl0ud9.manager.voice.rememberKrateLine
 
 private const val MAX_ACTIVITY_ROWS = 5
 
@@ -173,21 +175,16 @@ private fun StatusHeroCard(
                 modifier = Modifier.size(36.dp),
             )
             Text(
-                text =
-                    when {
-                        upToDate -> "You're all caught up"
-                        pendingUpdateCount == 1 -> "1 update available"
-                        else -> "$pendingUpdateCount updates available"
-                    },
+                text = rememberKrateLine(if (upToDate) Moment.ALL_CAUGHT_UP else Moment.UPDATES_WAITING),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text =
-                    if (upToDate) {
-                        "Every installed app matches the catalog's latest version."
-                    } else {
-                        "Review and install the latest versions from the Updates tab."
+                    when {
+                        upToDate -> "Every installed app is on its latest version."
+                        pendingUpdateCount == 1 -> "1 update is ready to install."
+                        else -> "$pendingUpdateCount updates are ready to install."
                     },
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -218,8 +215,9 @@ private fun RecentActivitySection(entries: List<ActivityEntry>) {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         ) {
             if (entries.isEmpty()) {
+                val headline = rememberKrateLine(Moment.NOTHING_UNPACKED)
                 Text(
-                    text = "Installs and updates you run will show up here.",
+                    text = "$headline Installs and updates you run will show up here.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp),

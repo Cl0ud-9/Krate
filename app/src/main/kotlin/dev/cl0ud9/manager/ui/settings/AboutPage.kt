@@ -78,6 +78,13 @@ fun AboutPage(
             shape = settingsGroupShape(0, 1),
             onClick = { uriHandler.openUri(SOURCE_URL) },
         )
+        // the Krate mark and notification icon are Font Awesome Free icons, CC BY 4.0
+        Text(
+            text = "Krate icons from Font Awesome Free, CC BY 4.0.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 12.dp, top = 16.dp),
+        )
     }
     if (showChangelog) {
         ChangelogSheet(onDismiss = { showChangelog = false })
@@ -96,7 +103,7 @@ private fun AboutHeroCard(versionName: String) {
                 ManagerIcon()
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "App Manager",
+                        text = "Krate",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )

@@ -224,10 +224,10 @@ class AppDetailsViewModel(
                     downloadProgressNotifier.onVerifying(currentApp.id, currentApp.displayName)
 
                 is DownloadStatus.ReadyToInstall ->
-                    downloadProgressNotifier.onComplete(currentApp.id, currentApp.displayName)
+                    downloadProgressNotifier.onComplete(currentApp)
 
                 is DownloadStatus.Failed -> {
-                    downloadProgressNotifier.onFailed(currentApp.id, currentApp.displayName, status.reason)
+                    downloadProgressNotifier.onFailed(currentApp, status.reason)
                     recordActivity(currentApp, ActivityAction.FAILED, "Download: ${status.reason}")
                 }
 

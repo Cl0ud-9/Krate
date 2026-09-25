@@ -2,6 +2,9 @@ package dev.cl0ud9.manager.ui.navigation
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.navigation.NavGraphBuilder
@@ -9,6 +12,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.ui.apps.AppsScreen
 import dev.cl0ud9.manager.ui.components.HomeChangelogAction
 import dev.cl0ud9.manager.ui.details.AppDetailsScreen
@@ -22,6 +26,7 @@ import dev.cl0ud9.manager.ui.settings.SettingsPageRoute
 import dev.cl0ud9.manager.ui.settings.SettingsScreen
 import dev.cl0ud9.manager.ui.settings.SettingsShortcutAction
 import dev.cl0ud9.manager.ui.updates.UpdatesScreen
+import dev.cl0ud9.manager.voice.KrateVoice
 
 private const val APP_DETAILS_ROUTE = "apps/{appId}"
 private const val APP_ID_ARG = "appId"
@@ -31,10 +36,14 @@ private const val APP_ID_ARG = "appId"
 internal fun NavGraphBuilder.tabDestinations(navController: NavHostController) {
     val openSettings = { navController.navigate(ManagerDestination.SETTINGS.route) { launchSingleTop = true } }
     composable(ManagerDestination.HOME.route) { entry ->
+        val context = LocalContext.current
         TabScreen(
             title = stringResource(ManagerDestination.HOME.titleRes),
             navController = navController,
             entry = entry,
+            titleIcon = painterResource(R.drawable.ic_krate),
+            // picked once per launch; saved state keeps it through tab switches and rotation
+            subtitle = rememberSaveable { KrateVoice.greeting(context) },
             actions = {
                 HomeChangelogAction()
                 SettingsShortcutAction(onClick = openSettings)

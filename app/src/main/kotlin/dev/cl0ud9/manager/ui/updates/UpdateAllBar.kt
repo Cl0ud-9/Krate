@@ -22,6 +22,8 @@ import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
+import dev.cl0ud9.manager.voice.Moment
+import dev.cl0ud9.manager.voice.rememberKrateLine
 
 // section 23 + 42.21 of the spec: Update All as its own card above the pending list, with a running
 // status while it works and a result summary when it's done - not a silent all-or-nothing batch
@@ -125,12 +127,21 @@ private fun DoneContent(
                 MaterialTheme.colorScheme.onErrorContainer
             },
     )
+    val headline =
+        rememberKrateLine(
+            when {
+                failed == 0 -> Moment.INSTALLED
+                succeeded == 0 -> Moment.INSTALL_FAILED
+                else -> Moment.PARTLY_INSTALLED
+            },
+            key = "$succeeded/$failed",
+        )
     Text(
         text =
             if (failed == 0) {
-                "All $succeeded app${if (succeeded == 1) "" else "s"} updated."
+                "$headline All $succeeded app${if (succeeded == 1) "" else "s"} updated."
             } else {
-                "$succeeded updated, $failed failed."
+                "$headline $succeeded updated, $failed failed."
             },
         style = MaterialTheme.typography.bodyMedium,
     )

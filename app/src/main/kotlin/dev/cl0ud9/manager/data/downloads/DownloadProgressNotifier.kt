@@ -1,5 +1,7 @@
 package dev.cl0ud9.manager.data.downloads
 
+import dev.cl0ud9.manager.domain.model.AppProfile
+
 // surfaces a download's state while the app itself isn't on screen to show it - callers report
 // every state transition unconditionally, the implementation decides whether that's actually worth
 // showing (e.g. progress only while the app is backgrounded, since the in-app UI already covers
@@ -18,14 +20,10 @@ interface DownloadProgressNotifier {
         appName: String,
     )
 
-    fun onComplete(
-        appId: String,
-        appName: String,
-    )
+    fun onComplete(app: AppProfile)
 
     fun onFailed(
-        appId: String,
-        appName: String,
+        app: AppProfile,
         reason: String,
     )
 

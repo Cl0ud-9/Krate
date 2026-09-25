@@ -39,7 +39,7 @@ class ManifestCheckWorker(
                     val downloaded = downloadInBackground(container, pending)
                     UpdateNotifier.notifyPendingUpdates(
                         applicationContext,
-                        pending.map { it.displayName },
+                        pending,
                         pendingUpdatesSignature(pending),
                         downloaded,
                     )

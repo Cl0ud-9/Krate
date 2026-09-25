@@ -36,6 +36,9 @@ import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
 import dev.cl0ud9.manager.ui.util.rememberDebouncedOnClick
+import dev.cl0ud9.manager.voice.KrateVoice
+import dev.cl0ud9.manager.voice.Moment
+import dev.cl0ud9.manager.voice.rememberKrateLine
 
 // curated application catalog, section 30 of the spec
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -67,7 +70,7 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
         }
         RefreshFailureSnackbar(
             refreshFailed = viewModel.refreshFailed,
-            message = "Couldn't refresh - showing the last known catalog.",
+            message = { "${KrateVoice.line(Moment.REFRESH_FAILED)} Couldn't refresh, showing the last known catalog." },
         )
     }
 }
@@ -98,8 +101,8 @@ private fun AppsContent(
             is AppsUiState.Empty -> {
                 EmptyState(
                     icon = rememberVectorPainter(Icons.Filled.Apps),
-                    title = "No apps in the catalog yet",
-                    subtitle = "Curated apps will appear here once the catalog is populated.",
+                    title = rememberKrateLine(Moment.EMPTY_CATALOG),
+                    subtitle = "Apps will appear here once the catalog is populated.",
                 )
             }
 

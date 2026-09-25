@@ -1,0 +1,20 @@
+Font Awesome Free
+Source: https://fontawesome.com (Font Awesome Free v7.3.1)
+Copyright 2026 Fonticons, Inc.
+License: Icons - Creative Commons Attribution 4.0 International (CC BY 4.0)
+         https://fontawesome.com/license/free
+         https://creativecommons.org/licenses/by/4.0/
+
+Two Font Awesome Free icons are used, converted from their SVG path data into
+Android vector drawables. The shapes are unchanged; they are only scaled and
+positioned for each use:
+
+  Krate brand mark (app icon, in-app logo)
+    app/src/main/res/drawable/ic_krate.xml
+    app/src/main/res/drawable/ic_launcher_foreground.xml
+    app/src/main/res/drawable/ic_launcher_monochrome.xml
+
+  Notification icon
+    app/src/main/res/drawable/ic_stat_krate.xml
+
+The app credits Font Awesome on its About page.

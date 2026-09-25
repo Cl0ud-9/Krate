@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,11 +42,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,7 +62,6 @@ import dev.cl0ud9.manager.domain.model.LaunchTab
 import dev.cl0ud9.manager.domain.model.NavBarStyle
 import dev.cl0ud9.manager.platform.appContainer
 import dev.cl0ud9.manager.ui.components.ManagerNavigationBarItem
-import dev.cl0ud9.manager.ui.theme.ManagerHeroTitle
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.theme.rememberHeroGradient
 
@@ -383,12 +383,16 @@ private fun ManagerNavGraph(
 private val TabContentPanelRadius = 28.dp
 private val TabHeaderExtraHeight = 28.dp
 
+// titleIcon and subtitle are Home's Krate mark and launch greeting - the other tabs are title-only
+@Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AnimatedContentScope.TabScreen(
     title: String,
     navController: NavHostController,
     entry: NavBackStackEntry,
+    titleIcon: Painter? = null,
+    subtitle: String? = null,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit,
 ) {
@@ -406,14 +410,24 @@ internal fun AnimatedContentScope.TabScreen(
             topBar = {
                 Column {
                     TopAppBar(
-                        title = { Text(title, style = ManagerHeroTitle, color = MaterialTheme.colorScheme.primary) },
+                        title = { TabTitle(title = title, icon = titleIcon) },
                         actions = actions,
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                     )
                     // extra breathing room under the title/icons instead of the wash cutting off right
                     // at the stock app-bar's own tight height - the header strip carries a
                     // full tab row's worth of space even on a title-only screen like this one
-                    Spacer(modifier = Modifier.height(TabHeaderExtraHeight))
+                    Box(modifier = Modifier.height(TabHeaderExtraHeight).padding(horizontal = 16.dp)) {
+                        if (subtitle != null) {
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
             },
             containerColor = Color.Transparent,

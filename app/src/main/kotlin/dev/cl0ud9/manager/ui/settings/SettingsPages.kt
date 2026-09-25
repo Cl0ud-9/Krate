@@ -150,8 +150,8 @@ internal fun ManagerUpdateBanner(
     onClick: () -> Unit,
 ) {
     SettingsNavRow(
-        icon = painterResource(R.drawable.ic_system_update_alt_rounded),
-        title = "App Manager $latestVersion is available",
+        icon = painterResource(R.drawable.ic_krate),
+        title = "Krate $latestVersion is available",
         subtitle = "Tap to update",
         colors =
             SettingsRowColors(

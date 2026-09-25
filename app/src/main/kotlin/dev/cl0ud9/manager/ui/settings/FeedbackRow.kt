@@ -257,7 +257,7 @@ private fun shareFeedbackIntent(
     return Intent(Intent.ACTION_SEND)
         .apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "App Manager feedback")
+            putExtra(Intent.EXTRA_SUBJECT, "Krate feedback")
             putExtra(Intent.EXTRA_TEXT, body)
         }.let { Intent.createChooser(it, "Send feedback with") }
 }
@@ -266,7 +266,7 @@ private fun shareTextIntent(text: String): Intent =
     Intent(Intent.ACTION_SEND)
         .apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "App Manager diagnostic report")
+            putExtra(Intent.EXTRA_SUBJECT, "Krate diagnostic report")
             putExtra(Intent.EXTRA_TEXT, text)
         }.let { Intent.createChooser(it, "Share diagnostic report") }
 

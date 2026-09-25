@@ -8,12 +8,17 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import dev.cl0ud9.manager.EXTRA_TARGET_ROUTE
 import dev.cl0ud9.manager.MainActivity
 import dev.cl0ud9.manager.R
+import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.platform.notifications.NotificationIcons
+import dev.cl0ud9.manager.voice.KrateVoice
+import dev.cl0ud9.manager.voice.Moment
 
 // "_v2", not just "updates": a notification channel's importance can't be changed after it's first
 // created under a given id - Android ignores createNotificationChannel() for an id that already
@@ -42,7 +47,7 @@ object UpdateNotifier {
         val manager = context.getSystemService(NotificationManager::class.java)
         val channel =
             NotificationChannel(CHANNEL_ID, "Updates", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Notifies about catalog app updates, manager updates, and Update All results"
+                description = "Notifies about app updates, Krate updates, and Update All results"
             }
         manager?.createNotificationChannel(channel)
     }
@@ -51,7 +56,7 @@ object UpdateNotifier {
     // periodic check that finds the same updates still waiting stays quiet instead of buzzing again
     fun notifyPendingUpdates(
         context: Context,
-        appNames: List<String>,
+        apps: List<AppProfile>,
         signature: String,
         downloaded: Boolean,
     ) {
@@ -60,15 +65,28 @@ object UpdateNotifier {
         prefs.edit().putString(KEY_PENDING_SIGNATURE, signature).apply()
         // names the apps instead of only counting them - "Videoapp (Patched) has an update" says what
         // to do with it at a glance, a bare "1 update available" doesn't
-        val title = appNames.singleOrNull()?.let { "Update for $it" } ?: "${appNames.size} updates available"
-        val action = if (downloaded) "Downloaded and ready to install." else "Tap to review and install."
+        val single = apps.singleOrNull()
         notify(
             context = context,
             id = PENDING_UPDATES_NOTIFICATION_ID,
-            title = title,
-            text = if (appNames.size > 1) "${appNames.joinToString(", ")}. $action" else action,
+            title = KrateVoice.line(Moment.UPDATES_WAITING),
+            text = pendingUpdatesText(apps.map { it.displayName }, downloaded),
             targetRoute = "updates",
+            largeIcon = single?.let { NotificationIcons.app(context, it) },
         )
+    }
+
+    private fun pendingUpdatesText(
+        appNames: List<String>,
+        downloaded: Boolean,
+    ): String {
+        val single = appNames.singleOrNull()
+        return when {
+            single != null && downloaded -> "$single has an update, downloaded and ready to install."
+            single != null -> "$single has an update. Tap to review and install."
+            downloaded -> "${appNames.size} updates: ${appNames.joinToString(", ")}. Downloaded and ready to install."
+            else -> "${appNames.size} updates: ${appNames.joinToString(", ")}. Tap to review and install."
+        }
     }
 
     // nothing pending anymore (installed, or the catalog withdrew it) - a leftover notification
@@ -90,10 +108,11 @@ object UpdateNotifier {
         notify(
             context = context,
             id = MANAGER_UPDATE_NOTIFICATION_ID,
-            title = "App Manager $version is available",
-            text = "Tap to update now.",
+            title = KrateVoice.line(Moment.KRATE_UPDATE_AVAILABLE),
+            text = "Krate $version is available. Tap to update.",
             // Settings checks on open and offers the in-app Update button right there
             targetRoute = "settings",
+            largeIcon = NotificationIcons.krate(context),
         )
     }
 
@@ -106,9 +125,10 @@ object UpdateNotifier {
         notify(
             context = context,
             id = MANAGER_UPDATED_NOTIFICATION_ID,
-            title = version?.let { "App Manager updated to $it" } ?: "App Manager updated",
-            text = "Tap to open.",
+            title = KrateVoice.line(Moment.KRATE_UPDATED),
+            text = version?.let { "Krate $it is installed. Tap to open." } ?: "Krate is updated. Tap to open.",
             targetRoute = "home",
+            largeIcon = NotificationIcons.krate(context),
         )
     }
 
@@ -125,17 +145,25 @@ object UpdateNotifier {
         succeeded: Int,
         failed: Int,
     ) {
-        val title =
+        val moment =
             when {
-                failed == 0 -> if (succeeded == 1) "App updated" else "All $succeeded apps updated"
-                succeeded == 0 -> if (failed == 1) "Update failed" else "$failed updates failed"
-                else -> "$succeeded updated, $failed failed"
+                failed == 0 -> Moment.INSTALLED
+                succeeded == 0 -> Moment.INSTALL_FAILED
+                else -> Moment.PARTLY_INSTALLED
+            }
+        val text =
+            when {
+                failed == 0 && succeeded == 1 -> "1 app updated. Everything is up to date."
+                failed == 0 -> "All $succeeded apps updated. Everything is up to date."
+                succeeded == 0 && failed == 1 -> "1 update failed. Tap to see what went wrong."
+                succeeded == 0 -> "$failed updates failed. Tap to see what went wrong."
+                else -> "$succeeded updated, $failed failed. Tap to see what went wrong."
             }
         notify(
             context = context,
             id = UPDATE_ALL_RESULT_NOTIFICATION_ID,
-            title = title,
-            text = if (failed == 0) "Everything is up to date." else "Tap to see what went wrong.",
+            title = KrateVoice.line(moment),
+            text = text,
             targetRoute = "updates",
         )
     }
@@ -144,12 +172,14 @@ object UpdateNotifier {
     // a declined/never-granted permission means silently skipping the notification, not a failure.
     // Checked inline, not via a helper function - lint's flow analysis for NotificationManagerCompat
     // .notify() doesn't trace a permission check across a function boundary.
+    @Suppress("LongParameterList")
     private fun notify(
         context: Context,
         id: Int,
         title: String,
         text: String,
         targetRoute: String,
+        largeIcon: Bitmap? = null,
     ) {
         val granted =
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -171,7 +201,8 @@ object UpdateNotifier {
         val notification =
             NotificationCompat
                 .Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_update)
+                .setSmallIcon(R.drawable.ic_stat_krate)
+                .setLargeIcon(largeIcon)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(text))

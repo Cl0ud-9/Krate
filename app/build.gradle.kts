@@ -27,8 +27,8 @@ android {
         applicationId = "dev.cl0ud9.manager"
         minSdk = 30
         targetSdk = 37
-        versionCode = 15
-        versionName = "0.2.7"
+        versionCode = 16
+        versionName = "0.2.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

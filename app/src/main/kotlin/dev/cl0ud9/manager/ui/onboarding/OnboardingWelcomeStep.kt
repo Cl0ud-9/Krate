@@ -48,7 +48,7 @@ internal fun WelcomeStepContent() {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_nav_apps_filled),
+                painter = painterResource(R.drawable.ic_krate),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(WelcomeHeroIconSize),

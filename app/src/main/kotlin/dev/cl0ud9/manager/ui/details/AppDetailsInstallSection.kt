@@ -26,6 +26,8 @@ import dev.cl0ud9.manager.ui.components.HelperText
 import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
 import dev.cl0ud9.manager.ui.components.ReopenPromptButton
 import dev.cl0ud9.manager.ui.components.StatusRow
+import dev.cl0ud9.manager.voice.Moment
+import dev.cl0ud9.manager.voice.rememberKrateLine
 
 // section 16 of the spec: the ui shows Install, Update, Reinstall or Roll back based on real device
 // state compared against whichever build is currently selected (App Details' version history lets
@@ -126,7 +128,7 @@ private fun InstallStatusContent(
             StatusRow(
                 icon = painterResource(R.drawable.ic_check_circle_rounded),
                 tint = MaterialTheme.colorScheme.primary,
-                text = "Installed.",
+                text = "${rememberKrateLine(Moment.INSTALLED)} ${state.app.displayName} is installed.",
             )
             // previously nothing followed this message - the app was reachable again only after
             // leaving and re-entering App Details (which re-derives downloadStatus back to Idle and
@@ -155,7 +157,9 @@ private fun FailedInstallSection(
     onRetryAsCleanInstall: () -> Unit,
 ) {
     val reasonText = if (failure.rolledBack) "${failure.reason} The previous version was restored." else failure.reason
-    FailureStatusRow(failure = failure, text = reasonText)
+    // saying no in the system dialog isn't a mishap, so a cancel gets no headline
+    val headline = if (failure.userCancelled) null else rememberKrateLine(Moment.INSTALL_FAILED, key = failure.reason)
+    FailureStatusRow(failure = failure, text = listOfNotNull(headline, reasonText).joinToString(" "))
 
     // reinstalling from scratch only means something for a real failure on an app that's already
     // installed - not after the user said no, and not for a first install
@@ -207,7 +211,7 @@ private fun ReadyToInstallContent(
     StatusRow(
         icon = painterResource(R.drawable.ic_check_circle_rounded),
         tint = MaterialTheme.colorScheme.tertiary,
-        text = "Downloaded and checked. Ready to install.",
+        text = "${rememberKrateLine(Moment.DOWNLOADED)} Downloaded and checked, ready to install.",
     )
     Button(
         onClick = onInstall,

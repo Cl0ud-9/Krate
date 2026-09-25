@@ -39,6 +39,8 @@ import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import dev.cl0ud9.manager.ui.components.ManagerSwitch
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.DebouncedButtonState
+import dev.cl0ud9.manager.voice.Moment
+import dev.cl0ud9.manager.voice.rememberKrateLine
 
 // an index of categories, each opening its own page - a short list you can take in at a glance,
 // grouped under section labels, instead of every control stacked on one long page. A waiting
@@ -88,8 +90,8 @@ fun SettingsScreen(
             onClick = { onNavigate(SettingsPageRoute.FEEDBACK) },
         )
         SettingsNavRow(
-            icon = painterResource(R.drawable.ic_info_rounded),
-            title = "About",
+            icon = painterResource(R.drawable.ic_krate),
+            title = "About Krate",
             subtitle = "Version ${rememberVersionName()}, updates, what's new",
             colors =
                 SettingsRowColors(
@@ -167,8 +169,8 @@ internal fun AboutRow(
     SettingsRow(
         header =
             SettingsRowHeader(
-                icon = painterResource(R.drawable.ic_system_update_alt_rounded),
-                title = "App Manager updates",
+                icon = painterResource(R.drawable.ic_krate),
+                title = "Krate updates",
                 subtitle = "Installed version $versionName",
                 colors =
                     SettingsRowColors(
@@ -238,7 +240,7 @@ private fun ManagerUpdateSection(
                         icon = painterResource(R.drawable.ic_system_update_alt_rounded),
                         badgeColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        text = "Check for a newer version of App Manager.",
+                        text = "Check for a newer version of Krate.",
                     )
                     FilledTonalButton(
                         onClick = actions.checkForUpdateState.onClick,
@@ -264,7 +266,10 @@ private fun ManagerUpdateSection(
                         ) {
                             Box(modifier = Modifier.size(18.dp)) { LoadingIndicator() }
                         }
-                        Text(text = "Checking for updates...", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = rememberKrateLine(Moment.CHECKING_FOR_UPDATES),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
                 }
 
@@ -286,7 +291,7 @@ private fun ManagerUpdateResultContent(
                 icon = painterResource(R.drawable.ic_check_circle_rounded),
                 badgeColor = MaterialTheme.colorScheme.tertiaryContainer,
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                text = "You're on the latest version.",
+                text = "${rememberKrateLine(Moment.KRATE_LATEST)} You're on the latest version.",
             )
             CheckAgainButton(state = actions.checkForUpdateState)
         }
@@ -311,7 +316,7 @@ private fun ManagerUpdateResultContent(
                 icon = painterResource(R.drawable.ic_info_rounded),
                 badgeColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                text = "No manager releases have been published yet.",
+                text = "No Krate releases have been published yet.",
             )
             CheckAgainButton(state = actions.checkForUpdateState)
         }

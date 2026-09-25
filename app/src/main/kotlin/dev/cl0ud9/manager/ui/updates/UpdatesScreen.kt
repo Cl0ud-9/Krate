@@ -33,6 +33,9 @@ import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
 import dev.cl0ud9.manager.ui.util.rememberDebouncedOnClick
+import dev.cl0ud9.manager.voice.KrateVoice
+import dev.cl0ud9.manager.voice.Moment
+import dev.cl0ud9.manager.voice.rememberKrateLine
 
 // pending updates with individual actions plus Update All, section 30 + 23/42.21 of the spec
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -82,7 +85,7 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
         }
         RefreshFailureSnackbar(
             refreshFailed = viewModel.refreshFailed,
-            message = "Couldn't refresh - showing the last known list.",
+            message = { "${KrateVoice.line(Moment.REFRESH_FAILED)} Couldn't refresh, showing the last known list." },
         )
     }
 }
@@ -113,8 +116,8 @@ private fun UpdatesContent(
             is UpdatesUiState.UpToDate -> {
                 EmptyState(
                     icon = painterResource(R.drawable.ic_check_circle_rounded),
-                    title = "You're all caught up",
-                    subtitle = "Installed apps matching the catalog's latest version have nothing pending.",
+                    title = rememberKrateLine(Moment.ALL_CAUGHT_UP),
+                    subtitle = "Every installed app is on its latest version.",
                 )
             }
 

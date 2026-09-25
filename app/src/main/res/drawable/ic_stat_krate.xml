@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- notification small icon (Font Awesome Free, CC BY 4.0): a white silhouette the system tints, 20dp inside 24dp -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <group
+        android:scaleX="0.040984"
+        android:scaleY="0.040984"
+        android:translateX="-0.295"
+        android:translateY="-1.934">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M192,384L88.5,384C63.6,384 48.3,356.9 61.1,335.5C122.7,232.8 138.3,224 155.2,224L250.2,224C326.3,95.1 439.8,88.6 515.7,99.7C528.5,101.6 538.5,111.6 540.3,124.3C551.4,200.2 544.9,313.7 416,389.8L416,484.8C416,501.7 407.2,517.3 392.7,526L304.5,578.9C283.2,591.7 256,576.3 256,551.5L256,448C256,412.7 227.3,384 192,384L191.9,384ZM464,224C464,197.5 442.5,176 416,176C389.5,176 368,197.5 368,224C368,250.5 389.5,272 416,272C442.5,272 464,250.5 464,224Z" />
+    </group>
+</vector>

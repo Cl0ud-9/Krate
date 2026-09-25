@@ -343,7 +343,7 @@ private fun StepBody(
                 icons = INSTALL_STEP_ICONS,
                 title = "Allow installs from this app",
                 body =
-                    "App Manager installs and updates apps directly, the same way an app store " +
+                    "Krate installs and updates apps directly, the same way an app store " +
                         "would. Android requires a one-time permission for that.",
                 action =
                     OnboardingAction(

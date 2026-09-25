@@ -124,7 +124,7 @@ class ManagerSelfUpdateInstaller(
     private fun selfProfile(): AppProfile =
         AppProfile(
             id = "manager-self-update",
-            displayName = "App Manager",
+            displayName = "Krate",
             packageName = context.packageName,
             supportStatus = SupportStatus.SUPPORTED,
             installationMode = InstallationMode.UPDATE,

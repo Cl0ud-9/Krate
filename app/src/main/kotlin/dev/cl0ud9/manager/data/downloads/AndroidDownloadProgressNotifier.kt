@@ -17,6 +17,10 @@ import dev.cl0ud9.manager.EXTRA_APP_ID
 import dev.cl0ud9.manager.EXTRA_TARGET_ROUTE
 import dev.cl0ud9.manager.MainActivity
 import dev.cl0ud9.manager.R
+import dev.cl0ud9.manager.domain.model.AppProfile
+import dev.cl0ud9.manager.platform.notifications.NotificationIcons
+import dev.cl0ud9.manager.voice.KrateVoice
+import dev.cl0ud9.manager.voice.Moment
 
 // "_v2", not just "downloads": this channel originally shipped at IMPORTANCE_LOW, and Android
 // permanently locks a channel's importance the first time it's created under a given id - deleting
@@ -114,34 +118,33 @@ class AndroidDownloadProgressNotifier(
     // posted even if the app has since come back to the foreground, as long as it was backgrounded
     // at the actual moment the download finished - if the app was in the foreground the whole time,
     // the live UI already showed this, so a notification on top of that would be pure noise
-    override fun onComplete(
-        appId: String,
-        appName: String,
-    ) {
-        activeAppIds -= appId
+    override fun onComplete(app: AppProfile) {
+        activeAppIds -= app.id
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
         if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
+        val text = "${app.displayName} is downloaded and checked. Tap to install."
         val notification =
-            terminalBuilder(appId, "$appName downloaded", android.R.drawable.stat_sys_download_done)
-                .setContentText("Ready to install. Tap to install.")
+            terminalBuilder(app, KrateVoice.line(Moment.DOWNLOADED))
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .build()
-        NotificationManagerCompat.from(context).notify(notificationIdFor(appId), notification)
+        NotificationManagerCompat.from(context).notify(notificationIdFor(app.id), notification)
     }
 
     override fun onFailed(
-        appId: String,
-        appName: String,
+        app: AppProfile,
         reason: String,
     ) {
-        activeAppIds -= appId
+        activeAppIds -= app.id
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
         if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
+        val text = "${app.displayName} couldn't be downloaded. $reason"
         val notification =
-            terminalBuilder(appId, "$appName download failed", android.R.drawable.stat_notify_error)
-                .setContentText(reason)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(reason))
+            terminalBuilder(app, KrateVoice.line(Moment.DOWNLOAD_FAILED))
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .build()
-        NotificationManagerCompat.from(context).notify(notificationIdFor(appId), notification)
+        NotificationManagerCompat.from(context).notify(notificationIdFor(app.id), notification)
     }
 
     override fun clear(appId: String) {
@@ -166,17 +169,18 @@ class AndroidDownloadProgressNotifier(
             .setPriority(NotificationCompat.PRIORITY_LOW)
 
     // dismissible (not ongoing) and NOT silent, unlike the in-progress builder above - this is a
-    // one-shot result the user should actually notice, not a running-task indicator
+    // one-shot result the user should actually notice, not a running-task indicator. The app's own
+    // icon as the large icon says which app it's about
     private fun terminalBuilder(
-        appId: String,
+        app: AppProfile,
         title: String,
-        smallIcon: Int,
     ): NotificationCompat.Builder =
         NotificationCompat
             .Builder(context, CHANNEL_ID)
-            .setSmallIcon(smallIcon)
+            .setSmallIcon(R.drawable.ic_stat_krate)
+            .setLargeIcon(NotificationIcons.app(context, app))
             .setContentTitle(title)
-            .setContentIntent(openAppIntent(appId))
+            .setContentIntent(openAppIntent(app.id))
             .setAutoCancel(true)
             .setOngoing(false)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

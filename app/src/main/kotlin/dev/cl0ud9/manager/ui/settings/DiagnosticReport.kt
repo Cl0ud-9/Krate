@@ -15,7 +15,7 @@ internal data class ReportedApp(
     val name: String,
     val installedVersion: String?,
     val latest: String?,
-    // the build App Manager itself last installed - what update detection compares against
+    // the build Krate itself last installed - what update detection compares against
     val installedByManager: String?,
 )
 
@@ -47,7 +47,7 @@ internal fun formatDiagnosticReport(
     recentActivity: List<ActivityEntry>,
 ): String =
     buildString {
-        appendLine("App Manager diagnostic report")
+        appendLine("Krate diagnostic report")
         appendLine()
         append(deviceSummary)
         appendLine()
@@ -55,7 +55,7 @@ internal fun formatDiagnosticReport(
         apps.forEach { app ->
             val installed = app.installedVersion?.let { "installed $it" } ?: "not installed"
             appendLine("- ${app.name}: $installed, latest ${app.latest ?: "unknown"}")
-            appendLine("    installed by App Manager: ${app.installedByManager ?: "no record"}")
+            appendLine("    installed by Krate: ${app.installedByManager ?: "no record"}")
         }
         val recent = recentActivity.take(RECENT_ACTIVITY_LIMIT)
         if (recent.isNotEmpty()) {

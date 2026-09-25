@@ -1,6 +1,6 @@
-# App Manager
+# Krate
 
-A curated Android application deployment and update manager. Full product/architecture spec lives in [spec/master-specification.md](spec/master-specification.md), with agreed fixes in [spec/amendment-44.md](spec/amendment-44.md).
+Krate is a curated Android application deployment and update manager. Full product/architecture spec lives in [spec/master-specification.md](spec/master-specification.md), with agreed fixes in [spec/amendment-44.md](spec/amendment-44.md).
 
 Zero paid infrastructure by design: GitHub Actions + GitHub Releases for CI/CD and artifact hosting, Firebase Cloud Messaging for push, everything else on-device.
 

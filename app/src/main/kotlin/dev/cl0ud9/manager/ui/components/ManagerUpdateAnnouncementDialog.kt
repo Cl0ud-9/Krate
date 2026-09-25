@@ -31,6 +31,8 @@ import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.manager.ui.settings.SelfUpdateAction
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.formatMarkdownLite
+import dev.cl0ud9.manager.voice.Moment
+import dev.cl0ud9.manager.voice.rememberKrateLine
 
 private val NOTES_MAX_HEIGHT = 180.dp
 
@@ -74,7 +76,7 @@ fun ManagerUpdateAnnouncementDialog(
                     )
                 } else {
                     Text(
-                        text = "A newer version of App Manager is available.",
+                        text = "A newer version of Krate is available.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -98,7 +100,7 @@ private fun AnnouncementHeader() {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
             Icon(
-                painter = painterResource(R.drawable.ic_system_update_alt_rounded),
+                painter = painterResource(R.drawable.ic_krate),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.padding(10.dp).size(26.dp),
@@ -106,9 +108,9 @@ private fun AnnouncementHeader() {
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(text = "App Manager", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(text = "Krate", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                text = "Update available",
+                text = rememberKrateLine(Moment.KRATE_UPDATE_AVAILABLE),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
