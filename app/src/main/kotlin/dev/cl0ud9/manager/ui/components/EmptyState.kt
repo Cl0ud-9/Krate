@@ -6,11 +6,16 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +31,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 private const val ICON_BADGE_SIZE = 72
@@ -54,8 +60,37 @@ fun EmptyState(
         )
     LaunchedEffect(Unit) { animateIn = true }
 
+    // scrollable though it never needs to scroll, so a pull-to-refresh around it still receives the pull
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        EmptyStateColumn(
+            minHeight = maxHeight,
+            icon = icon,
+            title = title,
+            subtitle = subtitle,
+            action = action,
+            entranceProgress = entranceProgress,
+        )
+    }
+}
+
+@Suppress("LongParameterList")
+@Composable
+private fun EmptyStateColumn(
+    minHeight: Dp,
+    icon: Painter,
+    title: String,
+    subtitle: String,
+    action: (@Composable () -> Unit)?,
+    entranceProgress: Float,
+) {
     Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(
+                    rememberScrollState(),
+                ).heightIn(min = minHeight)
+                .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

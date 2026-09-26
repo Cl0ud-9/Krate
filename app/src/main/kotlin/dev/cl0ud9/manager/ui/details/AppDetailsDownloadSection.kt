@@ -259,7 +259,7 @@ private fun IdleFootnotes(
     if (state.isDiverged) {
         HelperText(
             "Installed version changed from ${state.effectiveBaseline?.versionName} to " +
-                "${state.installedVersionName} outside the manager.",
+                "${state.installedVersionName} outside Krate.",
         )
     }
     val failure = state.installStatus as? InstallStatus.Failed

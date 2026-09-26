@@ -102,7 +102,8 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
+        // opens full height, so one Back closes it instead of first dropping to half height
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(

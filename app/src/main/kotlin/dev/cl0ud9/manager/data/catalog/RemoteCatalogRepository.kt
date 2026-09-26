@@ -24,6 +24,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 private const val MANIFEST_URL = "https://github.com/Cl0ud-9/manager/releases/download/manifest-latest/manifest.json"
@@ -95,8 +96,19 @@ class RemoteCatalogRepository(
 
     override fun observeAnnouncements(): Flow<List<Announcement>> = announcements.onSubscription { ensureLoaded() }
 
+    // a failed download keeps what's already showing and throws, so pull-to-refresh can say so
     override suspend fun refresh() {
-        publish(loadManifest())
+        val bytes = withContext(Dispatchers.IO) { fetchVerifiedManifestBytes() }
+        if (bytes == null) {
+            ensureLoaded()
+            throw IOException("Couldn't reach the catalog")
+        }
+        val manifest =
+            withContext(Dispatchers.IO) {
+                cacheFile.writeBytes(bytes)
+                parseManifest(json, device, bytes)
+            }
+        publish(manifest)
     }
 
     // only the first subscriber (across the whole app) actually pays for a fetch - later ones, even on

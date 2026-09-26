@@ -274,7 +274,8 @@ private fun AppDetailsContent(
         // waiting for the next release, by picking an older version to download/install instead
         VersionHistorySection(
             app = app,
-            installedBuild = state.effectiveBaseline?.takeIf { state.installed != null },
+            // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
+            installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
             selectedArtifact = state.selectedArtifact,
             onSelectVersion = onSelectVersion,
         )

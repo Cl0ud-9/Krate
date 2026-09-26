@@ -45,12 +45,14 @@ import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.manager.ui.components.AnnouncementCard
 import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
 import dev.cl0ud9.manager.ui.components.ManagerUpdateAnnouncementDialog
+import dev.cl0ud9.manager.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.StatTile
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.formatRelativeTime
 import dev.cl0ud9.manager.ui.util.managerViewModel
+import dev.cl0ud9.manager.voice.KrateVoice
 import dev.cl0ud9.manager.voice.Moment
 import dev.cl0ud9.manager.voice.rememberKrateLine
 
@@ -80,14 +82,9 @@ fun HomeScreen(
                 container.managerSelfUpdateInstaller,
             )
         }
-    val catalogCount by viewModel.catalogCount.collectAsStateWithLifecycle()
-    val pendingUpdateCount by viewModel.pendingUpdateCount.collectAsStateWithLifecycle()
-    val installedCount by viewModel.installedCount.collectAsStateWithLifecycle()
-    val recentActivity by viewModel.recentActivity.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val updateAnnouncement by viewModel.updateAnnouncement.collectAsStateWithLifecycle()
     val selfUpdateState by viewModel.selfUpdateState.collectAsStateWithLifecycle()
-    val announcements by viewModel.announcements.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
 
     ManagerUpdatePrompt(updateAnnouncement, selfUpdateState, viewModel)
@@ -95,43 +92,64 @@ fun HomeScreen(
     // the counts on this screen are derived from the same catalog data Apps/Updates show, so a stale
     // manifest shows up here first - refreshFromNetwork() shares its result with every other screen
     // via the catalog repository's cache, so this pull is never wasted even if the user never leaves Home
-    ManagerPullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = viewModel::refreshFromNetwork,
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+    Box(modifier = Modifier.fillMaxSize()) {
+        ManagerPullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = viewModel::refreshFromNetwork,
+            modifier = Modifier.fillMaxSize(),
         ) {
-            // above the status hero - these only exist when something needs the user's attention
-            announcements.forEach { item ->
-                AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = viewModel::dismissAnnouncement)
-            }
-
-            StatusHeroCard(pendingUpdateCount = pendingUpdateCount, onViewUpdates = onNavigateToUpdates)
-
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatTile(
-                    label = "Apps in catalog",
-                    value = catalogCount.toString(),
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateToApps,
-                )
-                StatTile(
-                    label = "Installed on device",
-                    value = installedCount.toString(),
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateToApps,
-                )
-            }
-
-            RecentActivitySection(entries = recentActivity.take(MAX_ACTIVITY_ROWS))
+            HomeContent(viewModel, onNavigateToApps, onNavigateToUpdates, onNavigateToApp)
         }
+        RefreshFailureSnackbar(
+            refreshFailed = viewModel.refreshFailed,
+            message = { "${KrateVoice.line(Moment.REFRESH_FAILED)} Couldn't refresh, showing what's already here." },
+        )
+    }
+}
+
+@Composable
+private fun HomeContent(
+    viewModel: HomeViewModel,
+    onNavigateToApps: () -> Unit,
+    onNavigateToUpdates: () -> Unit,
+    onNavigateToApp: (String) -> Unit,
+) {
+    val catalogCount by viewModel.catalogCount.collectAsStateWithLifecycle()
+    val pendingUpdateCount by viewModel.pendingUpdateCount.collectAsStateWithLifecycle()
+    val installedCount by viewModel.installedCount.collectAsStateWithLifecycle()
+    val recentActivity by viewModel.recentActivity.collectAsStateWithLifecycle()
+    val announcements by viewModel.announcements.collectAsStateWithLifecycle()
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        // above the status hero - these only exist when something needs the user's attention
+        announcements.forEach { item ->
+            AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = viewModel::dismissAnnouncement)
+        }
+
+        StatusHeroCard(pendingUpdateCount = pendingUpdateCount, onViewUpdates = onNavigateToUpdates)
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatTile(
+                label = "Apps in catalog",
+                value = catalogCount.toString(),
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToApps,
+            )
+            StatTile(
+                label = "Installed on device",
+                value = installedCount.toString(),
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToApps,
+            )
+        }
+
+        RecentActivitySection(entries = recentActivity.take(MAX_ACTIVITY_ROWS))
     }
 }
 

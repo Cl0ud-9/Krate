@@ -21,8 +21,10 @@ import dev.cl0ud9.manager.ui.util.withMinimumDuration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
@@ -47,6 +49,9 @@ class HomeViewModel(
 
     private val mutableIsRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = mutableIsRefreshing.asStateFlow()
+
+    private val mutableRefreshFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val refreshFailed: SharedFlow<Unit> = mutableRefreshFailed.asSharedFlow()
 
     private val mutableUpdateAnnouncement = MutableStateFlow<ManagerUpdateStatus.UpdateAvailable?>(null)
     val updateAnnouncement: StateFlow<ManagerUpdateStatus.UpdateAvailable?> = mutableUpdateAnnouncement.asStateFlow()
@@ -151,8 +156,9 @@ class HomeViewModel(
         if (mutableIsRefreshing.value) return
         viewModelScope.launch {
             mutableIsRefreshing.value = true
-            withMinimumDuration { runCatching { catalogRepository.refresh() } }
+            val result = withMinimumDuration { runCatching { catalogRepository.refresh() } }
             mutableIsRefreshing.value = false
+            if (result.isFailure) mutableRefreshFailed.emit(Unit)
         }
     }
 

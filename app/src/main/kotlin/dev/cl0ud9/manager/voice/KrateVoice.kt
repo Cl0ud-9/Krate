@@ -175,7 +175,7 @@ enum class Moment(
         listOf(
             "The Krate couldn't check in.",
             "We lost the trail.",
-            "That refresh didn't make it.",
+            "That didn't get through.",
             "The Krate needs a little internet.",
         ),
     ),
