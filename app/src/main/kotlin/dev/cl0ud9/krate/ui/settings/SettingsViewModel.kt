@@ -145,7 +145,7 @@ class SettingsViewModel(
                                             app.packageName,
                                         )?.versionName,
                                 latest = app.latestArtifact?.let { reportedVersion(it.versionName, it.buildId) },
-                                installedByManager =
+                                installedByKrate =
                                     baselines[app.packageName]?.let {
                                         reportedVersion(
                                             it.versionName,

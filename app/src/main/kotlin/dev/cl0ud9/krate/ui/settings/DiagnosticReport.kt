@@ -20,7 +20,7 @@ internal data class ReportedApp(
     val installedVersion: String?,
     val latest: String?,
     // the build Krate itself last installed - what update detection compares against
-    val installedByManager: String?,
+    val installedByKrate: String?,
 )
 
 // device/package facts read via Context, gathered here rather than in SettingsViewModel - matching
@@ -68,7 +68,7 @@ internal fun formatDiagnosticReport(
         apps.forEach { app ->
             val installed = app.installedVersion?.let { "installed $it" } ?: "not installed"
             appendLine("- ${app.name}: $installed, latest ${app.latest ?: "unknown"}")
-            appendLine("    installed by Krate: ${app.installedByManager ?: "no record"}")
+            appendLine("    installed by Krate: ${app.installedByKrate ?: "no record"}")
         }
         val recent = recentActivity.take(RECENT_ACTIVITY_LIMIT)
         if (recent.isNotEmpty()) {

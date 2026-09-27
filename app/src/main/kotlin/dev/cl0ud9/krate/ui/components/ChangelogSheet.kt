@@ -34,16 +34,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.cl0ud9.krate.R
@@ -209,25 +204,13 @@ private fun ReleasesContent(
 
         is ReleasesState.Loaded ->
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp).nestedScroll(KeepFlingInList),
+                // no custom scroll handling: the list hands its leftover drag and fling to the sheet, so pulling down
+                // from the top of the list drags the sheet and a flick down closes it
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
                 contentPadding = PaddingValues(bottom = 120.dp),
             ) {
                 items(state.releases, key = { it.version }) { release -> ReleaseItem(release) }
             }
     }
-}
-
-// a list fling ends in the list; its leftover would otherwise snap a pulled-down sheet back open
-private object KeepFlingInList : NestedScrollConnection {
-    override fun onPostScroll(
-        consumed: Offset,
-        available: Offset,
-        source: NestedScrollSource,
-    ): Offset = if (source == NestedScrollSource.SideEffect) available else Offset.Zero
-
-    override suspend fun onPostFling(
-        consumed: Velocity,
-        available: Velocity,
-    ): Velocity = available
 }

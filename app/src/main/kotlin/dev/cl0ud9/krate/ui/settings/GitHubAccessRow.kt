@@ -56,7 +56,7 @@ private fun accessSubtitle(
     status: InviteStatus,
 ): String =
     when {
-        !hasToken -> "Add a token to unlock catalog entries hosted privately."
+        !hasToken -> "Got an invite? Add your token to unlock a few extra apps."
         status is InviteStatus.Open -> "Invite-only apps are unlocked."
         status is InviteStatus.Rejected -> "The saved token isn't working."
         else -> "A token is saved."
@@ -77,11 +77,11 @@ private fun GitHubAccessRowContent(
         return
     }
     var tokenInput by remember { mutableStateOf("") }
-    // spelled out up front, since a token for the wrong repo or with the wrong access is turned away
+    // what the token is and where it goes, in plain words for someone who was simply sent one
     Text(
         text =
-            "Needs a fine-grained token scoped to the private artifacts repo you were invited to, " +
-                "with \"Contents: Read-only\" access.",
+            "Paste the GitHub token that came with your invite. It stays on this phone and is only ever sent to " +
+                "GitHub.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -148,8 +148,8 @@ private fun inviteStatusText(status: InviteStatus): String =
         InviteStatus.Rejected ->
             rememberKrateLeadIn(
                 Moment.TOKEN_REJECTED,
-                "GitHub didn't accept it, or it can't see the invite-only repo. " +
-                    "Check it has \"Contents: Read-only\" on that repo, or ask for a new one.",
+                "GitHub didn't accept it. It may have expired or been switched off, so ask whoever invited you " +
+                    "for a new one.",
             )
         InviteStatus.Unreachable ->
             rememberKrateLeadIn(Moment.INVITE_UNREACHABLE, "Krate will try again on the next refresh.")

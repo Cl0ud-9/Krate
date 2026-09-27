@@ -81,7 +81,7 @@ fun SettingsScreen(
         SettingsNavRow(
             icon = painterResource(R.drawable.ic_key_rounded),
             title = "GitHub access",
-            subtitle = if (hasGitHubToken) "Token saved" else "Needed for a few private apps",
+            subtitle = if (hasGitHubToken) "Token saved" else "Unlocks invite-only apps",
             colors = SettingsTint.INDIGO.colors(),
             shape = settingsGroupShape(0, 1),
             onClick = { onNavigate(SettingsPageRoute.GITHUB) },
