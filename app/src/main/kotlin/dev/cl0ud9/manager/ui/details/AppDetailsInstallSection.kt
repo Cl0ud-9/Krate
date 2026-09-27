@@ -100,7 +100,7 @@ private fun InstallStatusContent(
 
         is InstallStatus.PreparingRollback -> {
             ManagerLinearProgress(progress = null)
-            HelperText("Preserving the current version for rollback...")
+            HelperText("Keeping a copy of the current version...")
         }
 
         is InstallStatus.Uninstalling -> {
@@ -121,7 +121,7 @@ private fun InstallStatusContent(
 
         is InstallStatus.RollingBack -> {
             ManagerLinearProgress(progress = null)
-            HelperText("Install failed, restoring the previous version...")
+            HelperText("The install failed. Restoring the previous version...")
         }
 
         is InstallStatus.Success -> {
@@ -142,12 +142,12 @@ private fun InstallStatusContent(
 private fun waitingForUserMessage(step: WaitingForUserStep): String =
     when (step) {
         WaitingForUserStep.UNINSTALL_CONFIRM -> "Confirm the uninstall in the system dialog."
-        WaitingForUserStep.INSTALL_CONFIRM -> "Confirm the installation in the system dialog."
+        WaitingForUserStep.INSTALL_CONFIRM -> "Confirm the install in the system dialog."
     }
 
 // section 17 of the spec: a normal update failure offers an explicit, user-confirmed clean-install
-// fallback with a data-loss warning. an app that already used clean install (videoapp patched, or a
-// retry after this fallback) has nothing further to escalate to, so it only offers a plain retry
+// fallback with a data-loss warning. an app that already used clean install (an always-clean-install
+// app, or a retry after this fallback) has nothing further to escalate to, so it only offers a plain retry
 @Composable
 private fun FailedInstallSection(
     app: AppProfile,

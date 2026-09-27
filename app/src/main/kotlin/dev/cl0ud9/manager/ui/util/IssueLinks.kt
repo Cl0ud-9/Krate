@@ -2,7 +2,7 @@ package dev.cl0ud9.manager.ui.util
 
 import java.net.URLEncoder
 
-const val KRATE_REPO_URL = "https://github.com/Cl0ud-9/manager"
+const val KRATE_REPO_URL = "https://github.com/Cl0ud-9/krate"
 const val KOFI_URL = "https://ko-fi.com/cl0ud9"
 
 // browsers and GitHub start refusing links much past this, so longer content has to travel another way

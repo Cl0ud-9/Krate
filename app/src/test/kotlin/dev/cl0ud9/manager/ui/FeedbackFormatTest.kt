@@ -38,7 +38,7 @@ class FeedbackFormatTest {
     @Test
     fun `issue links keep spaces and new lines intact`() {
         val url = githubNewIssueUrl("App suggestion: Mihon", "App: Mihon\nLink: https://x.y/a?b=c&d")
-        assertTrue(url.startsWith("https://github.com/Cl0ud-9/manager/issues/new?title="))
+        assertTrue(url.startsWith("https://github.com/Cl0ud-9/krate/issues/new?title="))
         assertFalse(url.contains("+"))
         assertEquals("App suggestion: Mihon", query(url, "title"))
         assertEquals("App: Mihon\nLink: https://x.y/a?b=c&d", query(url, "body"))
@@ -91,7 +91,7 @@ class FeedbackFormatTest {
                 apps =
                     listOf(
                         ReportedApp("Mihon", "0.19.0", "0.20.4", "0.19.0"),
-                        ReportedApp("Videoapp", null, null, null),
+                        ReportedApp("Example Player", null, null, null),
                     ),
                 recentActivity =
                     listOf(ActivityEntry("1", "mihon", "Mihon", ActivityAction.FAILED, 0, "Download: No internet")),
@@ -101,7 +101,7 @@ class FeedbackFormatTest {
         assertTrue(report.contains("GitHub token saved: no"))
         assertTrue(report.contains("Apps (1 of 2 installed):"))
         assertTrue(report.contains("- Mihon: installed 0.19.0, latest 0.20.4"))
-        assertTrue(report.contains("- Videoapp: not installed, latest unknown"))
+        assertTrue(report.contains("- Example Player: not installed, latest unknown"))
         assertTrue(report.contains("Mihon: failed - Download: No internet"))
         assertFalse(report.contains("ago"))
     }

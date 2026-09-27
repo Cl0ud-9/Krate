@@ -4,14 +4,14 @@ package dev.cl0ud9.manager.domain.model
 // build currently retained that fits this device (newest first), not just the latest, so a broken
 // newest build still leaves older ones installable
 // requiresAuth is true only for artifacts hosted as a private GitHub release asset (the
-// Patched-style apps, kept off public releases) - downloadUrl is then a
+// invite-only apps, kept off public releases) - downloadUrl is then a
 // api.github.com/repos/.../releases/assets/{id} URL rather than a plain browser_download_url, and
 // needs a bearer token the download engine reads from GitHubCredentialStore
-// patchesVersionName is the version of the *tool* that built this artifact (e.g. the Patched
-// patches bundle), distinct from versionName (the app's own version, e.g. Videoapp's) - null for
+// patchesVersionName is the version of the *tool* that built this artifact (e.g. a patches
+// bundle), distinct from versionName (the app's own version) - null for
 // artifacts with no such intermediate build tool
-// buildId tells apart two builds of the same versionName (a Patched rebuild with newer patches
-// keeps Videoapp's own version), and is null only in manifests older than schema 2
+// buildId tells apart two builds of the same versionName (a rebuild with newer patches
+// keeps the app's own version), and is null only in manifests older than schema 2
 data class ArtifactInfo(
     val versionName: String,
     val downloadUrl: String,
@@ -60,7 +60,7 @@ val AppProfile.latestVersionName: String?
 
 // an app only belongs in front-of-user surfaces (Apps/Home/Updates) when the catalog's own
 // `enabled` kill switch is on, and - for an artifact hosted as a private release asset, currently
-// the Patched-style apps - only once a GitHub token is actually present. Without a token there is
+// the invite-only apps - only once a GitHub token is actually present. Without a token there is
 // nothing it could do (its download would just fail with a 401), so it should not be offered as an
 // option in the first place rather than shown and then broken. Dependency resolution deliberately
 // does not use this: a dependency must still resolve against the full catalog regardless of whether

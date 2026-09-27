@@ -54,7 +54,7 @@ import dev.cl0ud9.manager.ui.theme.ShapeCache
 import java.io.IOException
 
 private const val MAX_RELEASES = 6
-private const val RELEASES_URL = "https://github.com/Cl0ud-9/manager/releases"
+private const val RELEASES_URL = "https://github.com/Cl0ud-9/krate/releases"
 
 // What's new = the manager's real release notes from GitHub, newest first - a list written into the
 // app itself goes stale the moment a release forgets to update it

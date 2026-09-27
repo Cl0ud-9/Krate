@@ -16,6 +16,20 @@ class ManifestVerifierTest {
     private val testSignatureBase64 =
         "Jf7IymxpcVC1FkAi3JYwgAO2wqicvfKmgl2AMdZp5sHoMC5IuEU6QvX8ZRzLsfv27DMtudgkDoqt75jxkTmdCg=="
 
+    // signed with the private catalog's real key (openssl pkeyutl -sign -rawin), checked against the key the app ships
+    @Test
+    fun `the private catalog's key verifies its own signatures`() {
+        val verifier = ManifestVerifier(dev.cl0ud9.manager.data.catalog.PRIVATE_CATALOG_PUBLIC_KEY_BASE64)
+        val signed = "krate private catalog test vector".toByteArray()
+        val signature =
+            Base64.getDecoder().decode(
+                "Hv8ZKsqdkKSSJv2a7C0Wcw+l72lZkLYx9W2OqZFClJ2z+J2Hx3KC6FTvfY16IbLoBeaw56ZT85lJsnxS0x9bAQ==",
+            )
+
+        assertTrue(verifier.verify(signed, signature))
+        assertFalse(verifier.verify("something else".toByteArray(), signature))
+    }
+
     @Test
     fun `verifies a real openssl-signed manifest`() {
         val verifier = ManifestVerifier(testPublicKeyBase64)

@@ -2,8 +2,7 @@ name: manifest
 
 on:
   schedule:
-    # every 2 hours - the tracked apps release a few times a month at most, and the Patched builds
-    # land at most twice a day. Use workflow_dispatch to pick something up immediately
+    # every 2 hours - the tracked apps release a few times a month at most. Use workflow_dispatch to pick something up immediately
     - cron: "17 */2 * * *"
   workflow_dispatch:
   push:
@@ -44,10 +43,6 @@ jobs:
       - name: Generate manifest
         env:
           GH_TOKEN: ${{ github.token }}
-          # needed to read the Patched-style apps' releases on the shared private artifacts repo
-          # (a different repo than this workflow runs in, so the ambient GH_TOKEN above can't see
-          # it on its own) - see SETUP.md section 5
-          ARTIFACTS_REPO_TOKEN: ${{ secrets.ARTIFACTS_REPO_TOKEN }}
         run: python3 catalog/scripts/generate_manifest.py
 
       - name: Check for changes

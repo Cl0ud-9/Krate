@@ -48,7 +48,7 @@ class BaselineTest {
     // change, so the record can't be trusted to be the current build; a public app has one build
     // per version, so the record simply is that build
     // the version history is patches releases: a newer patches release is the update even when it
-    // had to target an older Videoapp version
+    // had to target an older app version
     @Test
     fun `a newer patches release is an update even on an older app version`() {
         val app = app(build("20.37.48", "p3"), build("20.40.45", "p2"))

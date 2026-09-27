@@ -28,7 +28,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
@@ -56,7 +55,7 @@ private enum class TileStyle(
     TERTIARY_ROUND(false),
 }
 
-// one app tile coming out of the crate; center is measured from the scene's top middle
+// one app tile coming out of the crate; center is measured from the scene's top middle (as drawn at full height)
 private class FloatingTile(
     @param:DrawableRes val icon: Int,
     val size: Dp,
@@ -112,7 +111,6 @@ internal fun KrateIllustration(modifier: Modifier = Modifier) {
         label = "bob",
     )
     Box(modifier = modifier.fillMaxWidth().height(SCENE_HEIGHT)) {
-        CrateLid()
         RISING.forEach { Tile(it, bob) }
         CrateFront()
         FLOATING.forEach { Tile(it, bob) }
@@ -139,8 +137,9 @@ private fun BoxScope.Tile(
     Surface(
         modifier =
             Modifier
-                .align(Alignment.TopCenter)
-                .offset(x = tile.center.x, y = tile.center.y - tile.size / 2)
+                // placed from the bottom like the crate, so a shorter scene (landscape) doesn't sink tiles into it
+                .align(Alignment.BottomCenter)
+                .offset(x = tile.center.x, y = tile.center.y + tile.size / 2 - SCENE_HEIGHT)
                 .graphicsLayer { translationY = (((bob + tile.phase) % 1f) - 0.5f) * 2f * BOB_PX }
                 .rotate(tile.rotation)
                 .size(tile.size),
@@ -161,23 +160,6 @@ private fun BoxScope.Tile(
 
 private fun BoxScope.crateArea(): Modifier =
     Modifier.align(Alignment.BottomCenter).padding(bottom = CRATE_BOTTOM).size(CRATE_WIDTH, CRATE_HEIGHT)
-
-// the lid, tipped open behind the crate on its back edge
-@Composable
-private fun BoxScope.CrateLid() {
-    val lid = MaterialTheme.colorScheme.surfaceContainerHighest
-    Canvas(modifier = crateArea()) {
-        val path =
-            Path().apply {
-                moveTo(size.width * 0.02f, size.height * 0.02f)
-                lineTo(size.width * 0.86f, -size.height * 0.46f)
-                lineTo(size.width * 0.93f, -size.height * 0.3f)
-                lineTo(size.width * 0.1f, size.height * 0.16f)
-                close()
-            }
-        drawPath(path, lid)
-    }
-}
 
 // the crate's front: a rounded body with a rim, two slats and a plank at each end
 @Composable

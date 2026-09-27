@@ -20,7 +20,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.ui.util.steadyHeight
 
-// the Patched-style catalog entries (Videoapp, and any future sibling app built the same way) are
+// the invite-only catalog entries are
 // hosted as published releases on one shared *private* artifacts repo, never the public manager
 // repo itself - this token is what lets the download engine authenticate to fetch those. A
 // read-only fine-grained token scoped to just that repo is all it ever needs: unlike a draft

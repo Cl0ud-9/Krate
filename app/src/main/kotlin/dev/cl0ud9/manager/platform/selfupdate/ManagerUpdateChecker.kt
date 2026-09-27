@@ -13,7 +13,7 @@ import okhttp3.OkHttpClient
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-private const val RELEASES_API_URL = "https://api.github.com/repos/Cl0ud-9/manager/releases"
+private const val RELEASES_API_URL = "https://api.github.com/repos/Cl0ud-9/krate/releases"
 private const val NETWORK_TIMEOUT_SECONDS = 8L
 
 // this repo also publishes a GitHub Release under this exact tag purely to host the signed catalog
@@ -93,7 +93,7 @@ class ManagerUpdateChecker(
         withContext(Dispatchers.IO) {
             val installedVersion = installedVersionName()
             if (installedVersion == null) {
-                ManagerUpdateStatus.Failed("Could not read the installed version.")
+                ManagerUpdateStatus.Failed("Couldn't read the installed version.")
             } else {
                 try {
                     toStatus(fetchAppReleases(revalidate = revalidate).firstOrNull(), installedVersion)

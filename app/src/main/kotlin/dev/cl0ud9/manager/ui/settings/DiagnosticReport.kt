@@ -61,7 +61,7 @@ internal fun formatDiagnosticReport(
         appendLine("Generated: ${formatReportTime(generatedAtMillis)}")
         appendLine()
         append(deviceSummary)
-        // only whether one is saved, never the token itself - private apps like Videoapp need it
+        // only whether one is saved, never the token itself - invite-only apps need it
         appendLine("GitHub token saved: ${yesNo(hasGitHubToken)}")
         appendLine()
         appendLine("Apps (${apps.count { it.installedVersion != null }} of ${apps.size} installed):")
@@ -83,7 +83,7 @@ internal fun formatDiagnosticReport(
         }
     }
 
-// the version as the app reports it, plus the build when that says more than the version (a Patched rebuild)
+// the version as the app reports it, plus the build when that says more than the version (a patched rebuild)
 internal fun reportedVersion(
     versionName: String,
     buildId: String?,

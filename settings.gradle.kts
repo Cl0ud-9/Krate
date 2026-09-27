@@ -24,6 +24,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "manager"
+rootProject.name = "krate"
 include(":app")
 include(":baselineprofile")

@@ -34,7 +34,7 @@ interface ArtifactDownloader {
         artifact: ArtifactInfo,
     ): String?
 
-    // deletes this app's downloads of any other build, so skipped updates don't pile up (Videoapp is ~170 MB each)
+    // deletes this app's downloads of any other build, so skipped updates don't pile up (the biggest are ~170 MB each)
     fun pruneOtherBuilds(
         app: AppProfile,
         keep: ArtifactInfo,

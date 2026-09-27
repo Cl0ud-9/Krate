@@ -229,7 +229,7 @@ private fun StepPage(
                 description =
                     "Some apps in Krate are signed by this project instead of Google. " +
                         "Play Protect may ask to scan them " +
-                        "when they install. That's expected, not a sign of a broken app.",
+                        "when they're installed. That's expected, not a sign of a broken app.",
                 icons = PLAY_PROTECT_ICONS,
             )
         OnboardingStep.THEME -> ThemePage(viewModel = settings)

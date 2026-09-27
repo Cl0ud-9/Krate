@@ -37,7 +37,7 @@ import androidx.core.graphics.drawable.toBitmap
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
-private const val SOURCE_URL = "https://github.com/Cl0ud-9/manager"
+private const val SOURCE_URL = "https://github.com/Cl0ud-9/krate"
 private val HERO_ICON_SIZE = 60.dp
 private const val PROJECT_ROWS = 2
 
@@ -60,7 +60,7 @@ fun AboutPage(
         SettingsNavRow(
             icon = painterResource(R.drawable.ic_github),
             title = "Source code",
-            subtitle = "github.com/Cl0ud-9/manager",
+            subtitle = "github.com/Cl0ud-9/krate",
             colors = SettingsTint.SLATE.colors(),
             shape = settingsGroupShape(0, PROJECT_ROWS),
             onClick = { uriHandler.openUri(SOURCE_URL) },

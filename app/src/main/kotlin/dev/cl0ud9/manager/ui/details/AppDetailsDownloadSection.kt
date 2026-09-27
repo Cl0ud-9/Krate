@@ -118,7 +118,7 @@ private fun DownloadStatusContent(
 
         is DownloadStatus.Verifying -> {
             ManagerLinearProgress(progress = null)
-            HelperText("Checking the download is genuine...")
+            HelperText("Making sure the download is genuine...")
         }
 
         is DownloadStatus.ReadyToInstall -> {

@@ -24,8 +24,11 @@ private typealias Builder = AnnotatedString.Builder
 // engine is overkill for what actually shows up in practice. This cleans up the constructs that do
 // show up: **bold** spans, `code` spans, [text](url) links, bare https:// URLs (GitHub renders
 // those as clickable too, and plenty of release notes rely on that instead of bracket syntax),
-// +/-/* bullet lists, and #/##/### ATX headers, so raw "**"/"`"/"[...](...)"/"+ "/"### " syntax
-// doesn't leak into the UI.
+// +/-/* bullet lists, #/##/### ATX headers, > quotes and GitHub's [!NOTE]-style alerts, so raw
+// "**"/"`"/"[...](...)"/"+ "/"### "/"> " syntax doesn't leak into the UI.
+private val QUOTE_LINE = Regex("""^\s*>\s?(.*)$""")
+private val ALERT_LINE = Regex("""^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)]\s*$""", RegexOption.IGNORE_CASE)
+private val HEADER_MARKS = Regex("""^#{1,6}\s+""")
 private val HEADER_LINE = Regex("^(#{1,6})\\s+(.*)$")
 
 // a line that is nothing but bold text, which many release notes use as a section title instead of "###"
@@ -37,6 +40,7 @@ private val HEADER_FONT_SIZE = 15.sp
 // under detekt's parameter-count threshold without losing each color's own name at the call site
 private data class InlineSpanColors(
     val body: Color,
+    val muted: Color,
     val link: Color,
     val codeText: Color,
     val codeBackground: Color,
@@ -48,6 +52,7 @@ fun String.formatMarkdownLite(): AnnotatedString {
     val colors =
         InlineSpanColors(
             body = LocalContentColor.current,
+            muted = MaterialTheme.colorScheme.onSurfaceVariant,
             link = MaterialTheme.colorScheme.primary,
             codeText = MaterialTheme.colorScheme.onSurfaceVariant,
             codeBackground = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -56,7 +61,7 @@ fun String.formatMarkdownLite(): AnnotatedString {
     return buildAnnotatedString {
         val writer = MarkdownLineWriter(this, headerStyle, colors)
         // "( https://... )" -> "(https://...)": release notes often space a trailing link out
-        trim().replace(SPACED_PAREN_URL, "($1)").lines().forEach(writer::write)
+        cleanReleaseNotes(this@formatMarkdownLite).replace(SPACED_PAREN_URL, "($1)").lines().forEach(writer::write)
     }
 }
 
@@ -71,7 +76,27 @@ private class MarkdownLineWriter(
     // the depth of the bullet the previous line belonged to, so an indented follow-on line stays with it
     private var bulletDepth: Int? = null
 
+    // the label of a GitHub alert ("Tip") waiting to lead its quote's first line
+    private var alertLabel: String? = null
+
     fun write(line: String) {
+        val quote = QUOTE_LINE.matchEntire(line)
+        when {
+            // blank runs (left behind by removed HTML comments, say) show as a single gap
+            line.isBlank() && previousWasBlank -> Unit
+            quote != null -> {
+                writeQuote(quote.groupValues[1].trim())
+                previousWasBlank = false
+                bulletDepth = null
+            }
+            else -> {
+                alertLabel = null
+                writeLine(line)
+            }
+        }
+    }
+
+    private fun writeLine(line: String) {
         val header = HEADER_LINE.matchEntire(line) ?: BOLD_TITLE_LINE.matchEntire(line)
         val bullet = BULLET_LINE.matchEntire(line)
         val continuing = bulletDepth
@@ -108,10 +133,29 @@ private class MarkdownLineWriter(
         }
     }
 
+    // quoted lines read as a muted, indented note; a heading inside one is just its text
+    private fun writeQuote(content: String) {
+        val alert = ALERT_LINE.matchEntire(content)
+        when {
+            alert != null -> alertLabel = alert.groupValues[1].lowercase().replaceFirstChar { it.uppercase() }
+            content.isNotEmpty() -> {
+                val label = alertLabel
+                builder.withStyle(QUOTE_PARAGRAPH) {
+                    withStyle(SpanStyle(color = colors.muted)) {
+                        if (label != null) withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("$label  ") }
+                        appendWithInlineSpans(content.replace(HEADER_MARKS, ""), colors)
+                    }
+                }
+                alertLabel = null
+            }
+        }
+    }
+
     private fun depthOf(indent: String): Int = (indent.replace("\t", "  ").length / 2).coerceIn(0, MAX_BULLET_DEPTH)
 }
 
 private val PLAIN_PARAGRAPH = ParagraphStyle()
+private val QUOTE_PARAGRAPH = ParagraphStyle(textIndent = TextIndent(firstLine = 12.sp, restLine = 12.sp))
 private const val MAX_BULLET_DEPTH = 3
 private const val BULLET_STEP_SP = 14f
 private const val BULLET_HANG_SP = 13f
@@ -236,3 +280,46 @@ private fun shortLinkText(url: String): String =
         ?: GITHUB_NUMBERED_URL.matchEntire(url)?.let { "#${it.groupValues[1]}" }
         ?: GITHUB_COMPARE_URL.matchEntire(url)?.let { "changes from ${it.groupValues[1]} to ${it.groupValues[2]}" }
         ?: url
+
+private val HTML_COMMENT = Regex("""<!--[\s\S]*?-->""")
+private val HTML_TAG =
+    Regex(
+        """</?(details|summary|br|p|div|img|picture|source|sub|sup|kbd|b|i|em|strong|span|a|hr|h[1-6])\b[^>]*>""",
+        RegexOption.IGNORE_CASE,
+    )
+
+// release notes as written for GitHub, minus what only makes sense there: HTML comments and tags, and alert blocks
+// telling readers which APK file to pick (Krate picks the right build itself)
+internal fun cleanReleaseNotes(text: String): String {
+    val withoutHtml =
+        text
+            .replace("<!-->", "")
+            .replace(HTML_COMMENT, "")
+            .replace(HTML_TAG, "")
+    val lines = withoutHtml.lines()
+    val kept = mutableListOf<String>()
+    var i = 0
+    while (i < lines.size) {
+        if (QUOTE_LINE.matches(lines[i])) {
+            var end = i
+            while (end < lines.size && QUOTE_LINE.matches(lines[end])) end++
+            val block = lines.subList(i, end)
+            val isAlert = block.any { ALERT_LINE.matches(QUOTE_LINE.matchEntire(it)!!.groupValues[1].trim()) }
+            if (!(isAlert && block.any { it.contains(".apk", ignoreCase = true) })) kept += block
+            i = end
+        } else {
+            kept += lines[i]
+            i++
+        }
+    }
+    return kept.joinToString("\n").trim()
+}
+
+// what a collapsed preview shows: the changes themselves, from the first heading or bullet, past a leading intro
+// such as a donation note; notes without either preview from the top. The flag says whether an intro was skipped
+internal fun releaseNotesPreview(text: String): Pair<String, Boolean> {
+    val lines = cleanReleaseNotes(text).lines()
+    val first =
+        lines.indexOfFirst { HEADER_LINE.matches(it) || BOLD_TITLE_LINE.matches(it) || BULLET_LINE.matches(it) }
+    return if (first > 0) lines.drop(first).joinToString("\n") to true else lines.joinToString("\n") to false
+}

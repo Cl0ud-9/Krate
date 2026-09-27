@@ -81,13 +81,13 @@ class InstallResultMappingTest {
         assertEquals("Installation failed.", (status as InstallStatus.Failed).reason)
     }
 
-    // seen live: a Videoapp installed from elsewhere, signed with a different key
+    // seen live: an app installed from elsewhere, signed with a different key
     @Test
     fun `a signing key mismatch gets a plain explanation instead of the raw system text`() {
         val status =
             interpretInstallResult(
                 PackageInstaller.STATUS_FAILURE_CONFLICT,
-                "INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package app.patched.android.videoapp signatures " +
+                "INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.example.player signatures " +
                     "do not match newer version; ignoring!",
                 WaitingForUserStep.INSTALL_CONFIRM,
             )

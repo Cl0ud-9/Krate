@@ -241,7 +241,7 @@ private fun AppDetailsContent(
         }
 
         // shown before the user ever reaches the Install button - a required dependency missing
-        // (e.g. microG RE for Videoapp Patched) means the app installs but silently fails to open,
+        // (e.g. a sign-in helper another app relies on) means the app installs but silently fails to open,
         // so this is surfaced as early and as plainly as possible rather than only as a disabled
         // button and small helper text further down the page
         val unmetDependencies = state.dependencies.filter { !it.installed }
@@ -260,17 +260,7 @@ private fun AppDetailsContent(
             onCancelDownload = onCancelDownload,
         )
 
-        // only renders once more than one version is actually retained (see catalog-metadata.json's
-        // retainVersions) - lets a broken newest build be worked around immediately instead of
-        // waiting for the next release, by picking an older version to download/install instead
-        VersionHistorySection(
-            app = app,
-            // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
-            installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
-            selectedArtifact = state.selectedArtifact,
-            onSelectVersion = onSelectVersion,
-        )
-
+        // what the app is sits right under the action, before the finer controls further down
         AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
 
         ReleaseNotesSection(
@@ -284,6 +274,17 @@ private fun AppDetailsContent(
                             null
                     },
                 ),
+        )
+
+        // only renders once more than one version is actually retained (see catalog-metadata.json's
+        // retainVersions) - lets a broken newest build be worked around immediately instead of
+        // waiting for the next release, by picking an older version to download/install instead
+        VersionHistorySection(
+            app = app,
+            // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
+            installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
+            selectedArtifact = state.selectedArtifact,
+            onSelectVersion = onSelectVersion,
         )
     }
 }
@@ -332,10 +333,9 @@ private fun AppDetailsHeader(
                         )
                     }
 
-                    // only set for an artifact built by an intermediate tool (currently just
-                    // Patched patches) - "Latest" above is always the app's own version (e.g.
-                    // Videoapp's), so this is shown alongside it rather than instead of it, giving a
-                    // complete picture of both what was patched, how, and what patched it
+                    // only set for an artifact built by an intermediate tool (a patches bundle) - "Latest"
+                    // above is always the app's own version, so this is shown alongside it rather than
+                    // instead of it, giving a complete picture of what was patched and what patched it
                     app.latestArtifact?.patchesVersionName?.let { patchesVersion ->
                         val label = app.latestArtifact?.label
                         Text(

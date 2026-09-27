@@ -7,7 +7,9 @@ import dev.cl0ud9.manager.data.auth.EncryptedGitHubCredentialStore
 import dev.cl0ud9.manager.data.auth.GitHubCredentialStore
 import dev.cl0ud9.manager.data.baseline.DataStoreManagerBaselineStore
 import dev.cl0ud9.manager.data.catalog.AssetCatalogRepository
+import dev.cl0ud9.manager.data.catalog.PrivateCatalogSource
 import dev.cl0ud9.manager.data.catalog.RemoteCatalogRepository
+import dev.cl0ud9.manager.data.catalog.defaultHttpClient
 import dev.cl0ud9.manager.data.downloads.AndroidDownloadProgressNotifier
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
 import dev.cl0ud9.manager.data.downloads.DownloadProgressNotifier
@@ -37,10 +39,22 @@ class AppContainer(
     context: Context,
 ) {
     private val seedCatalogRepository = AssetCatalogRepository(context.applicationContext)
-    val catalogRepository: CatalogRepository =
-        RemoteCatalogRepository(context.applicationContext, fallback = seedCatalogRepository)
-    val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.applicationContext)
     val githubCredentialStore: GitHubCredentialStore = EncryptedGitHubCredentialStore(context.applicationContext)
+    val catalogRepository: CatalogRepository =
+        defaultHttpClient().let { client ->
+            RemoteCatalogRepository(
+                context.applicationContext,
+                fallback = seedCatalogRepository,
+                httpClient = client,
+                privateSource =
+                    PrivateCatalogSource(
+                        githubCredentialStore,
+                        client,
+                        File(context.applicationContext.filesDir, "private-manifest-cache.json"),
+                    ),
+            )
+        }
+    val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.applicationContext)
     val artifactDownloader: ArtifactDownloader =
         OkHttpArtifactDownloader(
             downloadsDir = File(context.applicationContext.cacheDir, "downloads"),

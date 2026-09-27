@@ -24,10 +24,11 @@ from apk_icon import icon_png
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_DIR = REPO_ROOT / "catalog"
-METADATA_PATH = CATALOG_DIR / "catalog-metadata.json"
-ANNOUNCEMENTS_PATH = CATALOG_DIR / "announcements.json"
-OVERRIDES_PATH = CATALOG_DIR / "artifact-overrides.json"
-OUTPUT_PATH = REPO_ROOT / "manifest.json"
+# each overridable from the environment, so another repo can build its own catalog with this same script
+METADATA_PATH = Path(os.environ.get("CATALOG_METADATA", CATALOG_DIR / "catalog-metadata.json"))
+ANNOUNCEMENTS_PATH = Path(os.environ.get("CATALOG_ANNOUNCEMENTS", CATALOG_DIR / "announcements.json"))
+OVERRIDES_PATH = Path(os.environ.get("CATALOG_OVERRIDES", CATALOG_DIR / "artifact-overrides.json"))
+OUTPUT_PATH = Path(os.environ.get("MANIFEST_OUTPUT", REPO_ROOT / "manifest.json"))
 WORK_DIR = Path("manifest-work")
 # asset id -> verified facts about that exact upload. A GitHub release asset's bytes can never
 # change without it getting a new id, so a hit here is as good as re-downloading and re-checking
@@ -35,10 +36,11 @@ WORK_DIR = Path("manifest-work")
 CACHE_PATH = WORK_DIR / "asset-cache.json"
 
 GITHUB_API = "https://api.github.com"
-# this script only ever runs in this repo's own CI, publishing this repo's own manifest-latest
-# release (see RemoteCatalogRepository.kt's hardcoded MANIFEST_URL on the client side)
-OWN_REPO = "Cl0ud-9/manager"
-# every Patched-style app's releases live on one shared *private* repo, kept separate from this
+# the repo and release tag the catalog is published to, read back as the fallback for an app whose
+# ingestion fails a run (see RemoteCatalogRepository.kt's MANIFEST_URL on the client side)
+OWN_REPO = os.environ.get("MANIFEST_REPO", "Cl0ud-9/krate")
+MANIFEST_TAG = os.environ.get("MANIFEST_TAG", "manifest-latest")
+# invite-only apps' releases live on one shared *private* repo, kept separate from this
 # public repo - see SETUP.md section 5. The per-run GITHUB_TOKEN only covers this repo, so reading
 # that one needs its own token
 ARTIFACTS_TOKEN_ENV = "ARTIFACTS_REPO_TOKEN"
@@ -387,7 +389,7 @@ def active_announcements():
 # main()). A first-ever run, or any fetch hiccup, just means there is nothing to fall back to
 def fetch_previous_manifest():
     try:
-        release = gh_get(f"/repos/{OWN_REPO}/releases/tags/manifest-latest")
+        release = gh_get(f"/repos/{OWN_REPO}/releases/tags/{MANIFEST_TAG}")
         asset = pick_asset(release, r"^manifest\.json$")
         asset_url = f"{GITHUB_API}/repos/{OWN_REPO}/releases/assets/{asset['id']}"
         manifest = download_json(asset_url, authenticated=True)

@@ -102,7 +102,7 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
             message = {
                 KrateMessage(
                     headline = KrateVoice.line(Moment.REFRESH_FAILED),
-                    detail = "Couldn't refresh the catalog, showing what Krate saw last.",
+                    detail = "Couldn't refresh the catalog, so this is what Krate saw last.",
                     icon = R.drawable.ic_cloud_off_rounded,
                     actionLabel = "Retry",
                 )

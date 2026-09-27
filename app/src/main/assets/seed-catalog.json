@@ -20,16 +20,6 @@
       "dependencyIds": [],
       "releaseNotes": "Connect to the internet once to load the catalog and see available versions.",
       "enabled": true
-    },
-    {
-      "id": "microg-re",
-      "displayName": "MicroG RE",
-      "packageName": "app.patched.android.gms",
-      "supportStatus": "SUPPORTED",
-      "installationMode": "UPDATE",
-      "dependencyIds": [],
-      "releaseNotes": "Connect to the internet once to load the catalog and see available versions.",
-      "enabled": true
     }
   ]
 }

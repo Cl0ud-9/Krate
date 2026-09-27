@@ -32,6 +32,7 @@ import dev.cl0ud9.manager.domain.repository.isNewerThan
 import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.formatMarkdownLite
+import dev.cl0ud9.manager.ui.util.releaseNotesPreview
 import java.text.DateFormat
 import java.util.Date
 
@@ -148,10 +149,17 @@ private fun NotesBody(
     maxLines: Int,
     onTruncated: (Boolean) -> Unit,
 ) {
+    // collapsed, the preview opens on the changes; a skipped intro still counts as more to show
+    val collapsed = maxLines != Int.MAX_VALUE
+    val (shown, skippedIntro) =
+        remember(
+            text,
+            collapsed,
+        ) { if (collapsed) releaseNotesPreview(text) else text to false }
     Text(
-        text = text.formatMarkdownLite(),
+        text = shown.formatMarkdownLite(),
         style = MaterialTheme.typography.bodyMedium,
         maxLines = maxLines,
-        onTextLayout = { onTruncated(it.hasVisualOverflow) },
+        onTextLayout = { onTruncated(it.hasVisualOverflow || skippedIntro) },
     )
 }

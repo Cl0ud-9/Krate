@@ -32,7 +32,7 @@ class PackageInstallerEngine(
             val started = runCatching { createAndCommitSession(app, apkFile, requestKey) }
             if (started.isFailure) {
                 val reason = started.exceptionOrNull()?.message ?: "unknown error"
-                send(InstallStatus.Failed("Could not start installation: $reason"))
+                send(InstallStatus.Failed("Couldn't start the install: $reason"))
                 close()
                 return@callbackFlow
             }
@@ -49,7 +49,7 @@ class PackageInstallerEngine(
                 }
             if (started.isFailure) {
                 val reason = started.exceptionOrNull()?.message ?: "unknown error"
-                send(InstallStatus.Failed("Could not start uninstall: $reason"))
+                send(InstallStatus.Failed("Couldn't start the uninstall: $reason"))
                 close()
                 return@callbackFlow
             }

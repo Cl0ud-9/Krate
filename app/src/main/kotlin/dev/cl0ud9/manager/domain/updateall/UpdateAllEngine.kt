@@ -73,7 +73,7 @@ class UpdateAllEngine(
             artifactDownloader.deleteDownloadedFile(downloaded.filePath)
             UpdateAllOutcome(app, succeeded = true)
         } else {
-            UpdateAllOutcome(app, succeeded = false, reason = failure?.reason ?: "Installation did not complete")
+            UpdateAllOutcome(app, succeeded = false, reason = failure?.reason ?: "The install didn't finish.")
         }
     }
 
@@ -117,7 +117,7 @@ class UpdateAllEngine(
                     WaitingForUserStep.UNINSTALL_CONFIRM -> "Confirm the uninstall in the system dialog"
                     WaitingForUserStep.INSTALL_CONFIRM -> "Confirm the install in the system dialog"
                 }
-            InstallStatus.RollingBack -> "Install failed, restoring the previous version"
+            InstallStatus.RollingBack -> "The install failed. Restoring the previous version"
             InstallStatus.Success -> "Installed"
             InstallStatus.Idle -> "Preparing"
             is InstallStatus.Failed -> "Failed: ${status.reason}"

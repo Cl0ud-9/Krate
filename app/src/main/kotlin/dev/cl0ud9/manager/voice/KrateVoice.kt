@@ -174,7 +174,7 @@ enum class Moment(
     REFRESH_FAILED(
         listOf(
             "The Krate couldn't check in.",
-            "We lost the trail.",
+            "The Krate lost the trail.",
             "That didn't get through.",
             "The Krate needs a little internet.",
         ),

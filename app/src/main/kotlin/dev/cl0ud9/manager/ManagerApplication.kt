@@ -15,7 +15,7 @@ import dev.cl0ud9.manager.platform.workers.UpdateNotifier
 import java.util.concurrent.TimeUnit
 
 // section 40 of the spec: WorkManager periodic work is intentionally inexact. Every 6 hours is plenty -
-// the catalog itself is regenerated every 2 hours and Patched builds land at most twice a day, and a
+// the catalog itself is regenerated every 2 hours and privately built apps land at most twice a day, and a
 // pull-to-refresh in the app always checks right away. Stands on its own since FCM needs a Firebase
 // project this app can't set up for itself
 private const val MANIFEST_CHECK_INTERVAL_HOURS = 6L

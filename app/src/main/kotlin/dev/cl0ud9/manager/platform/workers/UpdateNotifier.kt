@@ -74,7 +74,7 @@ object UpdateNotifier {
             .apply()
         // a "ready" notice whose file has gone (cache cleared) is corrected in place, never raised again once dismissed
         if (sameUpdates && !downloaded && !isShowing(context, PENDING_UPDATES_NOTIFICATION_ID)) return
-        // names the apps instead of only counting them - "Videoapp (Patched) has an update" says what
+        // names the apps instead of only counting them - "Mihon has an update" says what
         // to do with it at a glance, a bare "1 update available" doesn't
         val single = apps.singleOrNull()
         notify(
@@ -97,7 +97,7 @@ object UpdateNotifier {
     ): String {
         val single = appNames.singleOrNull()
         return when {
-            single != null && downloaded -> "$single has an update, downloaded and ready to install."
+            single != null && downloaded -> "An update for $single is downloaded and ready to install."
             single != null -> "$single has an update. Tap to review and install."
             downloaded -> "${appNames.size} updates: ${appNames.joinToString(", ")}. Downloaded and ready to install."
             else -> "${appNames.size} updates: ${appNames.joinToString(", ")}. Tap to review and install."

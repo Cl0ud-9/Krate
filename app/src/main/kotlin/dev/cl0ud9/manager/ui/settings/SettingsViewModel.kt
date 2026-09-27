@@ -244,17 +244,20 @@ class SettingsViewModel(
         }
     }
 
-    // read only by artifacts whose manifest entry is requiresAuth (the Patched-style apps, hosted
+    // read only by artifacts whose manifest entry is requiresAuth (the invite-only apps, hosted
     // as published releases on a shared private artifacts repo) - a read-only "Contents" token
     // scoped to that one repo is all it ever needs, see SETUP.md section 4
+    // the invite-only entries come and go with the token, so the catalog is fetched again either way
     fun setGitHubToken(token: String) {
         githubCredentialStore.setToken(token)
         mutableHasGitHubToken.value = true
+        viewModelScope.launch { runCatching { catalogRepository.refresh() } }
     }
 
     fun clearGitHubToken() {
         githubCredentialStore.clearToken()
         mutableHasGitHubToken.value = false
+        viewModelScope.launch { runCatching { catalogRepository.refresh() } }
     }
 
     private fun formatMb(bytes: Long): String = "%.1f MB".format(bytes / BYTES_PER_MB)

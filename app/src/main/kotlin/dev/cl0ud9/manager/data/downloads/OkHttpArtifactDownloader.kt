@@ -111,7 +111,7 @@ class OkHttpArtifactDownloader(
     ) {
         val keepId = fileIdFor(app, keep)
         val prefix = "${app.id}-"
-        // an app whose id extends this one's ("videoapp" vs "videoapp-music") owns its own files
+        // an app whose id extends this one's ("reader" vs "reader-plus") owns its own files
         val longerIds = otherAppIds.filter { it != app.id && it.startsWith(prefix) }.map { "$it-" }
         downloadsDir.listFiles()?.forEach { file ->
             val id = file.name.removeSuffix(".part").removeSuffix(".apk")
@@ -121,7 +121,7 @@ class OkHttpArtifactDownloader(
 
     // the build (or, for manifests without build ids, the version) is part of the file name, not
     // just app.id - otherwise a stale .part/.apk from a different version, or from an older build of
-    // the same version (a Patched rebuild keeps Videoapp's version), could look resumable/ready here
+    // the same version (a patched rebuild keeps the app's own version), could look resumable/ready here
     private fun fileIdFor(
         app: AppProfile,
         artifact: ArtifactInfo,
@@ -155,7 +155,7 @@ class OkHttpArtifactDownloader(
         if (available < required) {
             val requiredMb = required / BYTES_PER_MB
             val availableMb = available / BYTES_PER_MB
-            return "Not enough storage. This needs about $requiredMb MB free and $availableMb MB is available."
+            return "Not enough storage. This needs about $requiredMb MB free, but only $availableMb MB is available."
         }
         return null
     }

@@ -122,7 +122,7 @@ fun ManifestAppDto.toDomain(device: DeviceProfile): AppProfile? {
 }
 
 // null when this manager version is outside the announcement's range - a notice like "update the
-// manager to keep getting Videoapp builds" only makes sense to managers that are actually too old
+// manager to keep getting updates" only makes sense to managers that are actually too old
 fun ManifestAnnouncementDto.toDomain(device: DeviceProfile): Announcement? {
     val tooOld = minManagerVersionCode != null && device.managerVersionCode < minManagerVersionCode
     val tooNew = maxManagerVersionCode != null && device.managerVersionCode > maxManagerVersionCode

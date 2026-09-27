@@ -30,7 +30,7 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-private const val MANIFEST_URL = "https://github.com/Cl0ud-9/manager/releases/download/manifest-latest/manifest.json"
+private const val MANIFEST_URL = "https://github.com/Cl0ud-9/krate/releases/download/manifest-latest/manifest.json"
 private const val SIGNATURE_URL = "$MANIFEST_URL.sig"
 private const val CACHE_FILE_NAME = "manifest-cache.json"
 
@@ -63,7 +63,19 @@ private fun parseManifest(
     )
 }
 
-private fun defaultHttpClient(): OkHttpClient =
+// invited entries (while a GitHub token is saved) join the public ones
+private fun withPrivateApps(
+    privateSource: PrivateCatalogSource?,
+    json: Json,
+    device: DeviceProfile,
+    manifest: ParsedManifest,
+): ParsedManifest {
+    val privateApps =
+        privateSource?.cached()?.let { runCatching { parseManifest(json, device, it).apps }.getOrNull() }.orEmpty()
+    return ParsedManifest((manifest.apps + privateApps).distinctBy { it.id }, manifest.announcements)
+}
+
+internal fun defaultHttpClient(): OkHttpClient =
     OkHttpClient
         .Builder()
         .connectTimeout(NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -86,6 +98,8 @@ class RemoteCatalogRepository(
     private val httpClient: OkHttpClient = defaultHttpClient(),
     private val verifier: ManifestVerifier = ManifestVerifier(),
     private val device: DeviceProfile = currentDevice(context),
+    // the invite-only entries, merged in only while a GitHub token is saved
+    private val privateSource: PrivateCatalogSource? = null,
 ) : CatalogRepository {
     private val json = Json { ignoreUnknownKeys = true }
     private val cacheFile = File(context.filesDir, CACHE_FILE_NAME)
@@ -110,7 +124,8 @@ class RemoteCatalogRepository(
         val manifest =
             withContext(Dispatchers.IO) {
                 cacheFile.writeBytes(bytes)
-                parseManifest(json, device, bytes)
+                privateSource?.refresh()
+                withPrivateApps(privateSource, json, device, parseManifest(json, device, bytes))
             }
         publish(manifest)
     }
@@ -148,12 +163,22 @@ class RemoteCatalogRepository(
                     cacheFile.writeBytes(it)
                     parseManifest(json, device, it)
                 }
-            fromNetwork ?: loadCachedManifest() ?: ParsedManifest(fallback.observeApps().first(), emptyList())
+            if (fromNetwork != null) privateSource?.refresh()
+            val manifest =
+                fromNetwork ?: loadCachedManifest() ?: ParsedManifest(fallback.observeApps().first(), emptyList())
+            withPrivateApps(privateSource, json, device, manifest)
         }
 
     private fun loadCachedManifest(): ParsedManifest? {
         val cached = runCatching { cacheFile.takeIf { it.exists() }?.readBytes() }.getOrNull() ?: return null
-        return runCatching { parseManifest(json, device, cached) }.getOrNull()
+        return runCatching {
+            withPrivateApps(
+                privateSource,
+                json,
+                device,
+                parseManifest(json, device, cached),
+            )
+        }.getOrNull()
     }
 
     private suspend fun fetchVerifiedManifestBytes(): ByteArray? =

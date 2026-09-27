@@ -75,7 +75,7 @@ class ManifestDtoTest {
         {
           "schemaVersion": 2,
           "apps": [{
-            "id": "videoapp-patched", "displayName": "Videoapp", "packageName": "app.patched.android.videoapp",
+            "id": "patched-player", "displayName": "Example Player", "packageName": "com.example.player",
             "supportStatus": "SUPPORTED", "installationMode": "UPDATE",
             "artifacts": [
               {"versionName": "20.40.45", "buildId": "modern", "minSdk": 31, "downloadUrl": "u1", "sha256": "s",

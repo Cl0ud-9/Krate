@@ -67,7 +67,7 @@ class ManagerSelfUpdateInstaller(
     fun downloadAndInstall(downloadUrl: String): Flow<SelfUpdateState> =
         flow {
             emit(SelfUpdateState.Downloading(null))
-            val apkFile = File(context.cacheDir, "manager-update.apk")
+            val apkFile = File(context.cacheDir, "krate-update.apk")
             val failure =
                 try {
                     download(downloadUrl, apkFile)

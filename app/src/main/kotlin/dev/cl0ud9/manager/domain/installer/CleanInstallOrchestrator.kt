@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.flow
 import java.io.File
 
 // preserve -> uninstall -> install, restoring the preserved apk if the new install fails,
-// section 17, 18, 21, 42.12, 42.13 of the spec. used for videoapp patched (always clean install) and
+// section 17, 18, 21, 42.12, 42.13 of the spec. used for apps that always clean install, and
 // as the explicit, user-confirmed fallback when a normal in-place update fails
 class CleanInstallOrchestrator(
     private val installationEngine: InstallationEngine,
