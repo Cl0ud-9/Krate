@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.cl0ud9.manager.baselineprofile"
+    namespace = "dev.cl0ud9.krate.baselineprofile"
     compileSdk = 37
 
     compileOptions {

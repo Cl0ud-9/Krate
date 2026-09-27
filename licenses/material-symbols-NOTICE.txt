@@ -70,8 +70,8 @@ shape), so the selected/unselected nav states never looked different for those t
 to grid_view, then to download_for_offline for the Updates tab specifically (system_update was
 tried in between but read as cluttered at 24dp) - both have distinct outline/fill1 art.
 
-Used for the bottom navigation bar's icon set (dev.cl0ud9.manager.ui.navigation.NavIcon /
-ManagerDestination), in the Material Symbols Rounded style, taken directly from Google's
+Used for the bottom navigation bar's icon set (dev.cl0ud9.krate.ui.navigation.NavIcon /
+KrateDestination), in the Material Symbols Rounded style, taken directly from Google's
 public repository.
 The four icons added below extend that same rounded icon family to the app's highest-visibility
 non-nav icons (status badges, the manager-update glyph, and every pushed screen's back button) -

@@ -1,0 +1,158 @@
+package dev.cl0ud9.krate.ui.settings
+
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.domain.model.InviteStatus
+import dev.cl0ud9.krate.ui.util.steadyHeight
+import dev.cl0ud9.krate.voice.Moment
+import dev.cl0ud9.krate.voice.rememberKrateLeadIn
+
+// a read-only token for the private artifacts repo unlocks the invite-only catalog; the row says what it actually got
+@Composable
+internal fun GitHubAccessRow(
+    hasToken: Boolean,
+    inviteStatus: InviteStatus,
+    onSaveToken: (String) -> Unit,
+    onClearToken: () -> Unit,
+    shape: Shape,
+) {
+    SettingsRow(
+        header =
+            SettingsRowHeader(
+                icon = painterResource(R.drawable.ic_key_rounded),
+                title = "GitHub access",
+                subtitle = accessSubtitle(hasToken, inviteStatus),
+                colors = SettingsTint.INDIGO.colors(),
+            ),
+        shape = shape,
+    ) {
+        GitHubAccessRowContent(
+            hasToken = hasToken,
+            inviteStatus = inviteStatus,
+            onSaveToken = onSaveToken,
+            onClearToken = onClearToken,
+        )
+    }
+}
+
+private fun accessSubtitle(
+    hasToken: Boolean,
+    status: InviteStatus,
+): String =
+    when {
+        !hasToken -> "Add a token to unlock catalog entries hosted privately."
+        status is InviteStatus.Open -> "Invite-only apps are unlocked."
+        status is InviteStatus.Rejected -> "The saved token isn't working."
+        else -> "A token is saved."
+    }
+
+@Composable
+private fun GitHubAccessRowContent(
+    hasToken: Boolean,
+    inviteStatus: InviteStatus,
+    onSaveToken: (String) -> Unit,
+    onClearToken: () -> Unit,
+) {
+    if (hasToken) {
+        InviteStatusLine(inviteStatus)
+        OutlinedButton(onClick = onClearToken, modifier = Modifier.fillMaxWidth()) {
+            Text("Remove saved token")
+        }
+        return
+    }
+    var tokenInput by remember { mutableStateOf("") }
+    // spelled out up front, since a token for the wrong repo or with the wrong access is turned away
+    Text(
+        text =
+            "Needs a fine-grained token scoped to the private artifacts repo you were invited to, " +
+                "with \"Contents: Read-only\" access.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OutlinedTextField(
+        value = tokenInput,
+        onValueChange = { tokenInput = it },
+        label = { Text("Personal access token") },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        modifier = Modifier.fillMaxWidth().steadyHeight(),
+    )
+    Button(
+        onClick = {
+            onSaveToken(tokenInput)
+            tokenInput = ""
+        },
+        enabled = tokenInput.isNotBlank(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text("Save token")
+    }
+}
+
+@Composable
+private fun InviteStatusLine(status: InviteStatus) {
+    val colors = MaterialTheme.colorScheme
+    val icon =
+        when (status) {
+            is InviteStatus.Open -> R.drawable.ic_check_circle_rounded
+            InviteStatus.Rejected -> R.drawable.ic_error_rounded
+            InviteStatus.Unreachable -> R.drawable.ic_cloud_off_rounded
+            else -> R.drawable.ic_key_rounded
+        }
+    KrateUpdateStatusRow(
+        icon = painterResource(icon),
+        badgeColor =
+            when (status) {
+                is InviteStatus.Open -> colors.tertiaryContainer
+                InviteStatus.Rejected -> colors.errorContainer
+                else -> colors.surfaceContainerHighest
+            },
+        contentColor =
+            when (status) {
+                is InviteStatus.Open -> colors.onTertiaryContainer
+                InviteStatus.Rejected -> colors.onErrorContainer
+                else -> colors.onSurfaceVariant
+            },
+        text = inviteStatusText(status),
+    )
+}
+
+@Composable
+private fun inviteStatusText(status: InviteStatus): String =
+    when (status) {
+        is InviteStatus.Open ->
+            if (status.appCount == 0) {
+                "The token works. There are no invite-only apps right now."
+            } else {
+                val apps =
+                    if (status.appCount == 1) "1 invite-only app is" else "${status.appCount} invite-only apps are"
+                rememberKrateLeadIn(Moment.INVITE_UNLOCKED, "$apps now in your catalog.")
+            }
+        InviteStatus.Rejected ->
+            rememberKrateLeadIn(
+                Moment.TOKEN_REJECTED,
+                "GitHub didn't accept it, or it can't see the invite-only repo. " +
+                    "Check it has \"Contents: Read-only\" on that repo, or ask for a new one.",
+            )
+        InviteStatus.Unreachable ->
+            rememberKrateLeadIn(Moment.INVITE_UNREACHABLE, "Krate will try again on the next refresh.")
+        InviteStatus.Checking -> "Checking the token..."
+        else -> "Saved. Krate checks it on the next refresh."
+    }

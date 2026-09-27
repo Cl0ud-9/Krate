@@ -1,7 +1,7 @@
-"""Renders an APK's launcher icon to a small PNG, so the manager can show an app's real icon before
+"""Renders an APK's launcher icon to a small PNG, so Krate can show an app's real icon before
 it is installed. Handles plain bitmap icons and adaptive icons whose layers are bitmaps, solid
 colors or simple vector drawables (what launcher icons almost always are); anything else (a gradient-only layer, say)
-returns None and the manager keeps its lettered placeholder.
+returns None and Krate keeps its lettered placeholder.
 """
 import io
 import re

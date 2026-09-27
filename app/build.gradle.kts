@@ -20,15 +20,15 @@ val keystoreProperties =
     }
 
 android {
-    namespace = "dev.cl0ud9.manager"
+    namespace = "dev.cl0ud9.krate"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.cl0ud9.manager"
+        applicationId = "dev.cl0ud9.krate"
         minSdk = 30
         targetSdk = 37
-        versionCode = 18
-        versionName = "0.3.0"
+        versionCode = 19
+        versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -46,7 +46,7 @@ android {
     buildTypes {
         release {
             // R8 shrinking: the release APK drops from about 62 MB to a fraction of that, which is
-            // what every in-app manager update downloads
+            // what every in-app Krate update downloads
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

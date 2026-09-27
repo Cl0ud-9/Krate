@@ -1,0 +1,109 @@
+package dev.cl0ud9.krate.ui.settings
+
+import android.os.Build
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.NotificationManagerCompat
+import dev.cl0ud9.krate.domain.model.ActivityAction
+import dev.cl0ud9.krate.domain.model.ActivityEntry
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+private const val RECENT_ACTIVITY_LIMIT = 10
+
+// one catalog app's state, as it goes into the report
+internal data class ReportedApp(
+    val name: String,
+    val installedVersion: String?,
+    val latest: String?,
+    // the build Krate itself last installed - what update detection compares against
+    val installedByManager: String?,
+)
+
+// device/package facts read via Context, gathered here rather than in SettingsViewModel - matching
+// how rememberVersionName() already keeps this kind of PackageManager lookup in the UI layer instead
+// of smuggling a Context into a ViewModel. Android has no public API for a normal (non-system) app to
+// read its own logcat output, so "attach logs" here means this self-assembled diagnostic summary -
+// device/app/catalog facts plus recent activity - not a raw system log
+@Composable
+internal fun rememberDeviceSummary(): String {
+    val context = LocalContext.current
+    return remember {
+        val info = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
+        buildString {
+            appendLine(
+                "App: ${context.packageName} ${info?.versionName ?: "unknown"} (build ${info?.longVersionCode ?: "?"})",
+            )
+            appendLine("Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+            appendLine(
+                "Device: ${Build.MANUFACTURER} ${Build.MODEL}, ${Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown ABI"}",
+            )
+            appendLine("Can install apps: ${yesNo(context.packageManager.canRequestPackageInstalls())}")
+            appendLine("Notifications: ${yesNo(NotificationManagerCompat.from(context).areNotificationsEnabled())}")
+        }
+    }
+}
+
+// what someone helping with a problem needs: the device, what each app is at versus the catalog,
+// and what recently happened - failures included, with the reason that was shown
+internal fun formatDiagnosticReport(
+    deviceSummary: String,
+    apps: List<ReportedApp>,
+    recentActivity: List<ActivityEntry>,
+    hasGitHubToken: Boolean,
+    generatedAtMillis: Long,
+): String =
+    buildString {
+        appendLine("Krate diagnostic report")
+        appendLine("Generated: ${formatReportTime(generatedAtMillis)}")
+        appendLine()
+        append(deviceSummary)
+        // only whether one is saved, never the token itself - invite-only apps need it
+        appendLine("GitHub token saved: ${yesNo(hasGitHubToken)}")
+        appendLine()
+        appendLine("Apps (${apps.count { it.installedVersion != null }} of ${apps.size} installed):")
+        apps.forEach { app ->
+            val installed = app.installedVersion?.let { "installed $it" } ?: "not installed"
+            appendLine("- ${app.name}: $installed, latest ${app.latest ?: "unknown"}")
+            appendLine("    installed by Krate: ${app.installedByManager ?: "no record"}")
+        }
+        val recent = recentActivity.take(RECENT_ACTIVITY_LIMIT)
+        if (recent.isNotEmpty()) {
+            appendLine()
+            appendLine("Recent activity:")
+            recent.forEach { entry ->
+                val detail = entry.detail?.let { " - $it" }.orEmpty()
+                appendLine(
+                    "- ${formatReportTime(entry.timestampMillis)} ${entry.appName}: ${entry.action.label()}$detail",
+                )
+            }
+        }
+    }
+
+// the version as the app reports it, plus the build when that says more than the version (a patched rebuild)
+internal fun reportedVersion(
+    versionName: String,
+    buildId: String?,
+): String =
+    buildId?.takeIf { it != versionName && it != "v$versionName" }?.let { "$versionName (build $it)" } ?: versionName
+
+private fun yesNo(value: Boolean): String = if (value) "yes" else "no"
+
+// exact local time with the zone, since "5 mins ago" is wrong by the time anyone reads the report
+private val REPORT_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm z", Locale.US)
+
+internal fun formatReportTime(
+    millis: Long,
+    zone: ZoneId = ZoneId.systemDefault(),
+): String = REPORT_TIME.format(Instant.ofEpochMilli(millis).atZone(zone))
+
+private fun ActivityAction.label(): String =
+    when (this) {
+        ActivityAction.INSTALLED -> "installed"
+        ActivityAction.UPDATED -> "updated"
+        ActivityAction.UNINSTALLED -> "uninstalled"
+        ActivityAction.FAILED -> "failed"
+    }

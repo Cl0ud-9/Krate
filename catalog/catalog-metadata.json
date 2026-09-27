@@ -46,6 +46,29 @@
       }
     },
     {
+      "id": "microg-re",
+      "displayName": "MicroG RE",
+      "description": "Signs you in to your Google account in apps that need it, without Google Play services.",
+      "highlights": [
+        "Google account sign-in for apps that rely on it",
+        "A light, open-source stand-in for Google Play services",
+        "Other apps in the Krate may list it as a requirement"
+      ],
+      "packageName": "app.revanced.android.gms",
+      "supportStatus": "SUPPORTED",
+      "installationMode": "UPDATE",
+      "dependencyIds": [],
+      "enabled": true,
+      "source": {
+        "repo": "MorpheApp/MicroG-RE",
+        "assetPattern": "^microg-[0-9.]+-arm64-v8a\\.apk$",
+        "includePrerelease": false,
+        "retainVersions": 3,
+        "expectedCertificateSha256": "0b6c9515afb195fac59601696ba0a7907a0b217ccf720b43148427ccf64343e7",
+        "releaseNotes": false
+      }
+    },
+    {
       "id": "mihon",
       "displayName": "Mihon",
       "description": "A free, open-source manga reader for Android.",

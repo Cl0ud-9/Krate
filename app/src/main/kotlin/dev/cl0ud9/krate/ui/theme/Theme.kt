@@ -1,0 +1,173 @@
+package dev.cl0ud9.krate.ui.theme
+
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import dev.cl0ud9.krate.domain.model.ThemeMode
+
+// full brand-seeded tonal palettes - every role, not just primary - see the generation note in Color.kt
+private val LightColors =
+    lightColorScheme(
+        primary = LightPrimary,
+        onPrimary = LightOnPrimary,
+        primaryContainer = LightPrimaryContainer,
+        onPrimaryContainer = LightOnPrimaryContainer,
+        inversePrimary = LightInversePrimary,
+        primaryFixed = LightPrimaryFixed,
+        primaryFixedDim = LightPrimaryFixedDim,
+        onPrimaryFixed = LightOnPrimaryFixed,
+        onPrimaryFixedVariant = LightOnPrimaryFixedVariant,
+        secondary = LightSecondary,
+        onSecondary = LightOnSecondary,
+        secondaryContainer = LightSecondaryContainer,
+        onSecondaryContainer = LightOnSecondaryContainer,
+        secondaryFixed = LightSecondaryFixed,
+        secondaryFixedDim = LightSecondaryFixedDim,
+        onSecondaryFixed = LightOnSecondaryFixed,
+        onSecondaryFixedVariant = LightOnSecondaryFixedVariant,
+        tertiary = LightTertiary,
+        onTertiary = LightOnTertiary,
+        tertiaryContainer = LightTertiaryContainer,
+        onTertiaryContainer = LightOnTertiaryContainer,
+        tertiaryFixed = LightTertiaryFixed,
+        tertiaryFixedDim = LightTertiaryFixedDim,
+        onTertiaryFixed = LightOnTertiaryFixed,
+        onTertiaryFixedVariant = LightOnTertiaryFixedVariant,
+        error = LightError,
+        onError = LightOnError,
+        errorContainer = LightErrorContainer,
+        onErrorContainer = LightOnErrorContainer,
+        background = LightBackground,
+        onBackground = LightOnBackground,
+        surface = LightSurface,
+        onSurface = LightOnSurface,
+        surfaceVariant = LightSurfaceVariant,
+        onSurfaceVariant = LightOnSurfaceVariant,
+        surfaceTint = LightSurfaceTint,
+        inverseSurface = LightInverseSurface,
+        inverseOnSurface = LightInverseOnSurface,
+        outline = LightOutline,
+        outlineVariant = LightOutlineVariant,
+        scrim = LightScrim,
+        surfaceBright = LightSurfaceBright,
+        surfaceDim = LightSurfaceDim,
+        surfaceContainer = LightSurfaceContainer,
+        surfaceContainerHigh = LightSurfaceContainerHigh,
+        surfaceContainerHighest = LightSurfaceContainerHighest,
+        surfaceContainerLow = LightSurfaceContainerLow,
+        surfaceContainerLowest = LightSurfaceContainerLowest,
+    )
+
+private val DarkColors =
+    darkColorScheme(
+        primary = DarkPrimary,
+        onPrimary = DarkOnPrimary,
+        primaryContainer = DarkPrimaryContainer,
+        onPrimaryContainer = DarkOnPrimaryContainer,
+        inversePrimary = DarkInversePrimary,
+        primaryFixed = DarkPrimaryFixed,
+        primaryFixedDim = DarkPrimaryFixedDim,
+        onPrimaryFixed = DarkOnPrimaryFixed,
+        onPrimaryFixedVariant = DarkOnPrimaryFixedVariant,
+        secondary = DarkSecondary,
+        onSecondary = DarkOnSecondary,
+        secondaryContainer = DarkSecondaryContainer,
+        onSecondaryContainer = DarkOnSecondaryContainer,
+        secondaryFixed = DarkSecondaryFixed,
+        secondaryFixedDim = DarkSecondaryFixedDim,
+        onSecondaryFixed = DarkOnSecondaryFixed,
+        onSecondaryFixedVariant = DarkOnSecondaryFixedVariant,
+        tertiary = DarkTertiary,
+        onTertiary = DarkOnTertiary,
+        tertiaryContainer = DarkTertiaryContainer,
+        onTertiaryContainer = DarkOnTertiaryContainer,
+        tertiaryFixed = DarkTertiaryFixed,
+        tertiaryFixedDim = DarkTertiaryFixedDim,
+        onTertiaryFixed = DarkOnTertiaryFixed,
+        onTertiaryFixedVariant = DarkOnTertiaryFixedVariant,
+        error = DarkError,
+        onError = DarkOnError,
+        errorContainer = DarkErrorContainer,
+        onErrorContainer = DarkOnErrorContainer,
+        background = DarkBackground,
+        onBackground = DarkOnBackground,
+        surface = DarkSurface,
+        onSurface = DarkOnSurface,
+        surfaceVariant = DarkSurfaceVariant,
+        onSurfaceVariant = DarkOnSurfaceVariant,
+        surfaceTint = DarkSurfaceTint,
+        inverseSurface = DarkInverseSurface,
+        inverseOnSurface = DarkInverseOnSurface,
+        outline = DarkOutline,
+        outlineVariant = DarkOutlineVariant,
+        scrim = DarkScrim,
+        surfaceBright = DarkSurfaceBright,
+        surfaceDim = DarkSurfaceDim,
+        surfaceContainer = DarkSurfaceContainer,
+        surfaceContainerHigh = DarkSurfaceContainerHigh,
+        surfaceContainerHighest = DarkSurfaceContainerHighest,
+        surfaceContainerLow = DarkSurfaceContainerLow,
+        surfaceContainerLowest = DarkSurfaceContainerLowest,
+    )
+
+// the resolved light/dark boolean behind the theme mode setting - shared with KrateActivity so the
+// system status/navigation bar icon color can track the same decision instead of only ever
+// following the raw system setting (which drifts from an explicit in-app Light/Dark override)
+@Composable
+fun ThemeMode.resolveDarkTheme(): Boolean =
+    when (this) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
+
+// MaterialExpressiveTheme and MotionScheme need material3 1.5.0-alpha (see gradle/libs.versions.toml)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun KrateTheme(
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    useSmoothCorners: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val darkTheme = themeMode.resolveDarkTheme()
+
+    // wallpaper colors on Android 12+, the brand scheme below that (minSdk is 30)
+    val colorScheme =
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                val context = LocalContext.current
+                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            }
+
+            darkTheme -> {
+                DarkColors
+            }
+
+            else -> {
+                LightColors
+            }
+        }
+
+    // the smooth-corners toggle has to be live before ShapeCache.materialShapes() is read below, so
+    // it's built here (inside the provider) instead of as a top-level val
+    ProvideUseSmoothCorners(enabled = useSmoothCorners) {
+        // expressive() over standard() - springier, more energetic defaults for stock M3 components'
+        // own built-in animations (Switch, dialogs, etc.), matching the hand-rolled spring motion
+        // already used for the nav bar and screen transitions rather than fighting calmer stock timing
+        MaterialExpressiveTheme(
+            colorScheme = colorScheme,
+            motionScheme = MotionScheme.expressive(),
+            shapes = ShapeCache.materialShapes(),
+            typography = KrateTypography,
+            content = content,
+        )
+    }
+}

@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Cl0ud-9/krate/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Cl0ud-9/krate?label=latest&color=5470FF"></a>
+  <a href="https://github.com/Cl0ud-9/Krate/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Cl0ud-9/Krate?label=latest&color=5470FF"></a>
   <img alt="Android 11+" src="https://img.shields.io/badge/Android-11%2B-3DDC84?logo=android&logoColor=white">
   <img alt="Kotlin and Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white">
   <img alt="Material 3 Expressive" src="https://img.shields.io/badge/Material%203-Expressive-2B42D6">
 </p>
 
 <p align="center">
-  <a href="https://github.com/Cl0ud-9/krate/releases/latest"><img alt="Download the latest Krate APK" src="https://img.shields.io/badge/Download-Krate%20APK-5470FF?style=for-the-badge&logo=android&logoColor=white"></a>
+  <a href="https://github.com/Cl0ud-9/Krate/releases/latest"><img alt="Download the latest Krate APK" src="https://img.shields.io/badge/Download-Krate%20APK-5470FF?style=for-the-badge&logo=android&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -70,14 +70,15 @@ It also has a bit of a personality. Say hello in the morning and it might tell y
 | **Mihon** | A free, open-source manga reader | [mihonapp/mihon](https://github.com/mihonapp/mihon) |
 | **LTE Cleaner FOSS** | Frees up storage by clearing out junk files | [MDP43140/LTECleanerFOSS](https://github.com/MDP43140/LTECleanerFOSS) |
 | **App Cache Cleaner** | Clears every app's cache in one go, no root needed | [bmx666/android-appcachecleaner](https://github.com/bmx666/android-appcachecleaner) |
+| **MicroG RE** | Google account sign-in for apps that need it, without Google Play services | [MorpheApp/MicroG-RE](https://github.com/MorpheApp/MicroG-RE) |
 | **MicroG RE** | Google sign-in for apps, without Google Play services | [MorpheApp/MicroG-RE](https://github.com/MorpheApp/MicroG-RE) |
 
 Know an app that belongs here? Suggest it from **Settings > Suggest an app**, or
-[open an issue](https://github.com/Cl0ud-9/krate/issues/new).
+[open an issue](https://github.com/Cl0ud-9/Krate/issues/new).
 
 ## Get Krate
 
-1. **Download** the latest APK from [Releases](https://github.com/Cl0ud-9/krate/releases/latest).
+1. **Download** the latest APK from [Releases](https://github.com/Cl0ud-9/Krate/releases/latest).
 2. **Open it** and let your browser or files app install it when Android asks.
 3. **Follow the setup.** It takes about a minute and asks for what Krate needs: permission to install apps, and on
    Android 13 or newer, notifications.
@@ -137,8 +138,8 @@ roaming, with Data Saver on, or in Battery Saver.
 ## Build it yourself
 
 ```bash
-git clone https://github.com/Cl0ud-9/krate.git
-cd krate
+git clone https://github.com/Cl0ud-9/Krate.git
+cd Krate
 ./gradlew assembleDebug
 ```
 
@@ -155,8 +156,10 @@ Tink, checked by ktlint, detekt and Android Lint.
 
 ## Support Krate
 
-Krate runs on coffee. If it saves you some tapping, you can
-[top it up on Ko-fi](https://ko-fi.com/cl0ud9). Bug reports and app suggestions help just as much.
+Krate runs on coffee. If it saves you some tapping, you can top it up. Bug reports and app suggestions help just as
+much.
+
+<a href='https://ko-fi.com/Z3E027P5XA' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi1.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 ## Credits
 

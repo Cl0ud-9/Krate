@@ -38,7 +38,7 @@ CACHE_PATH = WORK_DIR / "asset-cache.json"
 GITHUB_API = "https://api.github.com"
 # the repo and release tag the catalog is published to, read back as the fallback for an app whose
 # ingestion fails a run (see RemoteCatalogRepository.kt's MANIFEST_URL on the client side)
-OWN_REPO = os.environ.get("MANIFEST_REPO", "Cl0ud-9/krate")
+OWN_REPO = os.environ.get("MANIFEST_REPO", "Cl0ud-9/Krate")
 MANIFEST_TAG = os.environ.get("MANIFEST_TAG", "manifest-latest")
 # invite-only apps' releases live on one shared *private* repo, kept separate from this
 # public repo - see SETUP.md section 5. The per-run GITHUB_TOKEN only covers this repo, so reading
@@ -162,7 +162,7 @@ def badging(apk_path):
 
 def launcher_icon(apk_path):
     """The launcher icon as base64 PNG, or None - never fatal, an app without one just keeps the
-    manager's lettered placeholder."""
+    Krate's lettered placeholder."""
     try:
         png = icon_png(find_build_tool("aapt2"), apk_path)
     except Exception as exc:  # noqa: BLE001 - an icon is cosmetic, see docstring
@@ -248,7 +248,7 @@ def artifacts_from_public_source(app, source, cache):
                 "maxSdk": None,
                 "abis": facts["abis"],
                 "label": None,
-                "releaseNotes": release_notes(release),
+                "releaseNotes": release_notes(release) if source.get("releaseNotes", True) else None,
                 "publishedAt": release.get("published_at"),
                 "_icon": facts.get("icon"),
             }
@@ -303,7 +303,7 @@ def artifacts_from_private_source(app, source, cache, releases_by_repo):
                 "maxSdk": metadata.get("maxSdk"),
                 "abis": metadata.get("abis", facts["abis"]),
                 "label": metadata.get("profileLabel"),
-                "releaseNotes": release_notes(release),
+                "releaseNotes": release_notes(release) if source.get("releaseNotes", True) else None,
                 "publishedAt": release.get("published_at"),
                 "_icon": facts.get("icon"),
             }
@@ -335,7 +335,7 @@ def release_key(artifact):
 
 def build_artifacts(app, cache, releases_by_repo):
     """Every source's artifacts merged, newest release first. Within one release, sources keep
-    their catalog order (so the preferred build comes first - an older manager that ignores
+    their catalog order (so the preferred build comes first - an older Krate that ignores
     minSdk/maxSdk then still picks it), then the newest app version and newest build first."""
     sources = app.get("sources") or [app["source"]]
     merged = []
@@ -446,7 +446,7 @@ def main():
                 "installationMode": app["installationMode"],
                 "dependencyIds": app["dependencyIds"],
                 "artifacts": artifacts,
-                # app-level notes are the newest build's, kept for managers that predate per-build notes
+                # app-level notes are the newest build's, kept for Krate versions that predate per-build notes
                 "releaseNotes": newest.get("releaseNotes"),
                 "enabled": app["enabled"],
                 # shown until the app is installed and its real icon can be read on the device

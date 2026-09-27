@@ -1,0 +1,18 @@
+package dev.cl0ud9.krate.domain.repository
+
+import dev.cl0ud9.krate.domain.model.ActivityEntry
+import kotlinx.coroutines.flow.Flow
+
+// backs the Home screen's Recent activity section with genuine local history instead of a
+// permanently-empty placeholder - every entry is recorded from a real completed install/update
+interface ActivityLogRepository {
+    fun observeRecent(): Flow<List<ActivityEntry>>
+
+    suspend fun record(entry: ActivityEntry)
+
+    // drops an app's earlier failures once it has since worked; downloadsOnly keeps a failed install on record
+    suspend fun clearFailures(
+        appId: String,
+        downloadsOnly: Boolean = false,
+    )
+}

@@ -7,7 +7,7 @@ These steps involve your own accounts and secrets, so each is written as a comma
 Generate it locally, keep it outside the repo (`.gitignore` already excludes `*.jks`/`*.keystore`):
 
 ```
-keytool -genkeypair -v -keystore release.jks -alias manager-release -keyalg RSA -keysize 4096 -validity 10000
+keytool -genkeypair -v -keystore release.jks -alias krate-release -keyalg RSA -keysize 4096 -validity 10000
 ```
 
 Pick your own store/key passwords when prompted - don't reuse them elsewhere. Back the file up somewhere offline; losing it means you can never publish an update under the same signing identity again.
@@ -32,7 +32,7 @@ Delete `release.jks.b64` locally once uploaded.
 ## 2. Firebase project (needed from Phase 9, FCM)
 
 1. Create a project at https://console.firebase.google.com (free Spark plan - FCM has no usage cap on it).
-2. Add an Android app with package name `dev.cl0ud9.manager`.
+2. Add an Android app with package name `dev.cl0ud9.krate`.
 3. Download `google-services.json`, place it at `app/google-services.json`. It's gitignored - each environment (your machine, CI) needs its own copy or a secret-backed copy.
 4. For CI, base64-encode it the same way as the keystore and store as `GOOGLE_SERVICES_JSON_BASE64`; the workflow decodes it before build.
 
