@@ -12,6 +12,7 @@ import android.graphics.Bitmap
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import dev.cl0ud9.krate.EXTRA_NOTIFICATION_ID
 import dev.cl0ud9.krate.EXTRA_TARGET_ROUTE
 import dev.cl0ud9.krate.KrateActivity
 import dev.cl0ud9.krate.R
@@ -33,7 +34,7 @@ private const val CHANNEL_ID = "updates_v2"
 private const val PENDING_UPDATES_NOTIFICATION_ID = 1001
 private const val KRATE_UPDATE_NOTIFICATION_ID = 1002
 private const val UPDATE_ALL_RESULT_NOTIFICATION_ID = 1003
-private const val KRATE_UPDATED_NOTIFICATION_ID = 1004
+internal const val KRATE_UPDATED_NOTIFICATION_ID = 1004
 private const val STATE_PREFS = "update_notifier"
 private const val KEY_PENDING_SIGNATURE = "pending_signature"
 private const val KEY_PENDING_READY = "pending_ready"
@@ -228,6 +229,7 @@ object UpdateNotifier {
                 Intent(context, KrateActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra(EXTRA_TARGET_ROUTE, message.targetRoute)
+                    putExtra(EXTRA_NOTIFICATION_ID, id)
                 },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )

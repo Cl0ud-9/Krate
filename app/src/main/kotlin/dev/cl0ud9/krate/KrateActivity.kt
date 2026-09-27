@@ -25,12 +25,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dev.cl0ud9.krate.domain.model.ThemeMode
 import dev.cl0ud9.krate.platform.appContainer
+import dev.cl0ud9.krate.platform.workers.KRATE_UPDATED_NOTIFICATION_ID
 import dev.cl0ud9.krate.ui.components.KrateIntro
 import dev.cl0ud9.krate.ui.components.KrateIntroProgress
 import dev.cl0ud9.krate.ui.components.LocalIntroHeaderSlot
@@ -48,6 +50,7 @@ import kotlinx.coroutines.launch
 
 const val EXTRA_TARGET_ROUTE = "target_route"
 const val EXTRA_APP_ID = "appId"
+const val EXTRA_NOTIFICATION_ID = "notification_id"
 
 class KrateActivity : ComponentActivity() {
     private val pendingRoute = MutableStateFlow<String?>(null)
@@ -114,6 +117,13 @@ class KrateActivity : ComponentActivity() {
     // deep-linked route permanently, with no way to actually reach Home again from the bottom nav
     // that redirect keeps winning against
     private fun handleIntent(intent: Intent?) {
+        // Android only dismisses a notification on a tap of its body, not of its button, so Krate does it itself
+        intent?.getIntExtra(EXTRA_NOTIFICATION_ID, -1)?.takeIf { it >= 0 }?.let { id ->
+            NotificationManagerCompat.from(this).cancel(id)
+            intent.removeExtra(EXTRA_NOTIFICATION_ID)
+        }
+        // Krate is open now, which is all "Krate updated, tap to open" was asking for
+        NotificationManagerCompat.from(this).cancel(KRATE_UPDATED_NOTIFICATION_ID)
         val route =
             intent?.getStringExtra(EXTRA_TARGET_ROUTE)
                 ?: intent?.getStringExtra(EXTRA_APP_ID)?.let { "apps/$it" }

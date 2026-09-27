@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 
 // long enough to cover a section's resize animation after the tap
@@ -48,6 +48,7 @@ internal class ScrollAnchor(
 internal fun rememberScrollAnchor(scrollState: ScrollState): ScrollAnchor =
     remember(scrollState) { ScrollAnchor(scrollState) }
 
-// the section's place in the scrolling column, which doesn't move with the scroll itself
+// the section's place in the scrolling column, which doesn't move with the scroll itself. Read while the layout is
+// placed rather than after it, so the correction lands in the same frame instead of showing a one-frame bump
 internal fun Modifier.anchoredBy(anchor: ScrollAnchor): Modifier =
-    onGloballyPositioned { anchor.onPositioned(it.positionInParent().y) }
+    onPlaced { anchor.onPositioned(it.positionInParent().y) }

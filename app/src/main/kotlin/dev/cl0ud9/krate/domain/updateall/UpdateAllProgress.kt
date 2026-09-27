@@ -7,6 +7,8 @@ data class UpdateAllOutcome(
     val app: AppProfile,
     val succeeded: Boolean,
     val reason: String? = null,
+    // failed while downloading rather than installing, so a later successful download can clear it
+    val failedDownloading: Boolean = false,
 )
 
 sealed interface UpdateAllProgress {

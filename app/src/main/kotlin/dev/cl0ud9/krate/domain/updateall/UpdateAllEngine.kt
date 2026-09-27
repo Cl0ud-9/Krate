@@ -45,7 +45,7 @@ class UpdateAllEngine(
         val downloaded = downloadToReady(app, onStatus)
         if (downloaded !is DownloadStatus.ReadyToInstall) {
             val reason = (downloaded as? DownloadStatus.Failed)?.reason ?: "The download didn't finish."
-            return UpdateAllOutcome(app, succeeded = false, reason = reason)
+            return UpdateAllOutcome(app, succeeded = false, reason = reason, failedDownloading = true)
         }
 
         val apkFile = File(downloaded.filePath)

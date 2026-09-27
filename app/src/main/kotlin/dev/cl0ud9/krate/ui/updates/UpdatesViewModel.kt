@@ -2,6 +2,8 @@ package dev.cl0ud9.krate.ui.updates
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.cl0ud9.krate.data.activity.DOWNLOAD_FAILURE_PREFIX
+import dev.cl0ud9.krate.data.activity.INSTALL_FAILURE_PREFIX
 import dev.cl0ud9.krate.data.auth.GitHubCredentialStore
 import dev.cl0ud9.krate.data.downloads.DownloadProgressNotifier
 import dev.cl0ud9.krate.domain.model.ActivityAction
@@ -169,7 +171,7 @@ class UpdatesViewModel(
                     appName = outcome.app.displayName,
                     action = ActivityAction.FAILED,
                     timestampMillis = System.currentTimeMillis(),
-                    detail = outcome.reason,
+                    detail = "${failurePrefix(outcome)} ${outcome.reason}",
                 ),
             )
         }
@@ -207,3 +209,7 @@ class UpdatesViewModel(
         const val STOP_TIMEOUT_MS = 5000L
     }
 }
+
+// which step failed, so a later success at that step can clear it from Recent activity
+private fun failurePrefix(outcome: UpdateAllOutcome): String =
+    if (outcome.failedDownloading) DOWNLOAD_FAILURE_PREFIX else INSTALL_FAILURE_PREFIX

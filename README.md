@@ -44,7 +44,8 @@ checking release pages, downloading APKs and hoping you grabbed the right file.
 downloads the right build for your phone, checks that it's genuine, and hands it to Android to install. You tap
 *Install*, Android asks once, and that's it.
 
-It also has a bit of a personality. Say hello in the morning and it might tell you to *rise and Krate*.
+It also has a bit of a personality. Open it in the morning and it might tell you to *rise and Krate*. Prefer it
+quiet? Turn off **Playful messages** in **Settings > Appearance > Personality**.
 
 ## Features
 
@@ -55,6 +56,7 @@ It also has a bit of a personality. Say hello in the morning and it might tell y
 | 🔐 **Checked before it installs** | The catalog is signed with Ed25519, and every APK's SHA-256 and signing certificate are checked before Android ever sees it. |
 | 🔔 **Updates find you** | A background check every few hours, and a notification when something new lands. Nothing installs without your tap. |
 | 📶 **Automatic downloads** | Updates can download ahead of time on Wi-Fi (mobile data is opt-in), so installing takes seconds. |
+| 🏃 **Downloads that keep going** | Switch apps mid-download and it carries on, with progress in the notification. A dropped connection picks up where it stopped. |
 | 🕰️ **Version history** | A new build misbehaving? Pick an older one from the list and go back. |
 | 🛟 **Safe clean installs** | When an update can't go on top, Krate keeps a copy of the current version and puts it back if anything fails. |
 | 🎨 **Looks the part** | Material 3 Expressive, Material You colors, light and dark themes, a floating or full-width nav bar, and a proper landscape layout. |
@@ -71,7 +73,6 @@ It also has a bit of a personality. Say hello in the morning and it might tell y
 | **LTE Cleaner FOSS** | Frees up storage by clearing out junk files | [MDP43140/LTECleanerFOSS](https://github.com/MDP43140/LTECleanerFOSS) |
 | **App Cache Cleaner** | Clears every app's cache in one go, no root needed | [bmx666/android-appcachecleaner](https://github.com/bmx666/android-appcachecleaner) |
 | **MicroG RE** | Google account sign-in for apps that need it, without Google Play services | [MorpheApp/MicroG-RE](https://github.com/MorpheApp/MicroG-RE) |
-| **MicroG RE** | Google sign-in for apps, without Google Play services | [MorpheApp/MicroG-RE](https://github.com/MorpheApp/MicroG-RE) |
 
 Know an app that belongs here? Suggest it from **Settings > Suggest an app**, or
 [open an issue](https://github.com/Cl0ud-9/Krate/issues/new).
@@ -119,6 +120,13 @@ GitHub releases ──► catalog (built every 2 hours, signed) ──► Krate 
 
 No. Automatic downloads only fetch updates ahead of time. Every install still needs your tap and Android's
 confirmation.
+</details>
+
+<details>
+<summary><b>Do downloads keep going if I leave Krate?</b></summary>
+
+Yes. A download you start keeps going while you use other apps, with its progress in the notification, and a dropped
+connection resumes where it stopped instead of starting over.
 </details>
 
 <details>

@@ -33,11 +33,14 @@ import java.util.Date
 // every retained build, so a misbehaving newest one can be swapped for an earlier one (a withdrawn build is
 // listed but can't be picked); with only one build it says so rather than vanishing. For a patched app each row
 // is a patches release
+@Suppress("LongParameterList")
 @Composable
 internal fun VersionHistorySection(
     app: AppProfile,
     installedBuild: Baseline?,
     selectedArtifact: ArtifactInfo?,
+    // some listed build is older than the one on the device, so picking it means uninstalling first
+    olderThanInstalledListed: Boolean,
     onSelectVersion: (ArtifactInfo) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -69,6 +72,15 @@ internal fun VersionHistorySection(
                         onClick = { onSelectVersion(artifact) },
                     )
                 }
+            }
+            // said once, here, rather than appearing above the list when an older build is picked and shoving it down
+            if (olderThanInstalledListed) {
+                Text(
+                    text = "Going back to a version older than yours uninstalls the app first, which erases its data.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
             if (artifacts.size == 1) {
                 Text(

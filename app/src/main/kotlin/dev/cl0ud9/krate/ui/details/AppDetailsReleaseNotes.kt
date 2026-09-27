@@ -2,8 +2,9 @@ package dev.cl0ud9.krate.ui.details
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,9 +24,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.ArtifactInfo
@@ -39,6 +45,9 @@ import java.text.DateFormat
 import java.util.Date
 
 private const val COLLAPSED_LINES = 6
+private val CARD_PADDING = 16.dp
+private const val MISSING = "No release notes for this version."
+private const val MISSING_WITH_LINK = "No notes here for this version."
 private const val DIVIDER_ALPHA = 0.4f
 private val RELEASE_ASSET_URL = Regex("https://github\\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/[^/]+")
 
@@ -59,22 +68,46 @@ internal fun releaseNotesBuilds(
     return newer?.ifEmpty { null } ?: listOf(chosen)
 }
 
-// release notes for the selected build, or for everything since the installed one; a few lines until expanded
+// release notes for the selected build, or for everything since the installed one; a few lines until expanded.
+// The card fits its notes; whether they need "Show more" is worked out before the first draw, so the button never
+// pops in a frame late and nudges what's below
 @Composable
 internal fun ReleaseNotesSection(
     app: AppProfile,
     builds: List<ArtifactInfo>,
     onCollapse: () -> Unit = {},
 ) {
-    var expanded by remember(app.id) { mutableStateOf(false) }
-    var truncated by remember(app.id, builds) { mutableStateOf(false) }
+    // a different pick starts from the preview again
+    var expanded by remember(app.id, builds.firstOrNull()) { mutableStateOf(false) }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val truncated =
+            rememberPreviewTruncated(
+                builds.firstOrNull()?.let { notesFor(app, builds, it) },
+                maxWidth - CARD_PADDING * 2,
+            )
+        NotesCard(app, builds, expanded, truncated, onToggle = {
+            if (expanded) onCollapse()
+            expanded = !expanded
+        })
+    }
+}
+
+@Composable
+private fun NotesCard(
+    app: AppProfile,
+    builds: List<ArtifactInfo>,
+    expanded: Boolean,
+    truncated: Boolean,
+    onToggle: () -> Unit,
+) {
     val shown = if (expanded) builds else builds.take(1)
+    val missingPage = shown.firstOrNull()?.takeIf { notesFor(app, builds, it) == null }?.releasePageUrl()
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         shape = ShapeCache.smooth16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(CARD_PADDING), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(
                 title = if (builds.size > 1) "What's new since yours" else "Release notes",
                 icon = rememberVectorPainter(Icons.Filled.Description),
@@ -82,43 +115,74 @@ internal fun ReleaseNotesSection(
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
             )
             if (shown.isEmpty()) {
-                NotesBody(text = "No release notes available.", maxLines = Int.MAX_VALUE) {}
+                NotesBody(text = "No release notes available.", collapsed = !expanded)
             }
             shown.forEachIndexed { index, build ->
-                if (index >
-                    0
-                ) {
+                if (index > 0) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = DIVIDER_ALPHA))
                 }
                 BuildNotes(
                     build = build,
-                    notes = build.releaseNotes ?: app.releaseNotes.takeIf { build == builds.first() },
-                    maxLines = if (expanded) Int.MAX_VALUE else COLLAPSED_LINES,
-                    onTruncated = { truncated = it || truncated },
+                    notes = notesFor(app, builds, build),
+                    collapsed = !expanded,
                 )
             }
-            if (expanded || truncated || builds.size > 1) {
-                TextButton(
-                    onClick = {
-                        if (expanded) onCollapse()
-                        expanded = !expanded
+            NotesActionSlot(
+                label =
+                    when {
+                        expanded -> "Show less"
+                        builds.size > 1 -> "Show all ${builds.size} versions"
+                        truncated -> "Show more"
+                        else -> null
                     },
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Text(
-                        if (expanded) {
-                            "Show less"
-                        } else if (builds.size >
-                            1
-                        ) {
-                            "Show all ${builds.size} versions"
-                        } else {
-                            "Show more"
-                        },
-                    )
-                }
-            }
+                releasePage = missingPage,
+                onToggle = onToggle,
+            )
         }
+    }
+}
+
+private fun notesFor(
+    app: AppProfile,
+    builds: List<ArtifactInfo>,
+    build: ArtifactInfo,
+): String? = build.releaseNotes ?: app.releaseNotes.takeIf { build == builds.first() }
+
+// the card's bottom-right action: the expand toggle, or a way to the notes on GitHub; nothing when neither applies
+@Composable
+private fun NotesActionSlot(
+    label: String?,
+    releasePage: String?,
+    onToggle: () -> Unit,
+) {
+    val uriHandler = LocalUriHandler.current
+    if (label == null && releasePage == null) return
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+        if (label != null) {
+            TextButton(onClick = onToggle) { Text(label) }
+        } else if (releasePage != null) {
+            TextButton(onClick = { uriHandler.openUri(releasePage) }) { Text("See the release on GitHub") }
+        }
+    }
+}
+
+// whether the collapsed preview of these notes runs past its lines, measured up front at the width the card gives them
+@Composable
+private fun rememberPreviewTruncated(
+    notes: String?,
+    availableWidth: Dp,
+): Boolean {
+    if (notes == null) return false
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.bodyMedium
+    val (preview, skippedIntro) = remember(notes) { releaseNotesPreview(notes) }
+    val formatted = preview.formatMarkdownLite()
+    val width = with(LocalDensity.current) { availableWidth.roundToPx() }
+    return remember(formatted, style, width) {
+        skippedIntro ||
+            measurer
+                .measure(formatted, style, maxLines = COLLAPSED_LINES, constraints = Constraints(maxWidth = width))
+                .hasVisualOverflow
     }
 }
 
@@ -127,8 +191,7 @@ internal fun ReleaseNotesSection(
 private fun BuildNotes(
     build: ArtifactInfo,
     notes: String?,
-    maxLines: Int,
-    onTruncated: (Boolean) -> Unit,
+    collapsed: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -149,27 +212,11 @@ private fun BuildNotes(
                 )
             }
         }
-        if (notes != null) {
-            NotesBody(text = notes, maxLines = maxLines, onTruncated = onTruncated)
-        } else {
-            MissingNotes(releasePage = build.releasePageUrl())
-        }
-    }
-}
-
-// nothing to show here, but a public build's own release page on GitHub always has the story
-@Composable
-private fun MissingNotes(releasePage: String?) {
-    val uriHandler = LocalUriHandler.current
-    Text(
-        text = if (releasePage != null) "No notes here for this version." else "No release notes for this version.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    if (releasePage != null) {
-        TextButton(onClick = { uriHandler.openUri(releasePage) }, contentPadding = PaddingValues(0.dp)) {
-            Text("See the release on GitHub")
-        }
+        NotesBody(
+            text = notes ?: if (build.releasePageUrl() != null) MISSING_WITH_LINK else MISSING,
+            collapsed = collapsed,
+            muted = notes == null,
+        )
     }
 }
 
@@ -183,23 +230,19 @@ internal fun ArtifactInfo.releasePageUrl(): String? =
         }
     }
 
+// a few lines of the changes while collapsed, all of it once expanded
 @Composable
 private fun NotesBody(
     text: String,
-    maxLines: Int,
-    onTruncated: (Boolean) -> Unit,
+    collapsed: Boolean,
+    muted: Boolean = false,
 ) {
-    // collapsed, the preview opens on the changes; a skipped intro still counts as more to show
-    val collapsed = maxLines != Int.MAX_VALUE
-    val (shown, skippedIntro) =
-        remember(
-            text,
-            collapsed,
-        ) { if (collapsed) releaseNotesPreview(text) else text to false }
+    // collapsed, the preview opens on the changes, past any intro
+    val shown = remember(text, collapsed) { if (collapsed) releaseNotesPreview(text).first else text }
     Text(
         text = shown.formatMarkdownLite(),
         style = MaterialTheme.typography.bodyMedium,
-        maxLines = maxLines,
-        onTextLayout = { onTruncated(it.hasVisualOverflow || skippedIntro) },
+        color = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
+        maxLines = if (collapsed) COLLAPSED_LINES else Int.MAX_VALUE,
     )
 }

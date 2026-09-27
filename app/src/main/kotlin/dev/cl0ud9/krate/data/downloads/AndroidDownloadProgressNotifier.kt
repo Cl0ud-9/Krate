@@ -14,6 +14,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import dev.cl0ud9.krate.EXTRA_APP_ID
+import dev.cl0ud9.krate.EXTRA_NOTIFICATION_ID
 import dev.cl0ud9.krate.EXTRA_TARGET_ROUTE
 import dev.cl0ud9.krate.KrateActivity
 import dev.cl0ud9.krate.R
@@ -236,6 +237,8 @@ class AndroidDownloadProgressNotifier(
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(EXTRA_TARGET_ROUTE, "apps/$appId")
                 putExtra(EXTRA_APP_ID, appId)
+                // a finished download's result is dismissed when it opens Krate; a running one's progress can't be
+                putExtra(EXTRA_NOTIFICATION_ID, resultIdFor(appId))
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

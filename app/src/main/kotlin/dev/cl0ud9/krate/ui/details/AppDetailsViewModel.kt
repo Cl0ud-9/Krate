@@ -170,6 +170,8 @@ class AppDetailsViewModel(
                         withContext(Dispatchers.IO) { artifactDownloader.existingReadyFile(profile, artifact) }
                     if (readyFile != null) {
                         mutableDownloadStatus.value = DownloadStatus.ReadyToInstall(readyFile)
+                        // fetched some other way (automatic downloads, an earlier run), so an old failure is moot
+                        activityLogRepository.clearFailures(profile.id, downloadsOnly = true)
                     }
                 }
                 mutableFirstCheckDone.value = true

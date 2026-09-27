@@ -240,13 +240,12 @@ private fun RollbackContent(
                 "Older version selected: ${state.selectedArtifact?.buildDescription()}."
             },
     )
+    // no uninstall warning here: picking a version must not change this section's height and shove the list below;
+    // the version list says it once, and the install step says it again right before it happens
     if (uninstalling) {
         UninstallingStatus(installStatus = state.installStatus)
     } else {
         InstalledNotUpToDateActions(state = state, onDownload = onDownload)
-    }
-    if (state.requiresUninstall) {
-        HelperText(UNINSTALL_FIRST_WARNING)
     }
 }
 

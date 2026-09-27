@@ -316,13 +316,27 @@ private fun AppDetailsContent(
     }
 }
 
-// the selected build's notes, then every build to pick from; the list stays put when a pick resizes the notes
+// every build to pick from, then the picked build's notes below it: a pick only ever changes what's under the list,
+// so nothing the finger is on moves, and the notes can grow or shrink freely
 @Composable
 private fun NotesAndHistory(
     state: AppDetailsUiState,
     anchor: ScrollAnchor,
     onSelectVersion: (ArtifactInfo) -> Unit,
 ) {
+    // a broken newest build can be worked around right away by picking an earlier one here
+    VersionHistorySection(
+        app = state.app,
+        // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
+        installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
+        selectedArtifact = state.selectedArtifact,
+        olderThanInstalledListed = state.app.artifacts.any { requiresUninstall(state.installed, it) },
+        onSelectVersion = { artifact ->
+            anchor.hold()
+            onSelectVersion(artifact)
+        },
+        modifier = Modifier.anchoredBy(anchor),
+    )
     ReleaseNotesSection(
         app = state.app,
         builds =
@@ -334,19 +348,6 @@ private fun NotesAndHistory(
                         null
                 },
             ),
-        onCollapse = anchor::hold,
-    )
-    // a broken newest build can be worked around right away by picking an earlier one here
-    VersionHistorySection(
-        app = state.app,
-        // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
-        installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
-        selectedArtifact = state.selectedArtifact,
-        onSelectVersion = { artifact ->
-            anchor.hold()
-            onSelectVersion(artifact)
-        },
-        modifier = Modifier.anchoredBy(anchor),
     )
 }
 

@@ -88,7 +88,10 @@ class ManifestCheckWorker(
                                         ).last() is DownloadStatus.ReadyToInstall
                                 }.getOrDefault(false)
                         )
-                if (ready) downloader.pruneOtherBuilds(app, artifact, allAppIds)
+                if (ready) {
+                    downloader.pruneOtherBuilds(app, artifact, allAppIds)
+                    container.activityLogRepository.clearFailures(app.id, downloadsOnly = true)
+                }
                 ready
             }.all { it }
     }
