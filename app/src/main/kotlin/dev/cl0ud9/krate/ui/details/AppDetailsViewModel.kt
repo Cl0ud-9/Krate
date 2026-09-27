@@ -24,6 +24,8 @@ import dev.cl0ud9.krate.domain.repository.AnnouncementDismissalStore
 import dev.cl0ud9.krate.domain.repository.Baseline
 import dev.cl0ud9.krate.domain.repository.CatalogRepository
 import dev.cl0ud9.krate.domain.repository.KrateBaselineStore
+import dev.cl0ud9.krate.domain.repository.effectiveBaseline
+import dev.cl0ud9.krate.domain.repository.forTrack
 import dev.cl0ud9.krate.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
 import kotlinx.coroutines.Dispatchers
@@ -137,8 +139,19 @@ class AppDetailsViewModel(
     // more than just the latest so a broken newest build still leaves older ones installable)
     private val mutableExplicitArtifact = MutableStateFlow<ArtifactInfo?>(null)
     val selectedArtifact: StateFlow<ArtifactInfo?> =
-        combine(app, mutableExplicitArtifact) { profile, explicit -> explicit ?: profile?.latestArtifact }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+        combine(
+            app,
+            mutableExplicitArtifact,
+            krateBaseline,
+            installedVersion,
+        ) { profile, explicit, recorded, installed ->
+            // the newest build of the installed theme, for apps that publish several side by side
+            explicit ?: profile?.let { it.forTrack(effectiveBaseline(recorded, it, installed)).latestArtifact }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    // the screen opens once it knows whether a download is already waiting, so its card doesn't swap in late
+    private val mutableFirstCheckDone = MutableStateFlow(false)
+    val ready: StateFlow<Boolean> = mutableFirstCheckDone.asStateFlow()
 
     // a fresh ViewModel (any plain revisit of this screen - navigating away and back mints a new
     // screen-scoped instance every time, not just process death) otherwise starts at Idle even when
@@ -159,6 +172,7 @@ class AppDetailsViewModel(
                         mutableDownloadStatus.value = DownloadStatus.ReadyToInstall(readyFile)
                     }
                 }
+                mutableFirstCheckDone.value = true
             }
         }
     }
@@ -192,12 +206,9 @@ class AppDetailsViewModel(
         mutableInstallStatus.value = InstallStatus.Idle
         // the tap shows at once, even before the first byte arrives
         mutableDownloadStatus.value = DownloadStatus.Downloading(0L, null)
-        // this keeps running for as long as the ViewModel itself is alive, which backgrounding the
-        // app via Home does not affect - only leaving this screen (clearing the ViewModel) or the
-        // process actually dying does. downloadProgressNotifier decides on its own whether a
-        // notification is actually worth showing (it no-ops while the app is in the foreground,
-        // where App Details' own progress bar already covers this) and whether a finished result
-        // is worth surfacing even after the app comes back to the foreground
+        // told right away, while Krate is still on screen: that's when it can keep the network for the whole
+        // download, which then runs for as long as this screen's ViewModel lives, app backgrounded or not
+        downloadProgressNotifier.onDownloading(currentApp.id, currentApp.displayName, 0L, null)
         downloadJob =
             viewModelScope.launch {
                 collectDownload(currentApp, artifact)

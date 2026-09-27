@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dev.cl0ud9.krate.domain.model.ThemeMode
@@ -34,7 +35,9 @@ import dev.cl0ud9.krate.ui.components.KrateIntro
 import dev.cl0ud9.krate.ui.components.KrateIntroProgress
 import dev.cl0ud9.krate.ui.components.LocalIntroHeaderSlot
 import dev.cl0ud9.krate.ui.components.LocalIntroPlaying
+import dev.cl0ud9.krate.ui.navigation.ArrivalFromOutside
 import dev.cl0ud9.krate.ui.navigation.KrateNavHost
+import dev.cl0ud9.krate.ui.navigation.LiveNavigation
 import dev.cl0ud9.krate.ui.onboarding.OnboardingScreen
 import dev.cl0ud9.krate.ui.theme.KrateTheme
 import dev.cl0ud9.krate.ui.theme.resolveDarkTheme
@@ -115,7 +118,11 @@ class KrateActivity : ComponentActivity() {
             intent?.getStringExtra(EXTRA_TARGET_ROUTE)
                 ?: intent?.getStringExtra(EXTRA_APP_ID)?.let { "apps/$it" }
         if (!route.isNullOrEmpty()) {
-            pendingRoute.value = route
+            // a tap while Krate is already on screen keeps the normal push animation
+            val fromOutside = !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            if (fromOutside) ArrivalFromOutside.arm()
+            // already running: switch right now, before the window draws, so it opens straight onto the target
+            if (!(fromOutside && LiveNavigation.open(route))) pendingRoute.value = route
             intent?.removeExtra(EXTRA_TARGET_ROUTE)
             intent?.removeExtra(EXTRA_APP_ID)
         }

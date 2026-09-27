@@ -36,10 +36,12 @@ import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.ArtifactInfo
 import dev.cl0ud9.krate.domain.model.DownloadStatus
 import dev.cl0ud9.krate.domain.model.InstallStatus
+import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.WaitingForUserStep
 import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.domain.repository.Baseline
 import dev.cl0ud9.krate.domain.repository.effectiveBaseline
+import dev.cl0ud9.krate.domain.repository.forTrack
 import dev.cl0ud9.krate.domain.repository.isNewerThan
 import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
@@ -83,7 +85,8 @@ fun AppDetailsScreen(
     val downloadStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
     val installStatus by viewModel.installStatus.collectAsStateWithLifecycle()
     val selectedArtifact by viewModel.selectedArtifact.collectAsStateWithLifecycle()
-    val currentApp = app
+    val ready by viewModel.ready.collectAsStateWithLifecycle()
+    val currentApp = app.takeIf { ready }
     // no pull-to-refresh here - RefreshOnResume above already re-checks this one app whenever the
     // screen comes back into view, so a swipe gesture on top of that was a redundant second trigger
     Box(modifier = Modifier.fillMaxSize()) {
@@ -144,9 +147,50 @@ internal data class AppDetailsUiState(
     val effectiveBaseline: Baseline?
         get() = effectiveBaseline(recordedBaseline, app, installed)
 
-    // the user picked an older retained build in version history while something is installed
+    // just the installed theme's builds, for apps that publish several themes side by side
+    val trackApp: AppProfile
+        get() = app.forTrack(effectiveBaseline?.takeIf { installed != null })
+
+    // the listed build that's on the device, when Krate knows exactly which one
+    private val installedArtifact: ArtifactInfo?
+        get() =
+            effectiveBaseline?.takeIf { installed != null && it.buildId != null }?.let { baseline ->
+                app.artifacts.firstOrNull { it.isBuildOf(baseline) }
+            }
+
+    // a build of another theme than the installed one - a change of look, not an update or a rollback
+    val isSwitch: Boolean
+        get() {
+            val currentLabel = installedArtifact?.label
+            val selected = selectedArtifact
+            return currentLabel != null && selected != null && selected.label != currentLabel
+        }
+
+    // a build older than the one on the device - by version code when both are known, else by catalog order
     val isRollback: Boolean
-        get() = installed != null && selectedArtifact != null && selectedArtifact != app.latestArtifact
+        get() {
+            val selected = selectedArtifact
+            // the default pick is never a rollback, even when the installed build is newer than the catalog's
+            return installed != null &&
+                selected != null &&
+                selected != trackApp.latestArtifact &&
+                !isSwitch &&
+                isOlderThanInstalled(selected)
+        }
+
+    private fun isOlderThanInstalled(selected: ArtifactInfo): Boolean {
+        val code = selected.versionCode
+        val baseline = effectiveBaseline
+        return when {
+            code != null && installed != null && code != installed.versionCode -> code < installed.versionCode
+            baseline != null -> !selected.isNewerThan(baseline, trackApp.artifacts) && !selected.isBuildOf(baseline)
+            else -> false
+        }
+    }
+
+    // a build that was already going to uninstall first, so offering "from scratch" as a fallback would repeat it
+    val installsFromScratch: Boolean
+        get() = app.installationMode == InstallationMode.CLEAN_INSTALL || requiresUninstall
 
     // see requiresUninstall - shown as a warning before, and used to route the install through the
     // uninstall-first path
@@ -165,7 +209,7 @@ internal data class AppDetailsUiState(
         get() {
             val baseline = effectiveBaseline ?: return false
             val selected = selectedArtifact ?: return false
-            return !selected.isNewerThan(baseline, app.artifacts)
+            return !selected.isNewerThan(baseline, trackApp.artifacts)
         }
 
     // true when the live-installed version doesn't match the baseline - something changed this
@@ -189,6 +233,11 @@ internal fun requiresUninstall(
     val versionCode = artifact?.versionCode ?: return false
     return installed != null && versionCode < installed.versionCode
 }
+
+// a baseline recorded before builds had ids only knows its version, which is enough for apps that
+// publish one build per version
+internal fun ArtifactInfo.isBuildOf(baseline: Baseline): Boolean =
+    if (baseline.buildId != null) buildId == baseline.buildId else versionName == baseline.versionName
 
 // "patches v6.2.1 on 20.40.45, Material You" for a patched app, where the patches release is what
 // tells builds apart; just the version otherwise
@@ -217,6 +266,8 @@ private fun AppDetailsContent(
         state.installStatus is InstallStatus.WaitingForUser &&
             state.installStatus.step == WaitingForUserStep.UNINSTALL_CONFIRM
     val uninstalling = state.installStatus is InstallStatus.Uninstalling || awaitingUninstallConfirm
+    // picking a version or collapsing long notes resizes what's above the version list; it stays under the finger
+    val anchor = rememberScrollAnchor(scrollState)
 
     Column(
         modifier =
@@ -226,9 +277,7 @@ private fun AppDetailsContent(
                 .padding(top = topContentPadding + DetailContentTopGap, start = 20.dp, end = 20.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // one compact header block instead of three stacked rows (name/package, badge/version,
-        // installed status) - each of those is a short fragment on its own and reads as more
-        // intentional grouped together than as separate full-width rows with their own gaps
+        // name, version and installed status as one compact block
         AppDetailsHeader(
             app = app,
             installedVersionName = state.installedVersionName,
@@ -263,30 +312,42 @@ private fun AppDetailsContent(
         // what the app is sits right under the action, before the finer controls further down
         AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
 
-        ReleaseNotesSection(
-            app = app,
-            builds =
-                releaseNotesBuilds(
-                    app,
-                    state.selectedArtifact,
-                    state.effectiveBaseline?.takeIf {
-                        state.installed !=
-                            null
-                    },
-                ),
-        )
-
-        // only renders once more than one version is actually retained (see catalog-metadata.json's
-        // retainVersions) - lets a broken newest build be worked around immediately instead of
-        // waiting for the next release, by picking an older version to download/install instead
-        VersionHistorySection(
-            app = app,
-            // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
-            installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
-            selectedArtifact = state.selectedArtifact,
-            onSelectVersion = onSelectVersion,
-        )
+        NotesAndHistory(state = state, anchor = anchor, onSelectVersion = onSelectVersion)
     }
+}
+
+// the selected build's notes, then every build to pick from; the list stays put when a pick resizes the notes
+@Composable
+private fun NotesAndHistory(
+    state: AppDetailsUiState,
+    anchor: ScrollAnchor,
+    onSelectVersion: (ArtifactInfo) -> Unit,
+) {
+    ReleaseNotesSection(
+        app = state.app,
+        builds =
+            releaseNotesBuilds(
+                state.trackApp,
+                state.selectedArtifact,
+                state.effectiveBaseline?.takeIf {
+                    state.installed !=
+                        null
+                },
+            ),
+        onCollapse = anchor::hold,
+    )
+    // a broken newest build can be worked around right away by picking an earlier one here
+    VersionHistorySection(
+        app = state.app,
+        // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
+        installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
+        selectedArtifact = state.selectedArtifact,
+        onSelectVersion = { artifact ->
+            anchor.hold()
+            onSelectVersion(artifact)
+        },
+        modifier = Modifier.anchoredBy(anchor),
+    )
 }
 
 // the trash action sits beside the name/compatibility/version block as a whole, vertically centered

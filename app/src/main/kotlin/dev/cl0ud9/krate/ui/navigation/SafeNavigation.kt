@@ -19,7 +19,7 @@ internal fun NavHostController.navigateFromTap(route: String) {
 private val ROUTE_ARGUMENT = Regex("""\{([^}]+)\}""")
 
 // the concrete route of an entry, with its arguments filled in
-private fun currentRouteOf(entry: NavBackStackEntry): String? =
+internal fun currentRouteOf(entry: NavBackStackEntry): String? =
     entry.destination.route?.let { template ->
         ROUTE_ARGUMENT.replace(template) { match -> entry.arguments?.getString(match.groupValues[1]) ?: match.value }
     }

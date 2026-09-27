@@ -9,6 +9,7 @@ import dev.cl0ud9.krate.security.apk.ApkArchiveReader
 import dev.cl0ud9.krate.security.hash.hashesMatch
 import dev.cl0ud9.krate.security.hash.sha256Hex
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -20,6 +21,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.util.concurrent.TimeUnit
 
 private const val STREAM_BUFFER_SIZE = 8192
 private const val PROGRESS_EMIT_INTERVAL_BYTES = 256 * 1024L
@@ -27,6 +29,21 @@ private const val HTTP_PARTIAL_CONTENT = 206
 private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
 private const val HTTP_NOT_FOUND = 404
+private const val HTTP_RANGE_NOT_SATISFIABLE = 416
+
+// a slow mobile connection can go quiet for a while without being gone
+private const val CONNECT_TIMEOUT_SECONDS = 20L
+private const val READ_TIMEOUT_SECONDS = 30L
+
+// a dropped connection resumes from what's already on disk, after each of these pauses, before the download gives up
+private val DEFAULT_RETRY_DELAYS_MS = listOf(2_000L, 5_000L, 10_000L, 20_000L)
+
+private fun downloadHttpClient(): OkHttpClient =
+    OkHttpClient
+        .Builder()
+        .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .build()
 
 // safety margin over the artifact size to leave room for the rollback copy and install staging, section 42.6
 private const val STORAGE_SAFETY_MARGIN = 1.5
@@ -44,7 +61,8 @@ class OkHttpArtifactDownloader(
     private val downloadsDir: File,
     private val archiveReader: ApkArchiveReader,
     private val credentialStore: GitHubCredentialStore,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = downloadHttpClient(),
+    private val retryDelaysMs: List<Long> = DEFAULT_RETRY_DELAYS_MS,
 ) : ArtifactDownloader {
     override fun download(
         app: AppProfile,
@@ -130,20 +148,30 @@ class OkHttpArtifactDownloader(
         return "${app.id}-${build.replace(UNSAFE_FILE_NAME_CHARS, "_")}"
     }
 
-    // returns a user-facing failure message, or null on success. A cancellation (the user tapped
-    // Cancel, or left the screen) is rethrown rather than reported as a failed download
+    // returns a user-facing failure message, or null on success. A dropped connection picks up where it stopped a few
+    // times before giving up; a refusal from the server doesn't. A cancellation (the user tapped Cancel, or left the
+    // screen) is rethrown rather than reported as a failed download
     private suspend fun runDownload(
         artifact: ArtifactInfo,
         token: String?,
         partFile: File,
         collector: FlowCollector<DownloadStatus>,
-    ): String? =
-        try {
-            streamDownload(artifact, token, partFile, collector)
-            null
-        } catch (exception: IOException) {
-            friendlyNetworkError(exception)
-        }
+    ): String? {
+        val pauses = retryDelaysMs.iterator()
+        var failure: IOException?
+        do {
+            failure =
+                try {
+                    streamDownload(artifact, token, partFile, collector)
+                    null
+                } catch (exception: IOException) {
+                    exception
+                }
+            val retry = failure != null && failure !is UserFacingIOException && pauses.hasNext()
+            if (retry) delay(pauses.next())
+        } while (retry)
+        return failure?.let(::friendlyNetworkError)
+    }
 
     private fun checkStoragePreflight(
         artifact: ArtifactInfo,
@@ -216,6 +244,8 @@ class OkHttpArtifactDownloader(
             requestBuilder.header("Range", "bytes=$existingBytes-")
         }
         httpClient.newCall(requestBuilder.build()).execute().use { response ->
+            // the part file already holds the whole thing; verification decides whether it's any good
+            if (response.code == HTTP_RANGE_NOT_SATISFIABLE && existingBytes > 0) return
             if (!response.isSuccessful) throw UserFacingIOException(downloadFailureMessage(artifact, response.code))
             val resuming = response.code == HTTP_PARTIAL_CONTENT
             val body = response.body ?: throw UserFacingIOException("The server sent an empty file. Try again.")

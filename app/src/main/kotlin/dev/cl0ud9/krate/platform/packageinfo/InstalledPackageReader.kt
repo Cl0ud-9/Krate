@@ -4,6 +4,7 @@ import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.domain.repository.Baseline
 import dev.cl0ud9.krate.domain.repository.effectiveBaseline
+import dev.cl0ud9.krate.domain.repository.forTrack
 import dev.cl0ud9.krate.domain.repository.isNewerThan
 
 // the installed version of a package on this device, section 13 + 42.19 of the spec use this to
@@ -32,8 +33,9 @@ fun isUpdateAvailable(
     app: AppProfile,
     recordedBaseline: Baseline?,
 ): Boolean {
-    val latest = app.latestArtifact
-    if (installed == null || latest == null) return false
     val baseline = effectiveBaseline(recordedBaseline, app, installed)
-    return baseline == null || latest.isNewerThan(baseline, app.artifacts)
+    val track = app.forTrack(baseline)
+    val latest = track.latestArtifact
+    if (installed == null || latest == null) return false
+    return baseline == null || latest.isNewerThan(baseline, track.artifacts)
 }

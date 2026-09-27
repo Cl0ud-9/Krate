@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.Flow
 data class Baseline(
     val versionName: String,
     val buildId: String? = null,
+    // the theme it was installed from, for apps that publish several side by side
+    val label: String? = null,
 )
 
 // remembers the build this Krate actually installed for each app, keyed by package name -
@@ -105,6 +107,14 @@ fun ArtifactInfo.isNewerThan(
         // build per version, so their same-version record is simply that build
         else -> baselineBuildId == null && buildId != null && requiresAuth
     }
+}
+
+// themes of one app published side by side (same app, different label) are separate tracks: once one is
+// installed, its updates, its "latest" and every comparison only look at builds of that theme
+fun AppProfile.forTrack(baseline: Baseline?): AppProfile {
+    val label = baseline?.label ?: baseline?.buildId?.let { id -> artifacts.firstOrNull { it.buildId == id }?.label }
+    val track = label?.let { theme -> artifacts.filter { it.label == theme } }.orEmpty()
+    return if (track.isEmpty() || track.size == artifacts.size) this else copy(artifacts = track)
 }
 
 private fun ArtifactInfo.isListedBefore(

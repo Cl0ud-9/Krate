@@ -38,7 +38,7 @@ private enum class AppearanceSheet { THEME, NAV_STYLE, LAUNCH_TAB }
 private const val ROWS = 4
 private const val FOLD_MS = 300
 
-// Settings > Appearance: theme, the navigation bar, the app's corners and its voice, each row showing its current value
+// Settings > Appearance: theme, navigation bar, corners and personality, each row showing its current value
 @Composable
 fun AppearanceRoute(
     scrollState: ScrollState,
@@ -79,7 +79,7 @@ fun AppearanceRoute(
             shape = settingsGroupShape(0, 1),
             onCheckedChange = viewModel::setUseSmoothCorners,
         )
-        SettingsSectionLabel("Voice")
+        SettingsSectionLabel("Personality")
         val context = LocalContext.current
         SettingSwitchRow(
             item =

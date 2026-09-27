@@ -182,7 +182,8 @@ private fun IdleContent(
     val uninstalling = state.installStatus is InstallStatus.Uninstalling || awaitingUninstallConfirm
 
     when {
-        state.isRollback -> RollbackContent(state = state, uninstalling = uninstalling, onDownload = onDownload)
+        state.isRollback || state.isSwitch ->
+            RollbackContent(state = state, uninstalling = uninstalling, onDownload = onDownload)
 
         state.isUpToDate -> {
             StatusRow(
@@ -222,7 +223,7 @@ private fun IdleContent(
     IdleFootnotes(state = state, uninstalling = uninstalling)
 }
 
-// an older retained build picked in version history - Open stays available, the action rolls back
+// an older build, or another build of the same version, picked in version history - Open stays available
 @Composable
 private fun RollbackContent(
     state: AppDetailsUiState,
@@ -232,7 +233,12 @@ private fun RollbackContent(
     StatusRow(
         icon = rememberVectorPainter(Icons.Filled.History),
         tint = MaterialTheme.colorScheme.primary,
-        text = "Older version selected: ${state.selectedArtifact?.buildDescription()}.",
+        text =
+            if (state.isSwitch) {
+                "Other build selected: ${state.selectedArtifact?.buildDescription()}."
+            } else {
+                "Older version selected: ${state.selectedArtifact?.buildDescription()}."
+            },
     )
     if (uninstalling) {
         UninstallingStatus(installStatus = state.installStatus)

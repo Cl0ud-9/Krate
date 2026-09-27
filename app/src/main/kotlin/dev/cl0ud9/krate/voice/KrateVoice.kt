@@ -1,14 +1,15 @@
 package dev.cl0ud9.krate.voice
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import java.time.LocalDate
-import java.time.LocalTime
+import java.time.Instant
+import java.time.ZonedDateTime
 import kotlin.random.Random
 
 // Krate's voice: every playful line lives here, one pool per moment, plus the plain line for when playful is off.
@@ -22,15 +23,11 @@ enum class Moment(
         listOf(
             "Welcome back, Krate keeper.",
             "Welcome back, explorer.",
-            "You're back.",
-            "Hey there.",
-            "Hello again.",
             "Look who's here.",
             "Krate is awake.",
             "Krate is ready.",
             "Back for more?",
             "Ready when you are.",
-            "Good to have you here.",
             "The Krate is open.",
             "The lid is off.",
             "Let's see what's new.",
@@ -48,6 +45,49 @@ enum class Moment(
             "Everything in its place.",
             "Right where you left it.",
             "Another day, another update.",
+            "Unboxing time.",
+            "Knock knock. Updates?",
+            "Pop the lid.",
+            "Let's peek inside.",
+            "Your shelf, your rules.",
+            "Handle with care.",
+            "This side up.",
+            "Mind the packing peanuts.",
+            "No middlemen here.",
+            "The Krate is humming.",
+            "Fresh from the source.",
+        ),
+    ),
+    QUICK_RETURN(
+        "Welcome back.",
+        listOf(
+            "Back already?",
+            "Forgot something?",
+            "Miss me already?",
+            "That was quick.",
+            "Round two?",
+            "Didn't we just meet?",
+        ),
+    ),
+    LONG_ABSENCE(
+        "Welcome back.",
+        listOf(
+            "Long time no see!",
+            "The Krate missed you.",
+            "It's been a while.",
+            "Welcome back, stranger.",
+            "Blowing the dust off.",
+            "You're back! It's been ages.",
+        ),
+    ),
+    WEEKEND(
+        "Welcome back.",
+        listOf(
+            "Weekend unpacking?",
+            "Happy weekend, Krate keeper!",
+            "Weekend mode: on.",
+            "No work, just apps.",
+            "A lazy weekend check-in?",
         ),
     ),
     GREETING_MORNING(
@@ -58,6 +98,8 @@ enum class Moment(
             "Morning! Coffee first?",
             "Fresh morning, fresh apps.",
             "Early bird gets the updates.",
+            "Up and at 'em.",
+            "Morning, sunshine.",
         ),
     ),
     GREETING_AFTERNOON(
@@ -67,6 +109,8 @@ enum class Moment(
             "Afternoon check-in?",
             "Unpacking on your lunch break?",
             "Halfway through the day already.",
+            "Post-lunch unpacking?",
+            "Afternoon, Krate keeper.",
         ),
     ),
     GREETING_EVENING(
@@ -76,6 +120,8 @@ enum class Moment(
             "Evening, Krate keeper.",
             "Winding down?",
             "One last look before tonight?",
+            "Evening unpacking?",
+            "Dinner done? Apps next.",
         ),
     ),
     GREETING_NIGHT(
@@ -85,6 +131,8 @@ enum class Moment(
             "Burning the midnight oil?",
             "Up late, huh?",
             "The Krate never sleeps.",
+            "Still up?",
+            "Midnight snack? Fresh apps.",
         ),
     ),
 
@@ -157,6 +205,7 @@ enum class Moment(
             "Upgrade complete.",
             "Krate is back, and better.",
             "New Krate, same you.",
+            "Fresh coat of paint.",
         ),
     ),
     KRATE_LATEST(
@@ -165,6 +214,7 @@ enum class Moment(
             "Freshest Krate there is.",
             "Nothing newer yet.",
             "Still the newest Krate.",
+            "You've got the newest one.",
         ),
     ),
     CHECKING_FOR_UPDATES(
@@ -192,6 +242,7 @@ enum class Moment(
             "Mostly packed.",
             "Nearly everything made it in.",
             "Almost there.",
+            "Most of it made it in.",
         ),
     ),
     INSTALL_FAILED(
@@ -236,6 +287,8 @@ enum class Moment(
         listOf(
             "Nothing unpacked yet.",
             "A fresh, empty Krate.",
+            "Clean slate so far.",
+            "Nothing here... yet.",
         ),
     ),
     EMPTY_CATALOG(
@@ -243,6 +296,8 @@ enum class Moment(
         listOf(
             "The Krate is empty for now.",
             "Nothing on the shelves yet.",
+            "Empty shelves, for now.",
+            "Awaiting the first delivery.",
         ),
     ),
 
@@ -283,15 +338,15 @@ enum class Moment(
             "The back room isn't answering.",
             "Couldn't knock on the back room.",
             "No answer from the back room.",
+            "The back room is quiet right now.",
         ),
     ),
 }
 
 object KrateVoice {
     private const val PREFS = "krate_voice"
-    private const val KEY_LAST_GREETING = "last_greeting"
     private const val KEY_PLAYFUL = "playful"
-    private const val TIME_OF_DAY_ODDS = 3
+    private const val KEY_LAST_OPEN = "last_open"
 
     private val picker = LinePicker()
 
@@ -299,8 +354,11 @@ object KrateVoice {
     var playful by mutableStateOf(true)
         private set
 
+    // run once per process: the switch, and the used-lines memory that keeps pools from repeating across launches
     fun load(context: Context) {
-        playful = prefs(context).getBoolean(KEY_PLAYFUL, true)
+        val prefs = prefs(context)
+        playful = prefs.getBoolean(KEY_PLAYFUL, true)
+        picker.memory = PrefsLineMemory(prefs)
     }
 
     fun setPlayful(
@@ -322,37 +380,49 @@ object KrateVoice {
         fact: String,
     ): String = if (playful) "${line(moment)} $fact" else fact
 
-    // a special day's pool when there is one, otherwise a time-of-day line about a third of the time
+    // once per launch: reads how long it's been since the last one, then records this one
     fun greetingMoment(
         context: Context,
-        today: LocalDate = LocalDate.now(),
-        hour: Int = LocalTime.now().hour,
+        now: ZonedDateTime = ZonedDateTime.now(),
         random: Random = Random.Default,
-    ): Moment =
-        specialDay(today, installedOn(context))
-            ?: if (random.nextInt(TIME_OF_DAY_ODDS) == 0) timeOfDay(hour) else Moment.GREETING
-
-    // one greeting per launch, never the same as the previous launch's
-    fun greeting(
-        context: Context,
-        moment: Moment,
-    ): String {
+    ): Moment {
         val prefs = prefs(context)
-        val line = picker.pick(moment.name, moment.lines, avoid = prefs.getString(KEY_LAST_GREETING, null))
-        prefs.edit().putString(KEY_LAST_GREETING, line).apply()
-        return line
+        val lastOpen = prefs.getLong(KEY_LAST_OPEN, 0L).takeIf { it > 0L }
+        val nowMillis = now.toInstant().toEpochMilli()
+        prefs.edit().putLong(KEY_LAST_OPEN, nowMillis).apply()
+        val lastOpenDate = lastOpen?.let { Instant.ofEpochMilli(it).atZone(now.zone).toLocalDate() }
+        return greetingMomentFor(
+            GreetingContext(
+                today = now.toLocalDate(),
+                hour = now.hour,
+                sinceLastOpenMillis = lastOpen?.let { nowMillis - it },
+                firstOpenToday = lastOpenDate != now.toLocalDate(),
+                installedOn = installedOn(context),
+            ),
+            random,
+        )
     }
 
-    @Suppress("MagicNumber")
-    internal fun timeOfDay(hour: Int): Moment =
-        when (hour) {
-            in 5..11 -> Moment.GREETING_MORNING
-            in 12..16 -> Moment.GREETING_AFTERNOON
-            in 17..21 -> Moment.GREETING_EVENING
-            else -> Moment.GREETING_NIGHT
-        }
-
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+}
+
+// each pool's used lines as one newline-joined string, so a pool keeps its place across launches
+private class PrefsLineMemory(
+    private val prefs: SharedPreferences,
+) : LineMemory {
+    override fun used(key: String): List<String> =
+        prefs
+            .getString("used_$key", null)
+            ?.split('\n')
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+
+    override fun save(
+        key: String,
+        used: List<String>,
+    ) {
+        prefs.edit().putString("used_$key", used.joinToString("\n")).apply()
+    }
 }
 
 // a line that stays put while the screen is up (and across tab switches), re-picked only when [key] changes
@@ -381,6 +451,6 @@ fun rememberKrateLeadIn(
 fun rememberKrateGreeting(): String {
     val context = LocalContext.current
     val moment = rememberSaveable { KrateVoice.greetingMoment(context) }
-    val line = rememberSaveable(moment) { KrateVoice.greeting(context, moment) }
+    val line = rememberSaveable(moment) { KrateVoice.pick(moment) }
     return if (KrateVoice.playful) line else moment.plain
 }

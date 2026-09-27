@@ -3,6 +3,7 @@ package dev.cl0ud9.krate.ui.details
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.domain.model.AppProfile
@@ -38,6 +40,7 @@ import java.util.Date
 
 private const val COLLAPSED_LINES = 6
 private const val DIVIDER_ALPHA = 0.4f
+private val RELEASE_ASSET_URL = Regex("https://github\\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/[^/]+")
 
 // every build between the installed one and the selected one when that's an update, otherwise just the selected one
 internal fun releaseNotesBuilds(
@@ -61,6 +64,7 @@ internal fun releaseNotesBuilds(
 internal fun ReleaseNotesSection(
     app: AppProfile,
     builds: List<ArtifactInfo>,
+    onCollapse: () -> Unit = {},
 ) {
     var expanded by remember(app.id) { mutableStateOf(false) }
     var truncated by remember(app.id, builds) { mutableStateOf(false) }
@@ -94,7 +98,13 @@ internal fun ReleaseNotesSection(
                 )
             }
             if (expanded || truncated || builds.size > 1) {
-                TextButton(onClick = { expanded = !expanded }, modifier = Modifier.align(Alignment.End)) {
+                TextButton(
+                    onClick = {
+                        if (expanded) onCollapse()
+                        expanded = !expanded
+                    },
+                    modifier = Modifier.align(Alignment.End),
+                ) {
                     Text(
                         if (expanded) {
                             "Show less"
@@ -139,9 +149,39 @@ private fun BuildNotes(
                 )
             }
         }
-        NotesBody(text = notes ?: "No release notes for this version.", maxLines = maxLines, onTruncated = onTruncated)
+        if (notes != null) {
+            NotesBody(text = notes, maxLines = maxLines, onTruncated = onTruncated)
+        } else {
+            MissingNotes(releasePage = build.releasePageUrl())
+        }
     }
 }
+
+// nothing to show here, but a public build's own release page on GitHub always has the story
+@Composable
+private fun MissingNotes(releasePage: String?) {
+    val uriHandler = LocalUriHandler.current
+    Text(
+        text = if (releasePage != null) "No notes here for this version." else "No release notes for this version.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (releasePage != null) {
+        TextButton(onClick = { uriHandler.openUri(releasePage) }, contentPadding = PaddingValues(0.dp)) {
+            Text("See the release on GitHub")
+        }
+    }
+}
+
+// a public GitHub release asset's own release page; null for anything else, including private builds
+internal fun ArtifactInfo.releasePageUrl(): String? =
+    if (requiresAuth) {
+        null
+    } else {
+        RELEASE_ASSET_URL.matchEntire(downloadUrl)?.destructured?.let { (owner, repo, tag) ->
+            "https://github.com/$owner/$repo/releases/tag/$tag"
+        }
+    }
 
 @Composable
 private fun NotesBody(

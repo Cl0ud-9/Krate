@@ -252,7 +252,14 @@ private fun ActivityRow(
     onOpenApp: (String) -> Unit,
 ) {
     val presentation = activityPresentation(entry.action)
-    val rowModifier = if (app != null) Modifier.homeTappable { onOpenApp(entry.appId) } else Modifier
+    val rowModifier =
+        if (app !=
+            null
+        ) {
+            Modifier.homeTappable(ShapeCache.smooth16) { onOpenApp(entry.appId) }
+        } else {
+            Modifier
+        }
     Row(
         modifier = Modifier.fillMaxWidth().then(rowModifier).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

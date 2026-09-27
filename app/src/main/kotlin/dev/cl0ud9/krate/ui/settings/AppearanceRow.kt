@@ -18,7 +18,7 @@ internal fun AppearanceRow(
             SettingsRowHeader(
                 icon = painterResource(R.drawable.ic_palette_rounded),
                 title = "Appearance",
-                subtitle = "Theme, navigation bar, corners, voice",
+                subtitle = "Theme, navigation bar, corners, personality",
                 colors = SettingsTint.ROSE.colors(),
             ),
         shape = shape,

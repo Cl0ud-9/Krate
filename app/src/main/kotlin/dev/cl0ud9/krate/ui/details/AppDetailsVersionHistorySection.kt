@@ -1,8 +1,5 @@
 package dev.cl0ud9.krate.ui.details
 
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +14,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -30,14 +26,13 @@ import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.domain.repository.Baseline
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.theme.ShapeCache
-import dev.cl0ud9.krate.ui.util.pressScale
+import dev.cl0ud9.krate.ui.util.tappableRow
 import java.text.DateFormat
 import java.util.Date
 
-// only renders when more than one build is currently retained - a single-artifact app has nothing
-// to pick between. The point is recovery: if the newest build misbehaves, any of the previous
-// ones can be installed from here (a withdrawn build is listed but can't be picked). For a patched
-// app each row is a patches release, each on the newest app version it supported
+// every retained build, so a misbehaving newest one can be swapped for an earlier one (a withdrawn build is
+// listed but can't be picked); with only one build it says so rather than vanishing. For a patched app each row
+// is a patches release
 @Composable
 internal fun VersionHistorySection(
     app: AppProfile,
@@ -48,7 +43,7 @@ internal fun VersionHistorySection(
 ) {
     val artifacts = app.artifacts
     val latestArtifact = app.latestArtifact
-    if (artifacts.size <= 1) return
+    if (artifacts.isEmpty()) return
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = ShapeCache.smooth16,
@@ -56,28 +51,38 @@ internal fun VersionHistorySection(
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(title = "Version history", icon = rememberVectorPainter(Icons.Filled.History))
-            Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(modifier = Modifier.padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 artifacts.forEach { artifact ->
                     VersionRow(
                         artifact = artifact,
                         tags =
                             listOfNotNull(
-                                "Latest".takeIf { artifact == latestArtifact },
-                                "Installed".takeIf { installedBuild != null && artifact.matches(installedBuild) },
+                                "Latest".takeIf {
+                                    artifact == latestArtifact ||
+                                        artifact.isNewestOfItsTheme(
+                                            artifacts,
+                                        )
+                                },
+                                "Installed".takeIf { installedBuild != null && artifact.isBuildOf(installedBuild) },
                             ),
                         isSelected = artifact == selectedArtifact,
                         onClick = { onSelectVersion(artifact) },
                     )
                 }
             }
+            if (artifacts.size == 1) {
+                Text(
+                    text =
+                        "This is the only version available right now. When a newer one arrives, this one stays " +
+                            "here so you can come back to it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
     }
 }
-
-// a baseline recorded before builds had ids only knows its version, which is enough for apps that
-// publish one build per version
-private fun ArtifactInfo.matches(baseline: Baseline): Boolean =
-    if (baseline.buildId != null) buildId == baseline.buildId else versionName == baseline.versionName
 
 @Composable
 private fun VersionRow(
@@ -86,18 +91,8 @@ private fun VersionRow(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .pressScale(interactionSource)
-                .clickable(
-                    enabled = !isSelected && !artifact.withdrawn,
-                    interactionSource = interactionSource,
-                    indication = LocalIndication.current,
-                    onClick = onClick,
-                ),
+        modifier = Modifier.fillMaxWidth().tappableRow(enabled = !isSelected && !artifact.withdrawn, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -166,3 +161,7 @@ private fun VersionRowTrailing(
             )
     }
 }
+
+// with several themes side by side, each theme's newest build is its own latest
+private fun ArtifactInfo.isNewestOfItsTheme(artifacts: List<ArtifactInfo>): Boolean =
+    label != null && artifacts.firstOrNull { it.label == label && !it.withdrawn } == this

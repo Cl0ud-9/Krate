@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -62,14 +63,17 @@ private val APP_TILE_SIZE = 60.dp
 private const val APPEAR_STAGGER_MS = 60L
 private const val APPEAR_RISE_PX = 48f
 
-// how every tappable card and row on Home reacts: a slight shrink, a ripple, and double taps ignored
+// how every tappable card and row on Home reacts: a slight shrink, a ripple rounded to its shape, double taps ignored
 @Composable
-internal fun Modifier.homeTappable(onClick: () -> Unit): Modifier {
+internal fun Modifier.homeTappable(
+    shape: Shape,
+    onClick: () -> Unit,
+): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
     val debounced = rememberDebouncedOnClick(onClick = onClick)
-    return pressScale(
-        interactionSource,
-    ).clickable(interactionSource = interactionSource, indication = LocalIndication.current, onClick = debounced)
+    return pressScale(interactionSource)
+        .clip(shape)
+        .clickable(interactionSource = interactionSource, indication = LocalIndication.current, onClick = debounced)
 }
 
 // "am I up to date, and what should I do about it" - the whole card is the action: open Updates, or look again
@@ -86,7 +90,7 @@ internal fun StatusHeroCard(
     val content = if (upToDate) colors.onPrimaryContainer else colors.onTertiaryContainer
     val action = if (upToDate) onCheckAgain else onViewUpdates
     Card(
-        modifier = Modifier.fillMaxWidth().clip(ShapeCache.smooth28).homeTappable(action),
+        modifier = Modifier.fillMaxWidth().homeTappable(ShapeCache.smooth28, action),
         shape = ShapeCache.smooth28,
         colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
     ) {
@@ -161,8 +165,7 @@ private fun AppTile(
         modifier =
             Modifier
                 .width(76.dp)
-                .clip(ShapeCache.smooth16)
-                .homeTappable(onClick)
+                .homeTappable(ShapeCache.smooth16, onClick)
                 .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),

@@ -39,12 +39,39 @@ class KrateVoiceTest {
     }
 
     @Test
-    fun `the previous launch's greeting is avoided`() {
+    fun `every line comes up once before any repeats`() {
+        val picker = LinePicker(Random(9))
         val lines = Moment.GREETING.lines
-        repeat(200) { seed ->
-            val picker = LinePicker(Random(seed))
-            assertNotEquals(lines[0], picker.pick("greeting", lines, avoid = lines[0]))
-        }
+        val firstRound = List(lines.size) { picker.pick("greeting", lines) }
+        assertEquals(lines.toSet(), firstRound.toSet())
+    }
+
+    @Test
+    fun `a pool keeps its place across launches through its memory`() {
+        val memory = InMemoryLineMemory()
+        val lines = Moment.GREETING.lines
+        // a new picker per pick is a fresh process per launch
+        val picks = List(lines.size) { seed -> LinePicker(Random(seed), memory).pick("greeting", lines) }
+        assertEquals(lines.size, picks.toSet().size)
+    }
+
+    @Test
+    fun `a quick return, a long absence and the day's first open each get their own greeting`() {
+        val monday = LocalDate.of(2026, 9, 28)
+        val base =
+            GreetingContext(monday, hour = 9, sinceLastOpenMillis = null, firstOpenToday = true, installedOn = null)
+        val quick = base.copy(sinceLastOpenMillis = 60_000L, firstOpenToday = false)
+        val quickPicks = List(200) { seed -> greetingMomentFor(quick, Random(seed)) }.toSet()
+        assertTrue(Moment.QUICK_RETURN in quickPicks)
+        val away = base.copy(sinceLastOpenMillis = 10L * 24 * 60 * 60 * 1000)
+        assertEquals(Moment.LONG_ABSENCE, greetingMomentFor(away, Random(1)))
+        assertEquals(Moment.GREETING_MORNING, greetingMomentFor(base, Random(1)))
+    }
+
+    @Test
+    fun `a special day beats every other greeting`() {
+        val newYear = GreetingContext(LocalDate.of(2027, 1, 1), 9, 60_000L, false, null)
+        repeat(50) { seed -> assertEquals(Moment.NEW_YEAR, greetingMomentFor(newYear, Random(seed))) }
     }
 
     @Test
@@ -57,12 +84,12 @@ class KrateVoiceTest {
 
     @Test
     fun `hours map to the right part of the day`() {
-        assertEquals(Moment.GREETING_NIGHT, KrateVoice.timeOfDay(2))
-        assertEquals(Moment.GREETING_MORNING, KrateVoice.timeOfDay(5))
-        assertEquals(Moment.GREETING_MORNING, KrateVoice.timeOfDay(11))
-        assertEquals(Moment.GREETING_AFTERNOON, KrateVoice.timeOfDay(12))
-        assertEquals(Moment.GREETING_EVENING, KrateVoice.timeOfDay(17))
-        assertEquals(Moment.GREETING_NIGHT, KrateVoice.timeOfDay(22))
+        assertEquals(Moment.GREETING_NIGHT, timeOfDay(2))
+        assertEquals(Moment.GREETING_MORNING, timeOfDay(5))
+        assertEquals(Moment.GREETING_MORNING, timeOfDay(11))
+        assertEquals(Moment.GREETING_AFTERNOON, timeOfDay(12))
+        assertEquals(Moment.GREETING_EVENING, timeOfDay(17))
+        assertEquals(Moment.GREETING_NIGHT, timeOfDay(22))
     }
 
     @Test

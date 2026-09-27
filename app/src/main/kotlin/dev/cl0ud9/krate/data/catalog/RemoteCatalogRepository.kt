@@ -13,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -33,6 +34,7 @@ import java.util.concurrent.TimeUnit
 private const val MANIFEST_URL = "https://github.com/Cl0ud-9/Krate/releases/download/manifest-latest/manifest.json"
 private const val SIGNATURE_URL = "$MANIFEST_URL.sig"
 private const val CACHE_FILE_NAME = "manifest-cache.json"
+private val FIRST_LOAD_RETRIES_MS = listOf(5_000L, 15_000L, 45_000L)
 
 // bounds worst-case first-launch latency before falling back, section 32 never blocks the ui indefinitely
 private const val NETWORK_TIMEOUT_SECONDS = 8L
@@ -145,7 +147,17 @@ class RemoteCatalogRepository(
                 publish(cached)
                 backgroundScope.launch { runCatching { refresh() } }
             } else {
-                publish(loadManifest())
+                val (manifest, fresh) = loadManifest()
+                publish(manifest)
+                // a blip on the very first load would otherwise leave the bundled seed showing until a manual refresh
+                if (!fresh) {
+                    backgroundScope.launch {
+                        for (wait in FIRST_LOAD_RETRIES_MS) {
+                            delay(wait)
+                            if (runCatching { refresh() }.isSuccess) break
+                        }
+                    }
+                }
             }
         }
     }
@@ -156,7 +168,8 @@ class RemoteCatalogRepository(
         apps.value = manifest.apps
     }
 
-    private suspend fun loadManifest(): ParsedManifest =
+    // the manifest to show, and whether it came fresh from the network
+    private suspend fun loadManifest(): Pair<ParsedManifest, Boolean> =
         withContext(Dispatchers.IO) {
             val fromNetwork =
                 fetchVerifiedManifestBytes()?.let {
@@ -166,7 +179,7 @@ class RemoteCatalogRepository(
             if (fromNetwork != null) privateSource?.refresh()
             val manifest =
                 fromNetwork ?: loadCachedManifest() ?: ParsedManifest(fallback.observeApps().first(), emptyList())
-            withPrivateApps(privateSource, json, device, manifest)
+            withPrivateApps(privateSource, json, device, manifest) to (fromNetwork != null)
         }
 
     private fun loadCachedManifest(): ParsedManifest? {

@@ -22,6 +22,7 @@ private data class BaselineEntry(
     val packageName: String,
     val versionName: String,
     val buildId: String? = null,
+    val label: String? = null,
 )
 
 // one entry per app, unbounded (unlike the activity log, this can never drop an old entry just for
@@ -33,7 +34,7 @@ class DataStoreKrateBaselineStore(
 
     override fun observeBaselines(): Flow<Map<String, Baseline>> =
         context.baselineDataStore.data.map { prefs ->
-            decode(prefs[BASELINES_KEY]).associate { it.packageName to Baseline(it.versionName, it.buildId) }
+            decode(prefs[BASELINES_KEY]).associate { it.packageName to Baseline(it.versionName, it.buildId, it.label) }
         }
 
     override suspend fun recordInstall(
@@ -43,7 +44,7 @@ class DataStoreKrateBaselineStore(
         context.baselineDataStore.edit { prefs ->
             prefs.update { entries ->
                 entries.filterNot { it.packageName == packageName } +
-                    BaselineEntry(packageName, artifact.versionName, artifact.buildId)
+                    BaselineEntry(packageName, artifact.versionName, artifact.buildId, artifact.label)
             }
         }
     }

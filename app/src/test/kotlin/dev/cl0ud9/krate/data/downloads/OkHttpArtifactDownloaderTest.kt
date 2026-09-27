@@ -11,8 +11,11 @@ import dev.cl0ud9.krate.security.apk.ApkArchiveReader
 import dev.cl0ud9.krate.security.hash.sha256Hex
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
+import okhttp3.mockwebserver.SocketPolicy
 import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -55,6 +58,74 @@ class OkHttpArtifactDownloaderTest {
             val ready = statuses.last()
             assertTrue(ready is DownloadStatus.ReadyToInstall)
             assertTrue(File((ready as DownloadStatus.ReadyToInstall).filePath).exists())
+        }
+
+    @Test
+    fun `a connection dropped halfway resumes from what's on disk and completes`() =
+        runBlocking {
+            var gets = 0
+            server.dispatcher =
+                object : Dispatcher() {
+                    override fun dispatch(request: RecordedRequest): MockResponse {
+                        if (request.method ==
+                            "HEAD"
+                        ) {
+                            return MockResponse().setHeader("Content-Length", payload.size.toString())
+                        }
+                        gets++
+                        val from =
+                            request
+                                .getHeader("Range")
+                                ?.removePrefix("bytes=")
+                                ?.removeSuffix("-")
+                                ?.toInt()
+                        return when {
+                            // the first answer promises the whole file but the connection dies partway through
+                            from == null ->
+                                MockResponse()
+                                    .setBody(Buffer().write(payload))
+                                    .setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY)
+                            else ->
+                                MockResponse()
+                                    .setResponseCode(206)
+                                    .setHeader("Content-Range", "bytes $from-${payload.size - 1}/${payload.size}")
+                                    .setBody(Buffer().write(payload.copyOfRange(from, payload.size)))
+                        }
+                    }
+                }
+            val downloader =
+                OkHttpArtifactDownloader(
+                    downloadsDir = tempFolder.newFolder(),
+                    archiveReader = FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256),
+                    credentialStore = FakeCredentialStore(),
+                    retryDelaysMs = listOf(0L, 0L),
+                )
+            val app = appProfile()
+
+            val statuses = downloader.download(app, app.artifacts.single()).toList()
+
+            assertTrue(statuses.last().toString(), statuses.last() is DownloadStatus.ReadyToInstall)
+            assertEquals(2, gets)
+        }
+
+    @Test
+    fun `a refusal from the server fails straight away instead of retrying`() =
+        runBlocking {
+            server.enqueue(MockResponse().setHeader("Content-Length", payload.size.toString()))
+            server.enqueue(MockResponse().setResponseCode(404))
+            val downloader =
+                OkHttpArtifactDownloader(
+                    downloadsDir = tempFolder.newFolder(),
+                    archiveReader = FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256),
+                    credentialStore = FakeCredentialStore(),
+                    retryDelaysMs = listOf(0L, 0L),
+                )
+            val app = appProfile()
+
+            val statuses = downloader.download(app, app.artifacts.single()).toList()
+
+            assertTrue(statuses.last() is DownloadStatus.Failed)
+            assertEquals(2, server.requestCount)
         }
 
     @Test

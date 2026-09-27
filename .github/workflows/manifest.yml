@@ -43,6 +43,7 @@ jobs:
       - name: Generate manifest
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES_BLOCKLIST: ${{ secrets.RELEASE_NOTES_BLOCKLIST }}
         run: python3 catalog/scripts/generate_manifest.py
 
       - name: Check for changes

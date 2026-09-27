@@ -52,6 +52,7 @@ fun rememberUpdatesViewModel(): UpdatesViewModel =
             container.activityLogRepository,
             container.githubCredentialStore,
             container.krateBaselineStore,
+            container.downloadProgressNotifier,
         )
     }
 

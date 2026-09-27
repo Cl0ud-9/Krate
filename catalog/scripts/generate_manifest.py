@@ -46,6 +46,8 @@ MANIFEST_TAG = os.environ.get("MANIFEST_TAG", "manifest-latest")
 ARTIFACTS_TOKEN_ENV = "ARTIFACTS_REPO_TOKEN"
 DEFAULT_RETAIN_VERSIONS = 3
 RELEASE_NOTES_LIMIT = 2000
+# comma-separated words a catalog's release notes must not contain; set from a secret, never written down here
+NOTES_BLOCKLIST = [w.strip().lower() for w in os.environ.get("RELEASE_NOTES_BLOCKLIST", "").split(",") if w.strip()]
 MANIFEST_SCHEMA_VERSION = 2
 
 
@@ -217,7 +219,11 @@ def accept_identity(app, source, facts, tag, is_newest):
 
 
 def release_notes(release):
-    return (release.get("body") or "").strip()[:RELEASE_NOTES_LIMIT] or None
+    """Notes that mention a blocked word are left out whole, and the app links to the release page instead."""
+    body = (release.get("body") or "").strip()
+    if any(word in body.lower() for word in NOTES_BLOCKLIST):
+        return None
+    return body[:RELEASE_NOTES_LIMIT] or None
 
 
 def artifacts_from_public_source(app, source, cache):
@@ -248,7 +254,7 @@ def artifacts_from_public_source(app, source, cache):
                 "maxSdk": None,
                 "abis": facts["abis"],
                 "label": None,
-                "releaseNotes": release_notes(release) if source.get("releaseNotes", True) else None,
+                "releaseNotes": release_notes(release),
                 "publishedAt": release.get("published_at"),
                 "_icon": facts.get("icon"),
             }
@@ -303,7 +309,7 @@ def artifacts_from_private_source(app, source, cache, releases_by_repo):
                 "maxSdk": metadata.get("maxSdk"),
                 "abis": metadata.get("abis", facts["abis"]),
                 "label": metadata.get("profileLabel"),
-                "releaseNotes": release_notes(release) if source.get("releaseNotes", True) else None,
+                "releaseNotes": release_notes(release),
                 "publishedAt": release.get("published_at"),
                 "_icon": facts.get("icon"),
             }

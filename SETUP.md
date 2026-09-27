@@ -45,6 +45,13 @@ openssl pkey -in manifest-signing.key -pubout -out manifest-signing.pub
 
 Keep `manifest-signing.key` as a CI secret (`MANIFEST_SIGNING_KEY`), never commit it. The public key (`manifest-signing.pub`) gets baked into the app as a resource - that one's fine to commit once Phase 2 wires it in.
 
+Optionally, `RELEASE_NOTES_BLOCKLIST` (a comma-separated list of words) keeps any upstream release notes that
+mention one of them out of the catalog; the app links to that release on GitHub instead:
+
+```
+gh secret set RELEASE_NOTES_BLOCKLIST
+```
+
 ## 4. Invite-only catalog entries (optional)
 
 Some catalog entries are published privately, in a separate signed catalog that Krate fetches only while a GitHub token

@@ -64,8 +64,7 @@
         "assetPattern": "^microg-[0-9.]+-arm64-v8a\\.apk$",
         "includePrerelease": false,
         "retainVersions": 3,
-        "expectedCertificateSha256": "0b6c9515afb195fac59601696ba0a7907a0b217ccf720b43148427ccf64343e7",
-        "releaseNotes": false
+        "expectedCertificateSha256": "0b6c9515afb195fac59601696ba0a7907a0b217ccf720b43148427ccf64343e7"
       }
     },
     {

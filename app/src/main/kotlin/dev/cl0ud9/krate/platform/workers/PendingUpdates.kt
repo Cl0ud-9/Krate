@@ -4,6 +4,8 @@ import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.isVisible
 import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.domain.repository.Baseline
+import dev.cl0ud9.krate.domain.repository.effectiveBaseline
+import dev.cl0ud9.krate.domain.repository.forTrack
 import dev.cl0ud9.krate.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.krate.platform.packageinfo.isUpdateAvailable
 
@@ -17,9 +19,12 @@ internal fun pendingUpdates(
     hasGitHubToken: Boolean,
     baselines: Map<String, Baseline>,
 ): List<AppProfile> =
-    apps.filter { app ->
-        app.isVisible(hasGitHubToken) &&
-            isUpdateAvailable(installedPackageReader.installedVersion(app.packageName), app, baselines[app.packageName])
+    apps.mapNotNull { app ->
+        val installed = installedPackageReader.installedVersion(app.packageName)
+        val recorded = baselines[app.packageName]
+        app
+            .takeIf { it.isVisible(hasGitHubToken) && isUpdateAvailable(installed, it, recorded) }
+            ?.forTrack(effectiveBaseline(recorded, app, installed))
     }
 
 internal fun pendingUpdateCount(

@@ -1,7 +1,10 @@
 package dev.cl0ud9.krate.ui.navigation
 
 import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -21,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -28,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -101,7 +106,8 @@ private fun ApplyPendingRoute(
 ) {
     LaunchedEffect(pendingRoute) {
         val route = pendingRoute ?: return@LaunchedEffect
-        navController.navigate(route) { launchSingleTop = true }
+        // compared with its arguments, so a notification for one app opens it even over another app's details
+        if (navController.currentBackStackEntry?.let(::currentRouteOf) != route) navController.navigate(route)
         onRouteHandled()
     }
 }
@@ -125,6 +131,7 @@ fun KrateNavHost(
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    TrackLiveNavigation(navController, backStackEntry)
     val showBottomBar = KrateBottomNavDestinations.any { it.route == currentRoute }
 
     // Settings > Appearance's toggles - read directly here rather than through a
@@ -163,11 +170,7 @@ fun KrateNavHost(
     // exact same duration/easing as the detail screen's own push/pop transition (DetailTransitions.kt)
     // rather than an independently-picked number - two animations racing to different finish lines
     // is what read as rushed/uncoordinated rather than one fluid motion
-    val navBarVisibility by animateFloatAsState(
-        targetValue = if (showBottomBar) 1f else 0f,
-        animationSpec = tween(DETAIL_TRANSITION_MS, easing = M3EmphasizedEasing),
-        label = "NavBarVisibility",
-    )
+    val navBarVisibility = rememberNavBarVisibility(showBottomBar)
     // stays composed for the whole slide-out, not just while showBottomBar is true, otherwise the
     // bar would be yanked out of the tree mid-animation instead of finishing its slide
     val renderBottomBar = showBottomBar || navBarVisibility > NAV_BAR_VISIBILITY_EPSILON
@@ -184,7 +187,10 @@ fun KrateNavHost(
         // bar's top inset here AND again inside every TabScreen/DetailScreen's own TopAppBar (that's
         // the default inset every M3 TopAppBar carries) - zeroing it out here leaves exactly one
         // place (each screen's own top bar) consuming it, instead of double-padding every title down
+        // arriving from a notification, whatever screen was up stays hidden until the target one replaces it
+        val covered = pendingRoute != null && ArrivalFromOutside.active
         Scaffold(
+            modifier = Modifier.graphicsLayer { alpha = if (covered) 0f else 1f },
             bottomBar = {
                 if (renderBottomBar) {
                     KrateBottomBar(
@@ -204,6 +210,58 @@ fun KrateNavHost(
                 modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
             )
         }
+    }
+}
+
+// how far the bottom bar is on screen, 0 to 1, moving with the detail screens' own push and pop
+@Composable
+private fun rememberNavBarVisibility(showBottomBar: Boolean): Float {
+    val visibility by animateFloatAsState(
+        targetValue = if (showBottomBar) 1f else 0f,
+        animationSpec =
+            if (ArrivalFromOutside.active) {
+                snap()
+            } else {
+                tween(
+                    DETAIL_TRANSITION_MS,
+                    easing = M3EmphasizedEasing,
+                )
+            },
+        label = "NavBarVisibility",
+    )
+    return visibility
+}
+
+// lets a notification tap reach the running nav host, and ends an arrival from outside once its screen is in place
+@Composable
+private fun TrackLiveNavigation(
+    navController: NavHostController,
+    backStackEntry: NavBackStackEntry?,
+) {
+    DisposableEffect(navController) {
+        LiveNavigation.controller = navController
+        onDispose { if (LiveNavigation.controller === navController) LiveNavigation.controller = null }
+    }
+    // an arrival from outside ends two frames after its screen is in place: the one that swaps it in, and its draw
+    LaunchedEffect(backStackEntry) {
+        if (ArrivalFromOutside.active) {
+            repeat(2) { withFrameNanos { } }
+            ArrivalFromOutside.disarm()
+        }
+    }
+}
+
+// the running nav controller, so a notification tap can switch screens before Krate's window draws again; that way
+// the system's expand-from-notification animation grows into the target screen itself instead of an empty window
+internal object LiveNavigation {
+    @Volatile
+    var controller: NavHostController? = null
+
+    // false when there's no running nav host yet (a cold start), which then goes through the pending route
+    fun open(route: String): Boolean {
+        val navController = controller ?: return false
+        if (navController.currentBackStackEntry?.let(::currentRouteOf) != route) navController.navigate(route)
+        return true
     }
 }
 
@@ -246,8 +304,20 @@ private fun KrateNavGraph(
         modifier = modifier,
         // tab-to-tab: slide directionally by index. anything else (the App Details push, or the
         // first frame with no "from" side yet) falls back to a plain fade+grow
-        enterTransition = { tabEnterTransition(initialState.destination.route, targetState.destination.route) },
-        exitTransition = { tabExitTransition(initialState.destination.route, targetState.destination.route) },
+        enterTransition = {
+            if (ArrivalFromOutside.active) {
+                EnterTransition.None
+            } else {
+                tabEnterTransition(initialState.destination.route, targetState.destination.route)
+            }
+        },
+        exitTransition = {
+            if (ArrivalFromOutside.active) {
+                ExitTransition.None
+            } else {
+                tabExitTransition(initialState.destination.route, targetState.destination.route)
+            }
+        },
     ) {
         tabDestinations(navController)
         settingsDestination(navController)

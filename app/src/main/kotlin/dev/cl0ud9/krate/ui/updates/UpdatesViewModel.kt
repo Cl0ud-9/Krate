@@ -3,10 +3,10 @@ package dev.cl0ud9.krate.ui.updates
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.krate.data.auth.GitHubCredentialStore
+import dev.cl0ud9.krate.data.downloads.DownloadProgressNotifier
 import dev.cl0ud9.krate.domain.model.ActivityAction
 import dev.cl0ud9.krate.domain.model.ActivityEntry
 import dev.cl0ud9.krate.domain.model.AppProfile
-import dev.cl0ud9.krate.domain.model.isVisible
 import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.domain.repository.ActivityLogRepository
 import dev.cl0ud9.krate.domain.repository.Baseline
@@ -17,7 +17,7 @@ import dev.cl0ud9.krate.domain.updateall.UpdateAllOutcome
 import dev.cl0ud9.krate.domain.updateall.UpdateAllPlanner
 import dev.cl0ud9.krate.domain.updateall.UpdateAllProgress
 import dev.cl0ud9.krate.platform.packageinfo.InstalledPackageReader
-import dev.cl0ud9.krate.platform.packageinfo.isUpdateAvailable
+import dev.cl0ud9.krate.platform.workers.pendingUpdates
 import dev.cl0ud9.krate.ui.util.withMinimumDuration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -61,6 +61,7 @@ sealed interface UpdateAllUiState {
 
 // apps whose installed version genuinely differs from the catalog's latest, section 13 + 42.19 of the spec.
 // installed state is device-local, so a resume-triggered refresh() re-checks it after an install/uninstall
+@Suppress("LongParameterList")
 class UpdatesViewModel(
     private val catalogRepository: CatalogRepository,
     private val installedPackageReader: InstalledPackageReader,
@@ -68,6 +69,7 @@ class UpdatesViewModel(
     private val activityLogRepository: ActivityLogRepository,
     private val githubCredentialStore: GitHubCredentialStore,
     private val krateBaselineStore: KrateBaselineStore,
+    private val downloadProgressNotifier: DownloadProgressNotifier,
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -123,25 +125,34 @@ class UpdatesViewModel(
         if (mutableUpdateAllState.value is UpdateAllUiState.Running) return
 
         val ordered = UpdateAllPlanner.order(pending, catalog.value)
+        downloadProgressNotifier.onUpdateAllStarted()
         viewModelScope.launch {
-            updateAllEngine.run(ordered).collect { progress ->
-                mutableUpdateAllState.value =
-                    when (progress) {
-                        is UpdateAllProgress.Step ->
-                            UpdateAllUiState.Running(
-                                currentApp = progress.currentApp,
-                                currentIndex = progress.currentIndex,
-                                total = progress.total,
-                                statusLabel = progress.statusLabel,
-                            )
-
-                        is UpdateAllProgress.Finished -> {
-                            recordActivity(progress.outcomes)
-                            UpdateAllUiState.Done(progress.outcomes)
-                        }
-                    }
+            try {
+                collectUpdateAll(ordered)
+            } finally {
+                downloadProgressNotifier.onUpdateAllFinished()
             }
             refresh()
+        }
+    }
+
+    private suspend fun collectUpdateAll(ordered: List<AppProfile>) {
+        updateAllEngine.run(ordered).collect { progress ->
+            mutableUpdateAllState.value =
+                when (progress) {
+                    is UpdateAllProgress.Step ->
+                        UpdateAllUiState.Running(
+                            currentApp = progress.currentApp,
+                            currentIndex = progress.currentIndex,
+                            total = progress.total,
+                            statusLabel = progress.statusLabel,
+                        )
+
+                    is UpdateAllProgress.Finished -> {
+                        recordActivity(progress.outcomes)
+                        UpdateAllUiState.Done(progress.outcomes)
+                    }
+                }
         }
     }
 
@@ -188,16 +199,7 @@ class UpdatesViewModel(
         baselines: Map<String, Baseline>,
     ): UpdatesUiState {
         val hasToken = githubCredentialStore.getToken() != null
-        val pending =
-            apps
-                .filter { it.isVisible(hasToken) }
-                .filter { app ->
-                    isUpdateAvailable(
-                        installedPackageReader.installedVersion(app.packageName),
-                        app,
-                        baselines[app.packageName],
-                    )
-                }
+        val pending = pendingUpdates(apps, installedPackageReader, hasToken, baselines)
         return if (pending.isEmpty()) UpdatesUiState.UpToDate else UpdatesUiState.Content(pending)
     }
 

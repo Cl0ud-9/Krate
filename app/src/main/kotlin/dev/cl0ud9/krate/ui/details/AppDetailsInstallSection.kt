@@ -18,9 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
-import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.InstallStatus
-import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.WaitingForUserStep
 import dev.cl0ud9.krate.ui.components.HelperText
 import dev.cl0ud9.krate.ui.components.KrateLinearProgress
@@ -39,6 +37,7 @@ internal fun actionLabelFor(state: AppDetailsUiState): String =
     when {
         state.installed == null -> "Install"
         state.isRollback -> "Roll back"
+        state.isSwitch -> "Switch to this build"
         state.isUpToDate -> "Reinstall"
         else -> "Update"
     }
@@ -90,7 +89,7 @@ private fun InstallStatusContent(
 
         is InstallStatus.Failed -> {
             FailedInstallSection(
-                app = state.app,
+                fromScratch = state.installsFromScratch,
                 installed = state.installed != null,
                 failure = installStatus,
                 onInstall = onInstall,
@@ -145,12 +144,11 @@ private fun waitingForUserMessage(step: WaitingForUserStep): String =
         WaitingForUserStep.INSTALL_CONFIRM -> "Confirm the install in the system dialog."
     }
 
-// section 17 of the spec: a normal update failure offers an explicit, user-confirmed clean-install
-// fallback with a data-loss warning. an app that already used clean install (an always-clean-install
-// app, or a retry after this fallback) has nothing further to escalate to, so it only offers a plain retry
+// a failed in-place update offers a user-confirmed install from scratch, with its data-loss warning; an attempt
+// that already uninstalled first (an always-clean-install app, or a rollback) has nothing further to fall back to
 @Composable
 private fun FailedInstallSection(
-    app: AppProfile,
+    fromScratch: Boolean,
     installed: Boolean,
     failure: InstallStatus.Failed,
     onInstall: () -> Unit,
@@ -166,9 +164,8 @@ private fun FailedInstallSection(
         }
     FailureStatusRow(failure = failure, text = text)
 
-    // reinstalling from scratch only means something for a real failure on an app that's already
-    // installed - not after the user said no, and not for a first install
-    val offerReinstall = installed && !failure.userCancelled && app.installationMode != InstallationMode.CLEAN_INSTALL
+    // only for a real failure of an in-place update: not after the user said no, not for a first install
+    val offerReinstall = installed && !failure.userCancelled && !fromScratch
     if (!offerReinstall) {
         Button(onClick = onInstall, modifier = Modifier.fillMaxWidth()) {
             Text("Try again")

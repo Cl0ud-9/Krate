@@ -104,7 +104,7 @@ internal fun AppInfoSection(
                 if (dependencies.isEmpty()) {
                     BodyText("Nothing else. It travels light.")
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column {
                         dependencies.forEach { dependency ->
                             DependencyRow(dependency = dependency, onClick = { onNavigateToApp(dependency.app.id) })
                         }
