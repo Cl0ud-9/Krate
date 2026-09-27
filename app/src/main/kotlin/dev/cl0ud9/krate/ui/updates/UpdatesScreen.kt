@@ -135,6 +135,8 @@ private fun UpdatesContent(
 ) {
     AnimatedContent(
         targetState = uiState,
+        // fades only between loading, empty and the list; a change inside the list updates in place, no flash
+        contentKey = { it::class },
         label = "updates-content",
         transitionSpec = {
             fadeIn(animationSpec = tween(CONTENT_FADE_MS)) togetherWith

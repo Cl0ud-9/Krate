@@ -122,6 +122,8 @@ private fun AppsContent(
 ) {
     AnimatedContent(
         targetState = uiState,
+        // fades only between loading, empty and the list; a change inside the list updates in place, no flash
+        contentKey = { it::class },
         label = "apps-content",
         transitionSpec = {
             fadeIn(animationSpec = tween(CONTENT_FADE_MS)) togetherWith

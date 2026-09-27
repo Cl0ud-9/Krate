@@ -17,6 +17,9 @@ interface CatalogRepository {
     // subscriber (a StateFlow collector) only ever triggered once
     suspend fun refresh()
 
+    // the same re-fetch, started now and finished even if the screen that asked goes away
+    fun refreshInBackground() = Unit
+
     // curated notices from the same signed manifest - only the remote catalog has any
     fun observeAnnouncements(): Flow<List<Announcement>> = flowOf(emptyList())
 }

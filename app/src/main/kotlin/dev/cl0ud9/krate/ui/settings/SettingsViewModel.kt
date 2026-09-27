@@ -254,13 +254,14 @@ class SettingsViewModel(
     fun setGitHubToken(token: String) {
         githubCredentialStore.setToken(token)
         mutableHasGitHubToken.value = true
-        viewModelScope.launch { runCatching { catalogRepository.refresh() } }
+        // app-wide, so leaving this page straight after saving doesn't cancel the check
+        catalogRepository.refreshInBackground()
     }
 
     fun clearGitHubToken() {
         githubCredentialStore.clearToken()
         mutableHasGitHubToken.value = false
-        viewModelScope.launch { runCatching { catalogRepository.refresh() } }
+        catalogRepository.refreshInBackground()
     }
 
     private fun formatMb(bytes: Long): String = "%.1f MB".format(bytes / BYTES_PER_MB)

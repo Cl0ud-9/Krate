@@ -119,17 +119,24 @@ class RemoteCatalogRepository(
     // a failed download keeps what's already showing and throws, so pull-to-refresh can say so
     override suspend fun refresh() {
         val bytes = withContext(Dispatchers.IO) { fetchVerifiedManifestBytes() }
+        // the invite-only catalog stands on its own: a saved token is checked even if the public one is unreachable
+        withContext(Dispatchers.IO) { privateSource?.refresh() }
         if (bytes == null) {
             ensureLoaded()
+            // what's already known, with whatever the invite-only check just found
+            withContext(Dispatchers.IO) { loadCachedManifest() }?.let(::publish)
             throw IOException("Couldn't reach the catalog")
         }
         val manifest =
             withContext(Dispatchers.IO) {
                 cacheFile.writeBytes(bytes)
-                privateSource?.refresh()
                 withPrivateApps(privateSource, json, device, parseManifest(json, device, bytes))
             }
         publish(manifest)
+    }
+
+    override fun refreshInBackground() {
+        backgroundScope.launch { runCatching { refresh() } }
     }
 
     // only the first subscriber (across the whole app) actually pays for a fetch - later ones, even on
@@ -196,16 +203,16 @@ class RemoteCatalogRepository(
 
     private suspend fun fetchVerifiedManifestBytes(): ByteArray? =
         coroutineScope {
-            val manifestDeferred = async { downloadOrNull(MANIFEST_URL) }
-            val signatureDeferred = async { downloadOrNull(SIGNATURE_URL) }
+            val manifestDeferred = async { httpClient.bytesOrNull(MANIFEST_URL) }
+            val signatureDeferred = async { httpClient.bytesOrNull(SIGNATURE_URL) }
             val (manifestBytes, signatureBytes) = awaitAll(manifestDeferred, signatureDeferred)
             manifestBytes?.takeIf { signatureBytes != null && verifier.verify(it, signatureBytes) }
         }
-
-    private fun downloadOrNull(url: String): ByteArray? =
-        runCatching {
-            httpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                if (response.isSuccessful) response.body?.bytes() else null
-            }
-        }.getOrNull()
 }
+
+private fun OkHttpClient.bytesOrNull(url: String): ByteArray? =
+    runCatching {
+        newCall(Request.Builder().url(url).build()).execute().use { response ->
+            if (response.isSuccessful) response.body?.bytes() else null
+        }
+    }.getOrNull()

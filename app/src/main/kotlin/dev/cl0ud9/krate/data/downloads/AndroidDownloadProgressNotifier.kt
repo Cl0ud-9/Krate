@@ -1,17 +1,18 @@
 package dev.cl0ud9.krate.data.downloads
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import dev.cl0ud9.krate.EXTRA_APP_ID
 import dev.cl0ud9.krate.EXTRA_NOTIFICATION_ID
@@ -34,25 +35,17 @@ import dev.cl0ud9.krate.voice.Moment
 // which is harmless and the standard pattern for this exact situation
 private const val CHANNEL_ID = "downloads_v2"
 
-// only ever posts progress while the whole app process is backgrounded - App Details already
-// shows this same progress on screen while the app is in the foreground, so notifying there too
-// would just be a redundant, noisy duplicate of what the user is already looking at. A terminal
-// complete/failed result is the one exception: it's posted whenever the app was backgrounded at
-// the moment it happened, and then left alone (not swept away by simply reopening the app),
-// exactly like a normal download notification behaves. TooManyFunctions is a real but
-// justified count: one state (downloading/verifying/complete/failed/clear) per DownloadStatus
-// variant plus its own small builder/permission/id helpers, all inherent to one cohesive
-// responsibility (this notifier), not something splitting into more classes would shrink
+// one notification per download, updated in place from start to finish: live progress (the foreground service's own
+// notification, so the download keeps its network in the background), then the result replacing it. Progress is
+// posted at most once a second and only when it moves, and looks the same whether Krate is on screen or not.
+// TooManyFunctions: one handler per download state plus their small builders, one cohesive responsibility
 @Suppress("TooManyFunctions")
 class AndroidDownloadProgressNotifier(
     private val context: Context,
 ) : DownloadProgressNotifier {
-    // ids with an ACTIVE in-progress notification showing, so returning to the app can dismiss
-    // just those immediately instead of waiting for each download's next progress tick (which, on
-    // a slow connection, could be seconds away) - a completed/failed terminal notification is
-    // deliberately never added here, so it isn't swept away by the same mechanism
+    // downloads with a live notification, and when each last posted progress (so updates stay calm)
     private val activeAppIds = mutableSetOf<String>()
-    private val holdNames = mutableMapOf<String, String>()
+    private val lastPosted = mutableMapOf<String, Pair<Long, Int>>()
 
     init {
         val notifications = context.getSystemService(NotificationManager::class.java)
@@ -61,12 +54,6 @@ class AndroidDownloadProgressNotifier(
                 description = "Shows download progress and results while the app is in the background"
             }
         notifications?.createNotificationChannel(channel)
-
-        ProcessLifecycleOwner.get().lifecycle.addObserver(
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_START) activeAppIds.toList().forEach(::backToForeground)
-            },
-        )
     }
 
     override fun onDownloading(
@@ -76,7 +63,13 @@ class AndroidDownloadProgressNotifier(
         totalBytes: Long?,
     ) {
         keepAlive(appId, appName)
-        if (isAppInForeground()) return
+        val percent =
+            if (totalBytes != null && totalBytes > 0) {
+                ((bytesDownloaded * PERCENT_MAX) / totalBytes).toInt().coerceIn(0, PERCENT_MAX)
+            } else {
+                UNKNOWN_PERCENT
+            }
+        if (!isDue(appId, percent)) return
         // checked inline, not via a helper function - lint's flow analysis for
         // NotificationManagerCompat.notify() doesn't trace a permission check across a function
         // boundary, matching UpdateNotifier's own notify() below
@@ -84,16 +77,15 @@ class AndroidDownloadProgressNotifier(
         if (granted != PackageManager.PERMISSION_GRANTED) return
 
         val builder = progressBuilder(appId, "Downloading $appName")
-        if (totalBytes != null && totalBytes > 0) {
-            val percent = ((bytesDownloaded * PERCENT_MAX) / totalBytes).toInt().coerceIn(0, PERCENT_MAX)
-            val progress = "${bytesDownloaded / BYTES_PER_MB} of ${totalBytes / BYTES_PER_MB} MB \u00b7 $percent%"
+        if (percent != UNKNOWN_PERCENT) {
+            val progress = "${bytesDownloaded / BYTES_PER_MB} of ${totalBytes?.div(BYTES_PER_MB)} MB · $percent%"
             builder.setContentText(progress).setProgress(PERCENT_MAX, percent, false)
         } else {
             // total size unknown (server didn't report Content-Length) - shown as an indeterminate
             // bar with the raw byte count instead of a fabricated percentage
             builder.setContentText("${bytesDownloaded / BYTES_PER_MB}MB downloaded").setProgress(0, 0, true)
         }
-        NotificationManagerCompat.from(context).notify(progressIdFor(appId), builder.build())
+        NotificationManagerCompat.from(context).notify(notificationIdFor(appId), builder.build())
     }
 
     override fun onVerifying(
@@ -101,7 +93,6 @@ class AndroidDownloadProgressNotifier(
         appName: String,
     ) {
         keepAlive(appId, appName)
-        if (isAppInForeground()) return
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
         if (granted != PackageManager.PERMISSION_GRANTED) return
 
@@ -109,48 +100,74 @@ class AndroidDownloadProgressNotifier(
             progressBuilder(appId, "Checking $appName")
                 .setContentText("Making sure the download is genuine...")
                 .setProgress(0, 0, true)
-        NotificationManagerCompat.from(context).notify(progressIdFor(appId), builder.build())
+        NotificationManagerCompat.from(context).notify(notificationIdFor(appId), builder.build())
     }
 
-    // posted even if the app has since come back to the foreground, as long as it was backgrounded
-    // at the actual moment the download finished - if the app was in the foreground the whole time,
-    // the live UI already showed this, so a notification on top of that would be pure noise
     override fun onComplete(app: AppProfile) {
-        endProgress(app.id)
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-        if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
-        val text = "${app.displayName} is downloaded and checked. Tap to install."
-        val notification =
-            terminalBuilder(app, KrateVoice.line(Moment.DOWNLOADED), text)
-                .addAction(R.drawable.ic_stat_krate, "Install", openAppIntent(app.id))
+        val result =
+            terminalBuilder(
+                app,
+                KrateVoice.line(Moment.DOWNLOADED),
+                "${app.displayName} is downloaded and checked. Tap to install.",
+            ).addAction(R.drawable.ic_stat_krate, "Install", openAppIntent(app.id))
                 .build()
-        NotificationManagerCompat.from(context).notify(resultIdFor(app.id), notification)
+        finish(app.id, result)
     }
 
     override fun onFailed(
         app: AppProfile,
         reason: String,
     ) {
-        endProgress(app.id)
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-        if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
-        val text = "${app.displayName} couldn't be downloaded. $reason"
-        val notification =
-            terminalBuilder(app, KrateVoice.line(Moment.DOWNLOAD_FAILED), text)
-                .addAction(R.drawable.ic_stat_krate, "Try again", openAppIntent(app.id))
+        val result =
+            terminalBuilder(
+                app,
+                KrateVoice.line(Moment.DOWNLOAD_FAILED),
+                "${app.displayName} couldn't be downloaded. $reason",
+            ).addAction(R.drawable.ic_stat_krate, "Try again", openAppIntent(app.id))
                 .build()
-        NotificationManagerCompat.from(context).notify(resultIdFor(app.id), notification)
+        finish(app.id, result)
     }
 
-    override fun clear(appId: String) = endProgress(appId)
+    // cancelled, or the page went away mid-download: the notification goes with it
+    override fun clear(appId: String) {
+        if (appId in activeAppIds) finish(appId, result = null)
+    }
+
+    // the result takes the progress notification's place when Krate is in the background; on screen, the page
+    // already says it, so the notification just goes
+    private fun finish(
+        appId: String,
+        result: Notification?,
+    ) {
+        activeAppIds -= appId
+        lastPosted -= appId
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+        val shown = result?.takeIf { granted == PackageManager.PERMISSION_GRANTED && !isAppInForeground() }
+        if (DownloadKeepAlive.release(appId, shown)) return
+        if (shown != null && granted == PackageManager.PERMISSION_GRANTED) {
+            NotificationManagerCompat.from(context).notify(notificationIdFor(appId), shown)
+        } else {
+            NotificationManagerCompat.from(context).cancel(notificationIdFor(appId))
+        }
+    }
 
     override fun onUpdateAllStarted() {
         val notification =
-            keepAliveBuilder(null, "Updating your apps").setContentText("Keeps going if you switch apps.").build()
+            progressBuilder(UPDATE_ALL_KEY, "Updating your apps")
+                .setContentText("Keeps going if you switch apps.")
+                .setProgress(0, 0, true)
+                .build()
         DownloadKeepAlive.hold(context, UPDATE_ALL_KEY, UPDATE_ALL_NOTIFICATION_ID, notification)
     }
 
-    override fun onUpdateAllFinished() = DownloadKeepAlive.release(context, UPDATE_ALL_KEY)
+    override fun onUpdateAllFinished() {
+        if (!DownloadKeepAlive.release(
+                UPDATE_ALL_KEY,
+            )
+        ) {
+            NotificationManagerCompat.from(context).cancel(UPDATE_ALL_NOTIFICATION_ID)
+        }
+    }
 
     // the first word of a download keeps Krate's network through a foreground service until it ends
     private fun keepAlive(
@@ -158,39 +175,25 @@ class AndroidDownloadProgressNotifier(
         appName: String,
     ) {
         if (!activeAppIds.add(appId)) return
-        DownloadKeepAlive.hold(context, appId, progressIdFor(appId), holdNotification(appId, appName))
+        val starting =
+            progressBuilder(appId, "Downloading $appName")
+                .setContentText("Starting...")
+                .setProgress(0, 0, true)
+                .build()
+        DownloadKeepAlive.hold(context, appId, notificationIdFor(appId), starting)
     }
 
-    private fun endProgress(appId: String) {
-        activeAppIds -= appId
-        DownloadKeepAlive.release(context, appId)
-        NotificationManagerCompat.from(context).cancel(progressIdFor(appId))
-    }
-
-    // back on screen the live UI shows the progress, so the notification drops back to a plain "still going"
-    private fun backToForeground(appId: String) {
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-        if (DownloadKeepAlive.isHeld(appId) && granted == PackageManager.PERMISSION_GRANTED) {
-            val name = holdNames[appId] ?: return
-            NotificationManagerCompat.from(context).notify(progressIdFor(appId), holdNotification(appId, name))
-        }
-    }
-
-    private fun holdNotification(
+    // at most one progress update a second, and only when the number moved
+    private fun isDue(
         appId: String,
-        appName: String,
-    ) = keepAliveBuilder(appId, "Downloading $appName")
-        .setContentText("Keeps going if you switch apps.")
-        .also { holdNames[appId] = appName }
-        .build()
-
-    private fun keepAliveBuilder(
-        appId: String?,
-        title: String,
-    ): NotificationCompat.Builder =
-        progressBuilder(appId ?: UPDATE_ALL_KEY, title)
-            .setProgress(0, 0, true)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
+        percent: Int,
+    ): Boolean {
+        val now = SystemClock.uptimeMillis()
+        val last = lastPosted[appId]
+        val due = last == null || (percent != last.second && now - last.first >= MIN_UPDATE_GAP_MS)
+        if (due) lastPosted[appId] = now to percent
+        return due
+    }
 
     private fun progressBuilder(
         appId: String,
@@ -205,10 +208,14 @@ class AndroidDownloadProgressNotifier(
             .setSubText("Downloads")
             .setContentTitle(title)
             .setContentIntent(openAppIntent(appId))
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setShowWhen(false)
             .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            // a quick download finishes before this ever shows
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
 
     // dismissible (not ongoing) and NOT silent, unlike the in-progress builder above - this is a
     // one-shot result the user should actually notice, not a running-task indicator. The app's own
@@ -238,7 +245,7 @@ class AndroidDownloadProgressNotifier(
                 putExtra(EXTRA_TARGET_ROUTE, "apps/$appId")
                 putExtra(EXTRA_APP_ID, appId)
                 // a finished download's result is dismissed when it opens Krate; a running one's progress can't be
-                putExtra(EXTRA_NOTIFICATION_ID, resultIdFor(appId))
+                putExtra(EXTRA_NOTIFICATION_ID, notificationIdFor(appId))
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -250,16 +257,13 @@ class AndroidDownloadProgressNotifier(
             .currentState
             .isAtLeast(Lifecycle.State.STARTED)
 
-    // spread out per app id so two concurrent downloads (a manual one plus Update All, or two
-    // manual downloads in sequence before the first notification is dismissed) get distinct
-    // notifications instead of overwriting one another
-    private fun progressIdFor(appId: String): Int = NOTIFICATION_ID_BASE + appId.hashCode()
-
-    // a result gets its own id, so ending the progress one (and its foreground service) never takes it along
-    private fun resultIdFor(appId: String): Int = progressIdFor(appId) + 1
+    // one per app, so two downloads at once (a manual one plus Update All) never overwrite each other
+    private fun notificationIdFor(appId: String): Int = NOTIFICATION_ID_BASE + appId.hashCode()
 
     private companion object {
         const val PERCENT_MAX = 100
+        const val UNKNOWN_PERCENT = -1
+        const val MIN_UPDATE_GAP_MS = 1_000L
         const val BYTES_PER_MB = 1024L * 1024L
         const val NOTIFICATION_ID_BASE = 2000
         const val UPDATE_ALL_KEY = "update-all"
