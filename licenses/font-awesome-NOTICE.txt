@@ -5,7 +5,7 @@ License: Icons - Creative Commons Attribution 4.0 International (CC BY 4.0)
          https://fontawesome.com/license/free
          https://creativecommons.org/licenses/by/4.0/
 
-Two Font Awesome Free icons are used, converted from their SVG path data into
+Three Font Awesome Free icons are used, converted from their SVG path data into
 Android vector drawables. The shapes are unchanged; they are only scaled and
 positioned for each use:
 
@@ -16,5 +16,8 @@ positioned for each use:
 
   Notification icon
     app/src/main/res/drawable/ic_stat_krate.xml
+
+  GitHub mark (brands set; GitHub is a trademark of GitHub, Inc.)
+    app/src/main/res/drawable/ic_github.xml
 
 The app credits Font Awesome on its About page.

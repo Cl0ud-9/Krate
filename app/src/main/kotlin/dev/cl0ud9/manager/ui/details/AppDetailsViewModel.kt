@@ -2,6 +2,8 @@ package dev.cl0ud9.manager.ui.details
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.cl0ud9.manager.data.activity.DOWNLOAD_FAILURE_PREFIX
+import dev.cl0ud9.manager.data.activity.INSTALL_FAILURE_PREFIX
 import dev.cl0ud9.manager.data.downloads.ArtifactDownloader
 import dev.cl0ud9.manager.data.downloads.DownloadProgressNotifier
 import dev.cl0ud9.manager.domain.dependency.DependencyGraph
@@ -26,6 +28,7 @@ import dev.cl0ud9.manager.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.manager.platform.packageinfo.InstalledVersion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +50,8 @@ data class DependencyInfo(
     val app: AppProfile,
     val installed: Boolean,
 )
+
+private const val MIN_ATTEMPT_VISIBLE_MS = 600L
 
 // nine collaborators plus the screen's own appId argument - each one is a distinct, already-shared
 // singleton from AppContainer (not something to bundle into an artificial "dependencies" wrapper
@@ -185,6 +190,8 @@ class AppDetailsViewModel(
         // a new download starts a new install attempt - a finished earlier one (an uninstall's
         // Success, say) would otherwise show as "Installed." once this download is ready
         mutableInstallStatus.value = InstallStatus.Idle
+        // the tap shows at once, even before the first byte arrives
+        mutableDownloadStatus.value = DownloadStatus.Downloading(0L, null)
         // this keeps running for as long as the ViewModel itself is alive, which backgrounding the
         // app via Home does not affect - only leaving this screen (clearing the ViewModel) or the
         // process actually dying does. downloadProgressNotifier decides on its own whether a
@@ -209,7 +216,14 @@ class AppDetailsViewModel(
         currentApp: AppProfile,
         artifact: ArtifactInfo,
     ) {
+        val startedAt = System.currentTimeMillis()
         artifactDownloader.download(currentApp, artifact).collect { status ->
+            // an instant failure (offline, say) still shows the attempt, so Try again visibly does something
+            if (status is DownloadStatus.Failed) {
+                delay(
+                    MIN_ATTEMPT_VISIBLE_MS - (System.currentTimeMillis() - startedAt),
+                )
+            }
             mutableDownloadStatus.value = status
             when (status) {
                 is DownloadStatus.Downloading ->
@@ -223,12 +237,14 @@ class AppDetailsViewModel(
                 is DownloadStatus.Verifying ->
                     downloadProgressNotifier.onVerifying(currentApp.id, currentApp.displayName)
 
-                is DownloadStatus.ReadyToInstall ->
+                is DownloadStatus.ReadyToInstall -> {
                     downloadProgressNotifier.onComplete(currentApp)
+                    activityLogRepository.clearFailures(currentApp.id, downloadsOnly = true)
+                }
 
                 is DownloadStatus.Failed -> {
                     downloadProgressNotifier.onFailed(currentApp, status.reason)
-                    recordActivity(currentApp, ActivityAction.FAILED, "Download: ${status.reason}")
+                    recordActivity(currentApp, ActivityAction.FAILED, "$DOWNLOAD_FAILURE_PREFIX ${status.reason}")
                 }
 
                 is DownloadStatus.Idle -> downloadProgressNotifier.clear(currentApp.id)
@@ -326,12 +342,13 @@ class AppDetailsViewModel(
             flow.collect { status ->
                 mutableInstallStatus.value = status
                 if (status is InstallStatus.Failed && !status.userCancelled) {
-                    recordActivity(targetApp, ActivityAction.FAILED, "Install: ${status.reason}")
+                    recordActivity(targetApp, ActivityAction.FAILED, "$INSTALL_FAILURE_PREFIX ${status.reason}")
                 }
                 if (status is InstallStatus.Success) {
                     // the downloaded apk is redundant once PackageInstaller has actually committed it -
                     // not deleted on failure, since a retry reuses this same file instead of re-downloading
                     readyDownload()?.let { artifactDownloader.deleteDownloadedFile(it.filePath) }
+                    activityLogRepository.clearFailures(targetApp.id)
                     recordActivity(targetApp, action)
                     // this is now genuinely what the manager installed, real fact overriding whatever
                     // guess effectiveBaseline() would otherwise have made

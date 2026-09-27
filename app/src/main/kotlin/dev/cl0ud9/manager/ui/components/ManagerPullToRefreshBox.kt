@@ -11,9 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
-// PullToRefreshBox's own default indicator is the old circular arc spinner - this app
-// uses the newer M3 Expressive wavy LoadingIndicator on every one of its refreshable
-// lists instead, so every pull-to-refresh in this app goes through here instead of the bare component
+// PullToRefreshBox's own default indicator is the old circular arc spinner - every pull-to-refresh
+// in this app goes through here instead, for the newer M3 Expressive wavy LoadingIndicator
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ManagerPullToRefreshBox(

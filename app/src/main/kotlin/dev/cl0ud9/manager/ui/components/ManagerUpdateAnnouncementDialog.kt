@@ -3,27 +3,21 @@ package dev.cl0ud9.manager.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
@@ -34,12 +28,9 @@ import dev.cl0ud9.manager.ui.util.formatMarkdownLite
 import dev.cl0ud9.manager.voice.Moment
 import dev.cl0ud9.manager.voice.rememberKrateLine
 
-private val NOTES_MAX_HEIGHT = 180.dp
+private val NOTES_MAX_HEIGHT = 150.dp
 
-// a proactive "a new version is out" prompt on launch instead of a check tucked away in Settings.
-// Updates in place: Update now downloads the release and hands it to Android's installer, the same
-// flow Settings uses - no trip to GitHub. Shown at most once per app session (see HomeViewModel)
-@OptIn(ExperimentalMaterial3Api::class)
+// a proactive "a new version is out" prompt on launch; Update now downloads it and hands it to Android's installer
 @Composable
 fun ManagerUpdateAnnouncementDialog(
     status: ManagerUpdateStatus.UpdateAvailable,
@@ -47,48 +38,50 @@ fun ManagerUpdateAnnouncementDialog(
     onUpdate: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    BasicAlertDialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            shape = ShapeCache.smooth28,
-            // a plain neutral surface - a gradient from the primary/tertiary containers plus tonal
-            // elevation (which tints toward primary) read as an off blue wash rather than a dialog
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 0.dp,
+    val notes = releaseNoteItems(status.releaseNotes.orEmpty())
+    KrateDialog(
+        header =
+            KrateDialogHeader(
+                tag = "Krate ${status.latestVersion}",
+                icon = painterResource(R.drawable.ic_krate),
+                title = rememberKrateLine(Moment.KRATE_UPDATE_AVAILABLE),
+                body =
+                    "Version ${status.latestVersion} is ready. Updating takes a few seconds " +
+                        "and keeps your apps and settings.",
+            ),
+        onDismissRequest = onDismiss,
+        detail =
+            if (notes.isEmpty()) {
+                null
+            } else {
+                { ReleaseNotesHint(title = "What's new in ${status.latestVersion}", notes = notes) }
+            },
+        footer = { UpdateFooter(status, selfUpdateState, onUpdate, onDismiss) },
+    )
+}
+
+@Composable
+internal fun ReleaseNotesHint(
+    title: String,
+    notes: List<String>,
+) {
+    KrateDialogHint(icon = painterResource(R.drawable.ic_newspaper_rounded), title = title) {
+        Column(
+            modifier = Modifier.heightIn(max = NOTES_MAX_HEIGHT).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                AnnouncementHeader()
-                Text(
-                    text = "Version ${status.latestVersion} is ready",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                val notes = status.releaseNotes?.takeIf { it.isNotBlank() }
-                if (notes != null) {
+            notes.forEach { note ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = notes.formatMarkdownLite(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.heightIn(max = NOTES_MAX_HEIGHT).verticalScroll(rememberScrollState()),
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
                     )
-                } else {
                     Text(
-                        text = "A newer version of Krate is available.",
-                        style = MaterialTheme.typography.bodyLarge,
+                        text = note.formatMarkdownLite(),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-                // primary action first, the quiet dismiss under it
-                SelfUpdateAction(status = status, selfUpdateState = selfUpdateState, onInstallUpdate = onUpdate)
-                val busy =
-                    selfUpdateState is SelfUpdateState.Downloading || selfUpdateState is SelfUpdateState.Installing
-                if (!busy) {
-                    TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                        Text("Later")
-                    }
                 }
             }
         }
@@ -96,24 +89,34 @@ fun ManagerUpdateAnnouncementDialog(
 }
 
 @Composable
-private fun AnnouncementHeader() {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+private fun RowScope.UpdateFooter(
+    status: ManagerUpdateStatus.UpdateAvailable,
+    selfUpdateState: SelfUpdateState?,
+    onUpdate: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (selfUpdateState == null) {
+        val uriHandler = LocalUriHandler.current
+        TextButton(onClick = onDismiss) { Text("Later") }
+        Spacer(modifier = Modifier.weight(1f))
+        Button(
+            onClick = { status.downloadUrl?.let(onUpdate) ?: uriHandler.openUri(status.releaseUrl) },
+            shape = ShapeCache.smooth16,
+        ) {
             Icon(
-                painter = painterResource(R.drawable.ic_krate),
+                painterResource(R.drawable.ic_arrow_forward_rounded),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.padding(10.dp).size(26.dp),
+                modifier = Modifier.size(18.dp),
             )
+            Spacer(modifier = Modifier.size(6.dp))
+            Text("Update now")
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(text = "Krate", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(
-                text = rememberKrateLine(Moment.KRATE_UPDATE_AVAILABLE),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    } else {
+        // downloading, installing or a retry after a failure - the same states Settings shows
+        val busy = selfUpdateState is SelfUpdateState.Downloading || selfUpdateState is SelfUpdateState.Installing
+        Column(modifier = Modifier.weight(1f)) {
+            SelfUpdateAction(status = status, selfUpdateState = selfUpdateState, onInstallUpdate = onUpdate)
+            if (!busy) TextButton(onClick = onDismiss) { Text("Later") }
         }
     }
 }

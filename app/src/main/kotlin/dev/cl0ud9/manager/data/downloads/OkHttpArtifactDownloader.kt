@@ -104,6 +104,21 @@ class OkHttpArtifactDownloader(
         return if (readyFile.exists()) readyFile.absolutePath else null
     }
 
+    override fun pruneOtherBuilds(
+        app: AppProfile,
+        keep: ArtifactInfo,
+        otherAppIds: Collection<String>,
+    ) {
+        val keepId = fileIdFor(app, keep)
+        val prefix = "${app.id}-"
+        // an app whose id extends this one's ("videoapp" vs "videoapp-music") owns its own files
+        val longerIds = otherAppIds.filter { it != app.id && it.startsWith(prefix) }.map { "$it-" }
+        downloadsDir.listFiles()?.forEach { file ->
+            val id = file.name.removeSuffix(".part").removeSuffix(".apk")
+            if (id.startsWith(prefix) && id != keepId && longerIds.none { id.startsWith(it) }) file.delete()
+        }
+    }
+
     // the build (or, for manifests without build ids, the version) is part of the file name, not
     // just app.id - otherwise a stale .part/.apk from a different version, or from an older build of
     // the same version (a Patched rebuild keeps Videoapp's version), could look resumable/ready here

@@ -2,186 +2,101 @@ package dev.cl0ud9.manager.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.cl0ud9.manager.R
 
-// the look calls for ONE rounded family across the whole type scale - body text through the
-// biggest screen titles, not a different face per role. Nunito is a genuinely open (SIL OFL, see
-// licenses/nunito-OFL.txt) rounded sans that's a much better fit than an earlier attempt
-// with a more neutral geometric sans, used the same way here: one family, every role. It's a single
-// variable font file, so each weight is the same file with a different "wght" axis setting
-@OptIn(ExperimentalTextApi::class)
-val NunitoFamily =
-    FontFamily(
-        Font(
-            R.font.nunito_variable,
-            weight = FontWeight.Normal,
-            variationSettings = FontVariation.Settings(FontVariation.weight(400)),
-        ),
-        Font(
-            R.font.nunito_variable,
-            weight = FontWeight.Medium,
-            variationSettings = FontVariation.Settings(FontVariation.weight(500)),
-        ),
-        Font(
-            R.font.nunito_variable,
-            weight = FontWeight.SemiBold,
-            variationSettings = FontVariation.Settings(FontVariation.weight(600)),
-        ),
-        Font(
-            R.font.nunito_variable,
-            weight = FontWeight.Bold,
-            variationSettings = FontVariation.Settings(FontVariation.weight(700)),
-        ),
-        Font(
-            R.font.nunito_variable,
-            weight = FontWeight.ExtraBold,
-            variationSettings = FontVariation.Settings(FontVariation.weight(800)),
-        ),
-        Font(
-            R.font.nunito_variable,
-            weight = FontWeight.Black,
-            variationSettings = FontVariation.Settings(FontVariation.weight(900)),
-        ),
+// Google Sans Flex (SIL OFL, licenses/google-sans-flex-OFL.txt) with its roundness axis fully on
+private const val ROUNDED = 100f
+private const val WIDE = 151f
+private val FAMILY_WEIGHTS =
+    listOf(
+        FontWeight.Light,
+        FontWeight.Normal,
+        FontWeight.Medium,
+        FontWeight.SemiBold,
+        FontWeight.Bold,
+        FontWeight.ExtraBold,
+        FontWeight.Black,
     )
 
-// the big, bold, brand-tinted screen title treatment for each tab's top bar - a deliberately
-// heavier, larger style than the regular type scale below, not just headlineSmall at a bigger size
+@OptIn(ExperimentalTextApi::class)
+private fun googleSansFlex(width: Float? = null): FontFamily =
+    FontFamily(
+        FAMILY_WEIGHTS.map { weight ->
+            val rounded = FontVariation.Setting("ROND", ROUNDED)
+            val settings =
+                if (width == null) {
+                    FontVariation.Settings(FontVariation.weight(weight.weight), rounded)
+                } else {
+                    FontVariation.Settings(FontVariation.weight(weight.weight), rounded, FontVariation.width(width))
+                }
+            Font(R.font.google_sans_flex, weight = weight, variationSettings = settings)
+        },
+    )
+
+// the one family used across the app
+val KrateRounded: FontFamily = googleSansFlex()
+
+// the same face at its widest, for big expressive display lines like the setup welcome and What's new title
+val KrateWide: FontFamily = googleSansFlex(width = WIDE)
+
+// the big title heading each tab
 val ManagerHeroTitle =
     TextStyle(
-        fontFamily = NunitoFamily,
-        fontWeight = FontWeight.Black,
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
-        letterSpacing = 0.5.sp,
+        fontFamily = KrateRounded,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 40.sp,
+        lineHeight = 46.sp,
+        letterSpacing = 1.sp,
     )
 
-// type scale structure on our own legitimately-licensed rounded font - one family for every role
+// wide display text for moments that deserve it
+val KrateWideDisplay =
+    TextStyle(
+        fontFamily = KrateWide,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 42.sp,
+        lineHeight = 1.1.em,
+        letterSpacing = (-0.02).em,
+        platformStyle = PlatformTextStyle(includeFontPadding = false),
+    )
+
+private fun style(
+    weight: FontWeight,
+    size: Int,
+    lineHeight: Int,
+    letterSpacing: Double = 0.0,
+) = TextStyle(
+    fontFamily = KrateRounded,
+    fontWeight = weight,
+    fontSize = size.sp,
+    lineHeight = lineHeight.sp,
+    letterSpacing = letterSpacing.sp,
+)
+
+@Suppress("MagicNumber")
 val ManagerTypography =
     Typography(
-        displayLarge =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.Black,
-                fontSize = 48.sp,
-                lineHeight = 56.sp,
-                letterSpacing = 0.sp,
-            ),
-        displayMedium =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 36.sp,
-                lineHeight = 44.sp,
-                letterSpacing = 0.sp,
-            ),
-        displaySmall =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 30.sp,
-                lineHeight = 38.sp,
-                letterSpacing = 0.sp,
-            ),
-        headlineLarge =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 32.sp,
-                lineHeight = 40.sp,
-                letterSpacing = 0.sp,
-            ),
-        headlineMedium =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 28.sp,
-                lineHeight = 36.sp,
-                letterSpacing = 0.sp,
-            ),
-        headlineSmall =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
-                lineHeight = 32.sp,
-                letterSpacing = 0.sp,
-            ),
-        titleLarge =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 22.sp,
-                lineHeight = 28.sp,
-                letterSpacing = 0.sp,
-            ),
-        titleMedium =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                lineHeight = 24.sp,
-                letterSpacing = 0.15.sp,
-            ),
-        titleSmall =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                letterSpacing = 0.1.sp,
-            ),
-        bodyLarge =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.Normal,
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
-                letterSpacing = 0.5.sp,
-            ),
-        bodyMedium =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.Normal,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                letterSpacing = 0.25.sp,
-            ),
-        bodySmall =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.Normal,
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                letterSpacing = 0.4.sp,
-            ),
-        labelLarge =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 16.sp,
-                lineHeight = 20.sp,
-                letterSpacing = 0.1.sp,
-            ),
-        labelMedium =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
-                lineHeight = 16.sp,
-                letterSpacing = 0.5.sp,
-            ),
-        labelSmall =
-            TextStyle(
-                fontFamily = NunitoFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-                letterSpacing = 0.5.sp,
-            ),
+        displayLarge = style(FontWeight.Bold, 48, 56),
+        displayMedium = style(FontWeight.Bold, 36, 44),
+        displaySmall = style(FontWeight.Normal, 30, 38),
+        headlineLarge = style(FontWeight.SemiBold, 32, 40),
+        headlineMedium = style(FontWeight.SemiBold, 28, 36),
+        headlineSmall = style(FontWeight.SemiBold, 24, 32),
+        titleLarge = style(FontWeight.Normal, 22, 28),
+        titleMedium = style(FontWeight.Medium, 18, 24, 0.15),
+        titleSmall = style(FontWeight.Medium, 14, 20, 0.1),
+        bodyLarge = style(FontWeight.Normal, 16, 24, 0.5),
+        bodyMedium = style(FontWeight.Normal, 14, 20, 0.25),
+        bodySmall = style(FontWeight.Normal, 12, 16, 0.4),
+        labelLarge = style(FontWeight.Medium, 16, 20, 0.1),
+        labelMedium = style(FontWeight.Medium, 14, 16, 0.5),
+        labelSmall = style(FontWeight.Medium, 11, 16, 0.5),
     )

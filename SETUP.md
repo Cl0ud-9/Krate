@@ -1,6 +1,6 @@
 # Setup
 
-Steps here touch your own accounts/secrets, so they're written as commands for you to run rather than something done on your behalf. None of this is needed to build/run the current app shell - only for the phases that need signing, push, or CI publishing.
+These steps involve your own accounts and secrets, so each is written as a command to run yourself. None of it is needed to build and run the app locally - only for signing, push notifications, and CI publishing.
 
 ## 1. Release signing keystore (needed from Phase 4 onward)
 

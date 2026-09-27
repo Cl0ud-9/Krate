@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,31 +28,56 @@ import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.platform.workers.UpdateNotifier
 import dev.cl0ud9.manager.ui.components.AppListItem
 import dev.cl0ud9.manager.ui.components.EmptyState
+import dev.cl0ud9.manager.ui.components.KrateMessage
+import dev.cl0ud9.manager.ui.components.LocalNavBarClearance
 import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
 import dev.cl0ud9.manager.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
+import dev.cl0ud9.manager.ui.util.plusBottom
 import dev.cl0ud9.manager.ui.util.rememberDebouncedOnClick
 import dev.cl0ud9.manager.voice.KrateVoice
 import dev.cl0ud9.manager.voice.Moment
 import dev.cl0ud9.manager.voice.rememberKrateLine
 
+// the tab's one ViewModel, shared by its header and its content
+@Composable
+fun rememberUpdatesViewModel(): UpdatesViewModel =
+    managerViewModel { container ->
+        UpdatesViewModel(
+            container.catalogRepository,
+            container.installedPackageReader,
+            container.updateAllEngine,
+            container.activityLogRepository,
+            container.githubCredentialStore,
+            container.managerBaselineStore,
+        )
+    }
+
+// the header line under "Updates"; blank while loading so the header keeps its height
+@Composable
+fun rememberUpdatesSubtitle(): String {
+    val uiState by rememberUpdatesViewModel().uiState.collectAsStateWithLifecycle()
+    return when (val state = uiState) {
+        is UpdatesUiState.Loading -> ""
+        is UpdatesUiState.UpToDate -> "Everything is up to date"
+        is UpdatesUiState.Content ->
+            if (state.apps.size ==
+                1
+            ) {
+                "1 update waiting"
+            } else {
+                "${state.apps.size} updates waiting"
+            }
+    }
+}
+
 // pending updates with individual actions plus Update All, section 30 + 23/42.21 of the spec
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UpdatesScreen(onAppClick: (String) -> Unit) {
-    val viewModel =
-        managerViewModel { container ->
-            UpdatesViewModel(
-                container.catalogRepository,
-                container.installedPackageReader,
-                container.updateAllEngine,
-                container.activityLogRepository,
-                container.githubCredentialStore,
-                container.managerBaselineStore,
-            )
-        }
+    val viewModel = rememberUpdatesViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val updateAllState by viewModel.updateAllState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
@@ -85,7 +111,15 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
         }
         RefreshFailureSnackbar(
             refreshFailed = viewModel.refreshFailed,
-            message = { "${KrateVoice.line(Moment.REFRESH_FAILED)} Couldn't refresh, showing the last known list." },
+            message = {
+                KrateMessage(
+                    headline = KrateVoice.line(Moment.REFRESH_FAILED),
+                    detail = "Couldn't check for updates, showing what Krate saw last.",
+                    icon = R.drawable.ic_cloud_off_rounded,
+                    actionLabel = "Retry",
+                )
+            },
+            onRetry = viewModel::refreshFromNetwork,
         )
     }
 }
@@ -108,13 +142,17 @@ private fun UpdatesContent(
     ) { state ->
         when (state) {
             is UpdatesUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(bottom = LocalNavBarClearance.current),
+                    contentAlignment = Alignment.Center,
+                ) {
                     LoadingIndicator()
                 }
             }
 
             is UpdatesUiState.UpToDate -> {
                 EmptyState(
+                    modifier = Modifier.padding(bottom = LocalNavBarClearance.current),
                     icon = painterResource(R.drawable.ic_check_circle_rounded),
                     title = rememberKrateLine(Moment.ALL_CAUGHT_UP),
                     subtitle = "Every installed app is on its latest version.",
@@ -124,7 +162,7 @@ private fun UpdatesContent(
             is UpdatesUiState.Content -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(16.dp).plusBottom(LocalNavBarClearance.current),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     item(key = "update-all") {

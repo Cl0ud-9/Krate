@@ -14,11 +14,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.ui.apps.AppsScreen
+import dev.cl0ud9.manager.ui.apps.rememberAppsSubtitle
 import dev.cl0ud9.manager.ui.components.HomeChangelogAction
 import dev.cl0ud9.manager.ui.details.AppDetailsScreen
 import dev.cl0ud9.manager.ui.home.HomeScreen
 import dev.cl0ud9.manager.ui.settings.AboutPage
 import dev.cl0ud9.manager.ui.settings.AppearanceRoute
+import dev.cl0ud9.manager.ui.settings.CornerRadiusEditor
 import dev.cl0ud9.manager.ui.settings.DownloadsStoragePage
 import dev.cl0ud9.manager.ui.settings.FeedbackPage
 import dev.cl0ud9.manager.ui.settings.GitHubAccessPage
@@ -26,15 +28,17 @@ import dev.cl0ud9.manager.ui.settings.SettingsPageRoute
 import dev.cl0ud9.manager.ui.settings.SettingsScreen
 import dev.cl0ud9.manager.ui.settings.SettingsShortcutAction
 import dev.cl0ud9.manager.ui.updates.UpdatesScreen
+import dev.cl0ud9.manager.ui.updates.rememberUpdatesSubtitle
 import dev.cl0ud9.manager.voice.KrateVoice
 
+private const val CORNER_RADIUS_ROUTE = "settings/appearance/corner-radius"
 private const val APP_DETAILS_ROUTE = "apps/{appId}"
 private const val APP_ID_ARG = "appId"
 
 // a plain push (not navigateToTab's popUpTo/saveState dance) so the back button returns to
 // whichever tab was showing, and launchSingleTop keeps repeated taps from stacking copies
 internal fun NavGraphBuilder.tabDestinations(navController: NavHostController) {
-    val openSettings = { navController.navigate(ManagerDestination.SETTINGS.route) { launchSingleTop = true } }
+    val openSettings = { navController.navigateFromTap(ManagerDestination.SETTINGS.route) }
     composable(ManagerDestination.HOME.route) { entry ->
         val context = LocalContext.current
         TabScreen(
@@ -52,7 +56,7 @@ internal fun NavGraphBuilder.tabDestinations(navController: NavHostController) {
             HomeScreen(
                 onNavigateToApps = { navController.navigateToTab(ManagerDestination.APPS.route) },
                 onNavigateToUpdates = { navController.navigateToTab(ManagerDestination.UPDATES.route) },
-                onNavigateToApp = { appId -> navController.navigate("apps/$appId") },
+                onNavigateToApp = { appId -> navController.navigateFromTap("apps/$appId") },
             )
         }
     }
@@ -61,9 +65,10 @@ internal fun NavGraphBuilder.tabDestinations(navController: NavHostController) {
             title = stringResource(ManagerDestination.APPS.titleRes),
             navController = navController,
             entry = entry,
+            subtitle = rememberAppsSubtitle(),
             actions = { SettingsShortcutAction(onClick = openSettings) },
         ) {
-            AppsScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
+            AppsScreen(onAppClick = { appId -> navController.navigateFromTap("apps/$appId") })
         }
     }
     composable(ManagerDestination.UPDATES.route) { entry ->
@@ -71,9 +76,10 @@ internal fun NavGraphBuilder.tabDestinations(navController: NavHostController) {
             title = stringResource(ManagerDestination.UPDATES.titleRes),
             navController = navController,
             entry = entry,
+            subtitle = rememberUpdatesSubtitle(),
             actions = { SettingsShortcutAction(onClick = openSettings) },
         ) {
-            UpdatesScreen(onAppClick = { appId -> navController.navigate("apps/$appId") })
+            UpdatesScreen(onAppClick = { appId -> navController.navigateFromTap("apps/$appId") })
         }
     }
 }
@@ -92,12 +98,12 @@ internal fun NavGraphBuilder.settingsDestination(navController: NavHostControlle
             title = stringResource(ManagerDestination.SETTINGS.titleRes),
             navController = navController,
             entry = entry,
-            onBack = { navController.popBackStack() },
+            onBack = { navController.popBackFromTap() },
         ) { scrollState, topContentPadding ->
             SettingsScreen(
                 scrollState = scrollState,
                 topContentPadding = topContentPadding,
-                onNavigate = { route -> navController.navigate(route) { launchSingleTop = true } },
+                onNavigate = { route -> navController.navigateFromTap(route) },
             )
         }
     }
@@ -105,7 +111,21 @@ internal fun NavGraphBuilder.settingsDestination(navController: NavHostControlle
 
 internal fun NavGraphBuilder.appearanceDestination(navController: NavHostController) {
     settingsPageDestination(navController, APPEARANCE_ROUTE, "Appearance") { scrollState, topContentPadding ->
-        AppearanceRoute(scrollState = scrollState, topContentPadding = topContentPadding)
+        AppearanceRoute(
+            scrollState = scrollState,
+            topContentPadding = topContentPadding,
+            onOpenCornerRadius = { navController.navigateFromTap(CORNER_RADIUS_ROUTE) },
+        )
+    }
+    // full screen with its own back and Done, so the live bar preview can sit where the real bar does
+    composable(
+        route = CORNER_RADIUS_ROUTE,
+        enterTransition = { detailsEnterTransition() },
+        exitTransition = { detailsExitTransition() },
+        popEnterTransition = { detailsPopEnterTransition() },
+        popExitTransition = { detailsPopExitTransition() },
+    ) {
+        CornerRadiusEditor(onClose = { navController.popBackFromTap() })
     }
 }
 
@@ -142,7 +162,7 @@ private fun NavGraphBuilder.settingsPageDestination(
             title = title,
             navController = navController,
             entry = entry,
-            onBack = { navController.popBackStack() },
+            onBack = { navController.popBackFromTap() },
         ) { scrollState, topContentPadding ->
             content(scrollState, topContentPadding)
         }
@@ -163,11 +183,11 @@ internal fun NavGraphBuilder.appDetailsDestination(navController: NavHostControl
             title = "App Details",
             navController = navController,
             entry = entry,
-            onBack = { navController.popBackStack() },
+            onBack = { navController.popBackFromTap() },
         ) { scrollState, topContentPadding ->
             AppDetailsScreen(
                 appId = appId,
-                onNavigateToApp = { dependencyId -> navController.navigate("apps/$dependencyId") },
+                onNavigateToApp = { dependencyId -> navController.navigateFromTap("apps/$dependencyId") },
                 scrollState = scrollState,
                 topContentPadding = topContentPadding,
             )

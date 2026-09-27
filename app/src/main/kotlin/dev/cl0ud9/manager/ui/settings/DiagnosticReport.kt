@@ -4,9 +4,13 @@ import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.NotificationManagerCompat
 import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
-import dev.cl0ud9.manager.ui.util.formatRelativeTime
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private const val RECENT_ACTIVITY_LIMIT = 10
 
@@ -28,13 +32,17 @@ internal data class ReportedApp(
 internal fun rememberDeviceSummary(): String {
     val context = LocalContext.current
     return remember {
-        val versionName =
-            runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
-                .getOrNull() ?: "unknown"
+        val info = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
         buildString {
-            appendLine("App: ${context.packageName} $versionName")
+            appendLine(
+                "App: ${context.packageName} ${info?.versionName ?: "unknown"} (build ${info?.longVersionCode ?: "?"})",
+            )
             appendLine("Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
-            appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
+            appendLine(
+                "Device: ${Build.MANUFACTURER} ${Build.MODEL}, ${Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown ABI"}",
+            )
+            appendLine("Can install apps: ${yesNo(context.packageManager.canRequestPackageInstalls())}")
+            appendLine("Notifications: ${yesNo(NotificationManagerCompat.from(context).areNotificationsEnabled())}")
         }
     }
 }
@@ -45,11 +53,16 @@ internal fun formatDiagnosticReport(
     deviceSummary: String,
     apps: List<ReportedApp>,
     recentActivity: List<ActivityEntry>,
+    hasGitHubToken: Boolean,
+    generatedAtMillis: Long,
 ): String =
     buildString {
         appendLine("Krate diagnostic report")
+        appendLine("Generated: ${formatReportTime(generatedAtMillis)}")
         appendLine()
         append(deviceSummary)
+        // only whether one is saved, never the token itself - private apps like Videoapp need it
+        appendLine("GitHub token saved: ${yesNo(hasGitHubToken)}")
         appendLine()
         appendLine("Apps (${apps.count { it.installedVersion != null }} of ${apps.size} installed):")
         apps.forEach { app ->
@@ -64,11 +77,28 @@ internal fun formatDiagnosticReport(
             recent.forEach { entry ->
                 val detail = entry.detail?.let { " - $it" }.orEmpty()
                 appendLine(
-                    "- ${entry.appName}: ${entry.action.label()}$detail (${formatRelativeTime(entry.timestampMillis)})",
+                    "- ${formatReportTime(entry.timestampMillis)} ${entry.appName}: ${entry.action.label()}$detail",
                 )
             }
         }
     }
+
+// the version as the app reports it, plus the build when that says more than the version (a Patched rebuild)
+internal fun reportedVersion(
+    versionName: String,
+    buildId: String?,
+): String =
+    buildId?.takeIf { it != versionName && it != "v$versionName" }?.let { "$versionName (build $it)" } ?: versionName
+
+private fun yesNo(value: Boolean): String = if (value) "yes" else "no"
+
+// exact local time with the zone, since "5 mins ago" is wrong by the time anyone reads the report
+private val REPORT_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm z", Locale.US)
+
+internal fun formatReportTime(
+    millis: Long,
+    zone: ZoneId = ZoneId.systemDefault(),
+): String = REPORT_TIME.format(Instant.ofEpochMilli(millis).atZone(zone))
 
 private fun ActivityAction.label(): String =
     when (this) {

@@ -2,7 +2,7 @@
 agp = "9.1.1"
 kotlin = "2.4.0"
 composeBom = "2026.08.00"
-# EXPERIMENT: overriding material3 past what composeBom maps to, for the M3 Expressive components.
+# material3 is pinned past what composeBom maps to, for the M3 Expressive components.
 # Pre-release, no API stability guarantee between alphas.
 material3 = "1.5.0-alpha22"
 coreKtx = "1.19.0"

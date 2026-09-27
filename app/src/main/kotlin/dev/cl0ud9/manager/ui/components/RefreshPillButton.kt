@@ -1,10 +1,8 @@
 package dev.cl0ud9.manager.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -17,17 +15,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.ui.theme.ShapeCache
+import kotlin.math.ceil
 
 private const val SPIN_DURATION_MS = 900
 private const val FULL_TURN_DEGREES = 360f
+private const val SETTLE_MS = 350
 private val BUTTON_HEIGHT = 42.dp
 private val ICON_SIZE = 20.dp
 
@@ -41,22 +42,21 @@ fun RefreshPillButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "refreshPillSpin")
-    val spinAngle by
-        infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = FULL_TURN_DEGREES,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(SPIN_DURATION_MS, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart,
-                ),
-            label = "refreshPillSpinAngle",
-        )
+    // spins while refreshing, then eases on to the next full turn instead of snapping back mid-spin
+    val spin = remember { Animatable(0f) }
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            while (true) spin.animateTo(spin.value + FULL_TURN_DEGREES, tween(SPIN_DURATION_MS, easing = LinearEasing))
+        } else if (spin.value % FULL_TURN_DEGREES != 0f) {
+            val nextTurn = ceil(spin.value / FULL_TURN_DEGREES) * FULL_TURN_DEGREES
+            spin.animateTo(nextTurn, tween(SETTLE_MS, easing = FastOutSlowInEasing))
+            spin.snapTo(0f)
+        }
+    }
 
     FilledTonalButton(
-        onClick = onClick,
-        enabled = !isRefreshing,
+        // a tap mid-refresh is ignored rather than disabling the pill, which would flash it grey
+        onClick = { if (!isRefreshing) onClick() },
         modifier = modifier.height(BUTTON_HEIGHT),
         shape = ShapeCache.smoothPill,
         colors =
@@ -70,7 +70,7 @@ fun RefreshPillButton(
         Icon(
             painter = painterResource(R.drawable.ic_refresh_rounded),
             contentDescription = null,
-            modifier = Modifier.size(ICON_SIZE).rotate(if (isRefreshing) spinAngle else 0f),
+            modifier = Modifier.size(ICON_SIZE).graphicsLayer { rotationZ = spin.value },
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(text = "Refresh", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)

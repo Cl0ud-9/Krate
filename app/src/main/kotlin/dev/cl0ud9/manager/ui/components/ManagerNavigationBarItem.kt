@@ -67,8 +67,9 @@ fun RowScope.ManagerNavigationBarItem(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
-    val selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer
-    val selectedTextColor = MaterialTheme.colorScheme.onSurface
+    // the selected tab reads in the primary color, icon and label alike
+    val selectedIconColor = MaterialTheme.colorScheme.primary
+    val selectedTextColor = MaterialTheme.colorScheme.primary
     val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
     val iconColor by animateColorAsState(
         targetValue = if (selected) selectedIconColor else unselectedColor,
@@ -183,7 +184,7 @@ private fun NavItemLabel(
                 MaterialTheme.typography.labelMedium.copy(
                     color = textColor,
                     fontSize = 13.sp,
-                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 ),
         ) {
             Text(label)

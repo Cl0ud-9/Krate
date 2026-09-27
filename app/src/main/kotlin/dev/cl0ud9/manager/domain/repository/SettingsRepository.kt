@@ -2,6 +2,7 @@ package dev.cl0ud9.manager.domain.repository
 
 import dev.cl0ud9.manager.domain.model.LaunchTab
 import dev.cl0ud9.manager.domain.model.NavBarStyle
+import dev.cl0ud9.manager.domain.model.SettingsSnapshot
 import dev.cl0ud9.manager.domain.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 
@@ -9,9 +10,17 @@ import kotlinx.coroutines.flow.Flow
 // than split by feature, matching how the single DataStore-backed implementation stores them
 @Suppress("TooManyFunctions")
 interface SettingsRepository {
+    // the settings as last read, or null before the first read; screens start from it so nothing animates in
+    fun currentSettings(): SettingsSnapshot?
+
     fun observeAutomaticDownloads(): Flow<Boolean>
 
     suspend fun setAutomaticDownloads(enabled: Boolean)
+
+    // lets automatic downloads use mobile data too, not just Wi-Fi; off unless the user opts in
+    fun observeDownloadOnMobileData(): Flow<Boolean>
+
+    suspend fun setDownloadOnMobileData(enabled: Boolean)
 
     // whether first-run onboarding (amendment 44.4) has been completed - gates the Apps catalog
     fun observeOnboardingCompleted(): Flow<Boolean>

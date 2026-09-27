@@ -6,11 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
@@ -25,6 +27,9 @@ private typealias Builder = AnnotatedString.Builder
 // +/-/* bullet lists, and #/##/### ATX headers, so raw "**"/"`"/"[...](...)"/"+ "/"### " syntax
 // doesn't leak into the UI.
 private val HEADER_LINE = Regex("^(#{1,6})\\s+(.*)$")
+
+// a line that is nothing but bold text, which many release notes use as a section title instead of "###"
+private val BOLD_TITLE_LINE = Regex("^\\s*\\*\\*([^*]+)\\*\\*:?\\s*$")
 private val BULLET_LINE = Regex("^(\\s*)[+*-]\\s(.*)$")
 private val HEADER_FONT_SIZE = 15.sp
 
@@ -39,7 +44,7 @@ private data class InlineSpanColors(
 
 @Composable
 fun String.formatMarkdownLite(): AnnotatedString {
-    val headerColor = MaterialTheme.colorScheme.primary
+    val headerColor = MaterialTheme.colorScheme.onSurface
     val colors =
         InlineSpanColors(
             body = LocalContentColor.current,
@@ -47,45 +52,89 @@ fun String.formatMarkdownLite(): AnnotatedString {
             codeText = MaterialTheme.colorScheme.onSurfaceVariant,
             codeBackground = MaterialTheme.colorScheme.surfaceContainerHighest,
         )
+    val headerStyle = SpanStyle(fontWeight = FontWeight.Bold, fontSize = HEADER_FONT_SIZE, color = headerColor)
     return buildAnnotatedString {
+        val writer = MarkdownLineWriter(this, headerStyle, colors)
         // "( https://... )" -> "(https://...)": release notes often space a trailing link out
-        val lines = trimEnd().replace(SPACED_PAREN_URL, "($1)").lines()
-        var previousWasBlank = true // no separating blank line needed before the very first line
-        lines.forEachIndexed { index, line ->
-            if (index > 0) append('\n')
-            val header = HEADER_LINE.matchEntire(line)
-            val bullet = BULLET_LINE.matchEntire(line)
+        trim().replace(SPACED_PAREN_URL, "($1)").lines().forEach(writer::write)
+    }
+}
+
+// writes release-note lines one paragraph each - no '\n' between them, which would double every gap
+private class MarkdownLineWriter(
+    private val builder: Builder,
+    private val headerStyle: SpanStyle,
+    private val colors: InlineSpanColors,
+) {
+    private var previousWasBlank = true
+
+    // the depth of the bullet the previous line belonged to, so an indented follow-on line stays with it
+    private var bulletDepth: Int? = null
+
+    fun write(line: String) {
+        val header = HEADER_LINE.matchEntire(line) ?: BOLD_TITLE_LINE.matchEntire(line)
+        val bullet = BULLET_LINE.matchEntire(line)
+        val continuing = bulletDepth
+        when {
+            line.isBlank() -> builder.blankLine()
+            header != null -> writeHeader(header.groupValues.last().trim())
+            bullet != null -> writeBullet(depthOf(bullet.groupValues[1]), bullet.groupValues[2])
+            continuing != null && line.first().isWhitespace() ->
+                builder.withStyle(continuationParagraph(continuing)) { appendWithInlineSpans(line.trim(), colors) }
+            else -> builder.withStyle(PLAIN_PARAGRAPH) { appendWithInlineSpans(line, colors) }
+        }
+        bulletDepth =
             when {
-                header != null -> {
-                    val (_, text) = header.destructured
-                    // an extra blank line ahead of a header separates sections visually, matching
-                    // how a real markdown renderer would space a heading from the paragraph before it
-                    if (!previousWasBlank) append('\n')
-                    val headerStyle =
-                        SpanStyle(fontWeight = FontWeight.Bold, fontSize = HEADER_FONT_SIZE, color = headerColor)
-                    withStyle(headerStyle) {
-                        appendWithInlineSpans(text.trim(), colors)
-                    }
-                }
-
-                // no ParagraphStyle/hanging-indent here on purpose - wrapping each bullet in its
-                // own paragraph looked correct in isolation but made Compose insert noticeably
-                // larger gaps between consecutive bullets than a plain '\n' does (confirmed live:
-                // a real multi-bullet changelog rendered with huge vertical gaps between every
-                // line). A wrapped continuation line falling back to the left margin is a smaller
-                // cosmetic issue than that.
-                bullet != null -> {
-                    val (indent, rest) = bullet.destructured
-                    append(indent)
-                    append(if (indent.isEmpty()) "•  " else "◦  ")
-                    appendWithInlineSpans(rest, colors)
-                }
-
-                else -> appendWithInlineSpans(line, colors)
+                bullet != null -> depthOf(bullet.groupValues[1])
+                line.isBlank() || header != null || !line.first().isWhitespace() -> null
+                else -> bulletDepth
             }
-            previousWasBlank = line.isBlank()
+        previousWasBlank = line.isBlank()
+    }
+
+    // a heading gets a blank line above it, as a markdown renderer would space it
+    private fun writeHeader(text: String) {
+        if (!previousWasBlank) builder.blankLine()
+        builder.withStyle(PLAIN_PARAGRAPH) { withStyle(headerStyle) { appendWithInlineSpans(text, colors) } }
+    }
+
+    private fun writeBullet(
+        depth: Int,
+        text: String,
+    ) {
+        builder.withStyle(bulletParagraph(depth)) {
+            append(if (depth == 0) "•  " else "◦  ")
+            appendWithInlineSpans(text, colors)
         }
     }
+
+    private fun depthOf(indent: String): Int = (indent.replace("\t", "  ").length / 2).coerceIn(0, MAX_BULLET_DEPTH)
+}
+
+private val PLAIN_PARAGRAPH = ParagraphStyle()
+private const val MAX_BULLET_DEPTH = 3
+private const val BULLET_STEP_SP = 14f
+private const val BULLET_HANG_SP = 13f
+
+// a wrapped bullet line lines up under its text, not under the bullet
+private fun bulletParagraph(depth: Int): ParagraphStyle =
+    ParagraphStyle(
+        textIndent =
+            TextIndent(
+                firstLine = (BULLET_STEP_SP * depth).sp,
+                restLine = (BULLET_STEP_SP * depth + BULLET_HANG_SP).sp,
+            ),
+    )
+
+// a bullet's follow-on line, lined up with the bullet's text
+private fun continuationParagraph(depth: Int): ParagraphStyle {
+    val indent = (BULLET_STEP_SP * depth + BULLET_HANG_SP).sp
+    return ParagraphStyle(textIndent = TextIndent(firstLine = indent, restLine = indent))
+}
+
+// an empty line keeps its height as a paragraph holding a single space
+private fun Builder.blankLine() {
+    withStyle(PLAIN_PARAGRAPH) { append(" ") }
 }
 
 // the position (if any) of the next occurrence of a two-sided inline marker, or -1 if it isn't
@@ -178,10 +227,12 @@ private val BARE_URL = Regex("https?://[^\\s)]+")
 
 private val GITHUB_COMMIT_URL = Regex("^https://github\\.com/[^/]+/[^/]+/commit/([0-9a-f]{7})[0-9a-f]*$")
 private val GITHUB_NUMBERED_URL = Regex("^https://github\\.com/[^/]+/[^/]+/(?:pull|issues)/(\\d+)$")
+private val GITHUB_COMPARE_URL = Regex("^https://github\\.com/[^/]+/[^/]+/compare/(.+?)\\.\\.\\.(.+)$")
 
 // a full commit or pull request URL in release notes is noise for a reader - GitHub itself shows
 // these as "a1b2c3d" and "#123", so do the same while keeping them tappable
 private fun shortLinkText(url: String): String =
     GITHUB_COMMIT_URL.matchEntire(url)?.let { "commit ${it.groupValues[1]}" }
         ?: GITHUB_NUMBERED_URL.matchEntire(url)?.let { "#${it.groupValues[1]}" }
+        ?: GITHUB_COMPARE_URL.matchEntire(url)?.let { "changes from ${it.groupValues[1]} to ${it.groupValues[2]}" }
         ?: url

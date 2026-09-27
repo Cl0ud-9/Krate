@@ -1,10 +1,12 @@
 package dev.cl0ud9.manager.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,8 +20,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MediumExtendedFloatingActionButton
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -28,31 +30,37 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.data.downloads.friendlyNetworkError
 import dev.cl0ud9.manager.platform.appContainer
 import dev.cl0ud9.manager.platform.selfupdate.ManagerRelease
 import dev.cl0ud9.manager.ui.theme.ShapeCache
-import dev.cl0ud9.manager.ui.util.formatMarkdownLite
 import java.io.IOException
-import java.text.DateFormat
-import java.time.Instant
-import java.util.Date
 
 private const val MAX_RELEASES = 6
+private const val RELEASES_URL = "https://github.com/Cl0ud-9/manager/releases"
 
 // What's new = the manager's real release notes from GitHub, newest first - a list written into the
 // app itself goes stale the moment a release forgets to update it
 @Composable
 fun HomeChangelogAction() {
-    var showChangelog by remember { mutableStateOf(false) }
+    var showChangelog by rememberSaveable { mutableStateOf(false) }
     FilledIconButton(
         onClick = { showChangelog = true },
         colors =
@@ -100,34 +108,77 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
                 ReleasesState.Failed(friendlyNetworkError(exception))
             }
     }
+    // peeks at half height first, then drags up to full
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        // opens full height, so one Back closes it instead of first dropping to half height
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberModalBottomSheetState(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = "What's new",
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onSurface,
+        // full height from the start, so the sheet has a half-height peek to open at even while the notes load
+        Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ChangelogHeader()
+                ReleasesContent(state = state, onRetry = { attempt++ })
+            }
+            ViewOnGitHubButton(modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp))
+            // content fades out under the button instead of being cut by the sheet's edge
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(30.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, MaterialTheme.colorScheme.surfaceContainerLow),
+                            ),
+                        ),
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            SineWaveLine(
-                modifier = Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 8.dp),
-                animate = true,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                alpha = 0.95f,
-                strokeWidth = 4.dp,
-                amplitude = 4.dp,
-                waves = 7.6f,
-            )
-            ReleasesContent(state = state, onRetry = { attempt++ })
         }
     }
+}
+
+// the sheet's title over the animated wave divider
+@Composable
+private fun ChangelogHeader() {
+    Text(
+        text = "What's new",
+        style = MaterialTheme.typography.displaySmall.copy(fontSize = 36.sp, lineHeight = 44.sp),
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    Spacer(modifier = Modifier.height(16.dp))
+    SineWaveLine(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(32.dp)
+                .padding(horizontal = 8.dp)
+                .padding(bottom = 4.dp),
+        animate = true,
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+        alpha = 0.95f,
+        strokeWidth = 4.dp,
+        amplitude = 4.dp,
+        waves = 7.6f,
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ViewOnGitHubButton(modifier: Modifier = Modifier) {
+    val uriHandler = LocalUriHandler.current
+    MediumExtendedFloatingActionButton(
+        onClick = { uriHandler.openUri(RELEASES_URL) },
+        shape = ShapeCache.smooth16,
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        icon = { Icon(painterResource(R.drawable.ic_github), contentDescription = null) },
+        text = { Text("View on GitHub") },
+        modifier = modifier,
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -158,51 +209,25 @@ private fun ReleasesContent(
 
         is ReleasesState.Loaded ->
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                contentPadding = PaddingValues(bottom = 32.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp).nestedScroll(KeepFlingInList),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                contentPadding = PaddingValues(bottom = 120.dp),
             ) {
-                items(state.releases) { release -> ReleaseCard(release) }
+                items(state.releases, key = { it.version }) { release -> ReleaseItem(release) }
             }
     }
 }
 
-@Composable
-private fun ReleaseCard(release: ManagerRelease) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = ShapeCache.smooth20,
-        tonalElevation = 6.dp,
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = "Version ${release.version}",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-            )
-            releaseDate(release.publishedAt)?.let { date ->
-                Text(
-                    text = date,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                text = release.notes.ifBlank { "No notes for this version." }.formatMarkdownLite(),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
-}
+// a list fling ends in the list; its leftover would otherwise snap a pulled-down sheet back open
+private object KeepFlingInList : NestedScrollConnection {
+    override fun onPostScroll(
+        consumed: Offset,
+        available: Offset,
+        source: NestedScrollSource,
+    ): Offset = if (source == NestedScrollSource.SideEffect) available else Offset.Zero
 
-private fun releaseDate(publishedAt: String?): String? =
-    publishedAt?.let {
-        runCatching { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(Instant.parse(it).toEpochMilli())) }
-            .getOrNull()
-    }
+    override suspend fun onPostFling(
+        consumed: Velocity,
+        available: Velocity,
+    ): Velocity = available
+}

@@ -108,12 +108,7 @@ private fun DownloadStatusContent(
             val total = status.totalBytes
             val fraction = if (total != null && total > 0) status.bytesDownloaded / total.toFloat() else 0f
             ManagerLinearProgress(progress = if (total != null) fraction else null)
-            HelperText(
-                total?.let {
-                    "Downloading ${formatMb(status.bytesDownloaded)} of ${formatMb(it)} MB " +
-                        "(${(fraction * PERCENT).toInt()}%)"
-                } ?: "Downloading ${formatMb(status.bytesDownloaded)} MB",
-            )
+            HelperText(downloadingLabel(status.bytesDownloaded, total, fraction))
             // a 170 MB download shouldn't be a commitment - the partial file is kept, so starting
             // again later resumes it
             OutlinedButton(onClick = onCancelDownload, modifier = Modifier.fillMaxWidth()) {
@@ -366,9 +361,3 @@ private fun UninstallingStatus(installStatus: InstallStatus) {
     )
     if (installStatus is InstallStatus.WaitingForUser) ReopenPromptButton()
 }
-
-private const val BYTES_PER_MB = 1024 * 1024
-
-private fun formatMb(bytes: Long): String = "%.1f".format(bytes / BYTES_PER_MB.toFloat())
-
-private const val PERCENT = 100

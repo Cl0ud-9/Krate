@@ -2,6 +2,8 @@ package dev.cl0ud9.manager.platform.workers
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.PowerManager
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dev.cl0ud9.manager.domain.model.AppProfile
@@ -31,12 +33,12 @@ class ManifestCheckWorker(
                 val apps = container.catalogRepository.observeApps().first()
                 val hasToken = container.githubCredentialStore.getToken() != null
                 val baselines = container.managerBaselineStore.observeBaselines().first()
-                pendingUpdates(apps, container.installedPackageReader, hasToken, baselines)
-            }.onSuccess { pending ->
+                apps to pendingUpdates(apps, container.installedPackageReader, hasToken, baselines)
+            }.onSuccess { (apps, pending) ->
                 if (pending.isEmpty()) {
                     UpdateNotifier.clearPendingUpdates(applicationContext)
                 } else {
-                    val downloaded = downloadInBackground(container, pending)
+                    val downloaded = downloadInBackground(container, pending, apps.map { it.id })
                     UpdateNotifier.notifyPendingUpdates(
                         applicationContext,
                         pending,
@@ -59,24 +61,57 @@ class ManifestCheckWorker(
         return if (catalogResult.isSuccess) Result.success() else Result.retry()
     }
 
-    // Settings > Automatic downloads: fetch and verify pending updates ahead of time so installing
-    // is instant, only on an unmetered connection (Videoapp builds are ~170 MB). Installing still
-    // always needs the user. True when every pending update ended up downloaded
+    // Settings > Automatic downloads: pre-fetch updates on Wi-Fi (or mobile data if allowed), not in Battery Saver;
+    // true when all are ready
     private suspend fun downloadInBackground(
         container: AppContainer,
         pending: List<AppProfile>,
+        allAppIds: List<String>,
     ): Boolean {
-        val enabled = container.settingsRepository.observeAutomaticDownloads().first()
-        val connectivity = applicationContext.getSystemService(ConnectivityManager::class.java)
-        if (!enabled || connectivity == null || connectivity.isActiveNetworkMetered) return false
+        val settings = container.settingsRepository
+        if (!settings.observeAutomaticDownloads().first()) return false
+        val allowed = canDownloadNow(mobileDataAllowed = settings.observeDownloadOnMobileData().first())
         // map before all: one failed download must not stop the rest from being tried
         return pending
             .map { app ->
                 val artifact = app.latestArtifact ?: return@map false
-                container.artifactDownloader.existingReadyFile(app, artifact) != null ||
-                    runCatching {
-                        container.artifactDownloader.download(app, artifact).last() is DownloadStatus.ReadyToInstall
-                    }.getOrDefault(false)
+                val downloader = container.artifactDownloader
+                val ready =
+                    downloader.existingReadyFile(app, artifact) != null ||
+                        (
+                            allowed &&
+                                runCatching {
+                                    downloader
+                                        .download(
+                                            app,
+                                            artifact,
+                                        ).last() is DownloadStatus.ReadyToInstall
+                                }.getOrDefault(false)
+                        )
+                if (ready) downloader.pruneOtherBuilds(app, artifact, allAppIds)
+                ready
             }.all { it }
     }
+
+    // mobile data only when the user allowed it, and never while roaming or with Data Saver on
+    private fun canDownloadNow(mobileDataAllowed: Boolean): Boolean {
+        val connectivity = applicationContext.getSystemService(ConnectivityManager::class.java)
+        val power = applicationContext.getSystemService(PowerManager::class.java)
+        if (connectivity == null || power?.isPowerSaveMode == true) return false
+        val capabilities = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+        return backgroundDownloadAllowed(
+            metered = connectivity.isActiveNetworkMetered,
+            roaming = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING) == false,
+            dataSaver = connectivity.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED,
+            mobileDataAllowed = mobileDataAllowed,
+        )
+    }
 }
+
+// Wi-Fi (unmetered) always; a metered network only when allowed, not roaming and not under Data Saver
+internal fun backgroundDownloadAllowed(
+    metered: Boolean,
+    roaming: Boolean,
+    dataSaver: Boolean,
+    mobileDataAllowed: Boolean,
+): Boolean = !metered || (mobileDataAllowed && !roaming && !dataSaver)

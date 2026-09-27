@@ -4,6 +4,12 @@
     {
       "id": "ltecleaner-foss",
       "displayName": "LTE Cleaner FOSS",
+      "description": "Frees up storage by clearing out the junk files apps leave behind.",
+      "highlights": [
+        "Finds temporary files, logs, thumbnails and empty folders",
+        "Pick exactly what gets cleaned, and whitelist what stays",
+        "Open source, with no ads or trackers"
+      ],
       "packageName": "io.mdp43140.ltecleaner",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
@@ -20,6 +26,12 @@
     {
       "id": "app-cache-cleaner",
       "displayName": "App Cache Cleaner",
+      "description": "Clears the cache of all your apps in one go, no root needed.",
+      "highlights": [
+        "Clears cached data app by app, automatically",
+        "Uses Android's accessibility service to do the tapping for you",
+        "Open source, with no ads or trackers"
+      ],
       "packageName": "com.github.bmx666.appcachecleaner",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
@@ -36,6 +48,12 @@
     {
       "id": "microg-re",
       "displayName": "MicroG RE",
+      "description": "Lets the Patched apps sign in to your Google account.",
+      "highlights": [
+        "Needed for sign-in, subscriptions and playlists in Videoapp and Videoapp Music",
+        "A light, open-source stand-in for Google Play services",
+        "Install it before the Patched apps"
+      ],
       "packageName": "app.patched.android.gms",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
@@ -52,6 +70,12 @@
     {
       "id": "videoapp-patched",
       "displayName": "Videoapp (Patched)",
+      "description": "Videoapp without the ads, with background play and extra controls.",
+      "highlights": [
+        "No ads, in the feed or in videos",
+        "Keeps playing in the background and with the screen off",
+        "Segment skipping, Return Videoapp Dislike, swipe controls and a Material You theme"
+      ],
       "packageName": "app.patched.android.videoapp",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
@@ -81,6 +105,12 @@
     {
       "id": "videoapp-music-patched",
       "displayName": "Videoapp Music (Patched)",
+      "description": "Videoapp Music without the ads, and it keeps playing in the background.",
+      "highlights": [
+        "No ads between songs or on music videos",
+        "Background play without Premium",
+        "Cleaner layout with the Premium prompts hidden, plus a Material You theme"
+      ],
       "packageName": "app.patched.android.apps.videoapp.music",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
@@ -106,6 +136,28 @@
           "expectedCertificateSha256": "17238efb5db5a12b23cc8c838f57587abd80313eae0dfc35338f3f203f8f8c18"
         }
       ]
+    },
+    {
+      "id": "mihon",
+      "displayName": "Mihon",
+      "description": "A free, open-source manga reader for Android.",
+      "highlights": [
+        "Read from many sources through extensions",
+        "Track your reading with AniList, MyAnimeList and more",
+        "Download chapters to read offline, with backups built in"
+      ],
+      "packageName": "app.mihon",
+      "supportStatus": "SUPPORTED",
+      "installationMode": "UPDATE",
+      "dependencyIds": [],
+      "enabled": true,
+      "source": {
+        "repo": "mihonapp/mihon",
+        "assetPattern": "^mihon-arm64-v8a-v[0-9.]+\\.apk$",
+        "includePrerelease": false,
+        "retainVersions": 3,
+        "expectedCertificateSha256": "9add655a78e96c4ec7a53ef89dccb557cb5d767489fac5e785d671a5a75d4da2"
+      }
     }
   ]
 }

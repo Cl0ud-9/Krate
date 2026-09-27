@@ -20,13 +20,14 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 private const val THUMB_ICON_FADE_MS = 120
 
 // every Switch in the app goes through here instead of a bare Material Switch - a checkmark/close
-// glyph crossfading inside the thumb plus a toggle-specific haptic tick on every flip, giving the
-// settings toggles real weight instead of the plain default thumb
+// glyph crossfading inside the thumb plus a toggle-specific haptic tick on every flip, giving
+// settings toggles more weight than the plain default thumb
 @Composable
 fun ManagerSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val haptics = LocalHapticFeedback.current
     Switch(
@@ -36,6 +37,7 @@ fun ManagerSwitch(
             onCheckedChange(it)
         },
         modifier = modifier,
+        enabled = enabled,
         thumbContent = {
             AnimatedContent(
                 targetState = checked,

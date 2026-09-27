@@ -28,6 +28,7 @@ import dev.cl0ud9.manager.platform.rollback.FileRollbackStore
 import dev.cl0ud9.manager.platform.rollback.RollbackStore
 import dev.cl0ud9.manager.platform.selfupdate.ManagerSelfUpdateInstaller
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
+import dev.cl0ud9.manager.platform.selfupdate.WhatsNewTracker
 import dev.cl0ud9.manager.security.apk.PackageManagerApkArchiveReader
 import java.io.File
 
@@ -54,8 +55,10 @@ class AppContainer(
     val cleanInstallOrchestrator: CleanInstallOrchestrator = CleanInstallOrchestrator(installationEngine, rollbackStore)
     val updateAllEngine: UpdateAllEngine =
         UpdateAllEngine(artifactDownloader, installationEngine, cleanInstallOrchestrator)
-    val managerUpdateChecker = ManagerUpdateChecker(context.applicationContext)
+    val managerUpdateChecker =
+        ManagerUpdateChecker(context.applicationContext, tokenProvider = { githubCredentialStore.getToken() })
     val managerSelfUpdateInstaller = ManagerSelfUpdateInstaller(context.applicationContext, installationEngine)
+    val whatsNewTracker = WhatsNewTracker(context.applicationContext)
     val activityLogRepository: ActivityLogRepository = DataStoreActivityLogRepository(context.applicationContext)
     val managerBaselineStore: ManagerBaselineStore = DataStoreManagerBaselineStore(context.applicationContext)
     val announcementDismissalStore: AnnouncementDismissalStore =

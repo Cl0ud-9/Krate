@@ -3,19 +3,16 @@ package dev.cl0ud9.manager.ui.settings
 import android.graphics.drawable.Drawable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Code
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,13 +20,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -38,13 +35,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import dev.cl0ud9.manager.R
-import dev.cl0ud9.manager.ui.components.ChangelogSheet
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 
 private const val SOURCE_URL = "https://github.com/Cl0ud-9/manager"
-private val HERO_ICON_SIZE = 64.dp
+private val HERO_ICON_SIZE = 60.dp
+private const val PROJECT_ROWS = 2
 
-// who and what this is up top, then everything about keeping it current, then where it comes from
+// who and what Krate is, who makes it, keeping it current, and where it comes from
 @Composable
 fun AboutPage(
     scrollState: ScrollState,
@@ -52,45 +49,35 @@ fun AboutPage(
 ) {
     val viewModel = rememberSettingsViewModel()
     val uriHandler = LocalUriHandler.current
-    var showChangelog by remember { mutableStateOf(false) }
+    var showLicenses by rememberSaveable { mutableStateOf(false) }
     SettingsPage(scrollState, topContentPadding) {
         AboutHeroCard(versionName = rememberVersionName())
-        SettingsSectionLabel("Updates")
-        SettingsAboutRow(viewModel = viewModel, shape = settingsGroupShape(0, 2))
+        AboutSectionHeader(title = "Maintainer", subtitle = "The person behind Krate.")
+        MaintainerCard()
+        AboutSectionHeader(title = "Updates", subtitle = "Krate keeps itself current too.")
+        KrateUpdatesCard(viewModel = viewModel)
+        AboutSectionHeader(title = "Project", subtitle = "Open source, and built on open work.")
         SettingsNavRow(
-            icon = painterResource(R.drawable.ic_newspaper_rounded),
-            title = "What's new",
-            subtitle = "Release notes for recent versions",
-            colors = defaultSettingsRowColors(),
-            shape = settingsGroupShape(1, 2),
-            onClick = { showChangelog = true },
-        )
-        SettingsSectionLabel("Project")
-        SettingsNavRow(
-            icon = rememberVectorPainter(Icons.Filled.Code),
+            icon = painterResource(R.drawable.ic_github),
             title = "Source code",
             subtitle = "github.com/Cl0ud-9/manager",
-            colors =
-                SettingsRowColors(
-                    MaterialTheme.colorScheme.secondaryContainer,
-                    MaterialTheme.colorScheme.onSecondaryContainer,
-                ),
-            shape = settingsGroupShape(0, 1),
+            colors = SettingsTint.SLATE.colors(),
+            shape = settingsGroupShape(0, PROJECT_ROWS),
             onClick = { uriHandler.openUri(SOURCE_URL) },
         )
-        // the Krate mark and notification icon are Font Awesome Free icons, CC BY 4.0
-        Text(
-            text = "Krate icons from Font Awesome Free, CC BY 4.0.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 12.dp, top = 16.dp),
+        SettingsNavRow(
+            icon = painterResource(R.drawable.ic_gavel_rounded),
+            title = "Licenses",
+            subtitle = "Fonts and icons Krate uses, and their licenses",
+            colors = SettingsTint.INDIGO.colors(),
+            shape = settingsGroupShape(1, PROJECT_ROWS),
+            onClick = { showLicenses = true },
         )
     }
-    if (showChangelog) {
-        ChangelogSheet(onDismiss = { showChangelog = false })
-    }
+    if (showLicenses) LicensesSheet(onDismiss = { showLicenses = false })
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AboutHeroCard(versionName: String) {
     Surface(
@@ -98,44 +85,82 @@ private fun AboutHeroCard(versionName: String) {
         shape = ShapeCache.smooth28,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                ManagerIcon()
+                KrateIcon()
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(text = "Krate", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        text = "Krate",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = "Install your apps and keep them up to date, straight from their releases.",
+                        text = "Your apps, straight from their releases, always up to date.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                modifier =
-                    Modifier
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.tertiaryContainer),
-            ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer) {
                 Text(
                     text = "Version $versionName",
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
             }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AboutTag(icon = R.drawable.ic_public_rounded, label = "Open source")
+                AboutTag(icon = R.drawable.ic_gpp_good_rounded, label = "Handpicked apps")
+                AboutTag(icon = R.drawable.ic_palette_rounded, label = "Material 3 Expressive")
+            }
         }
+    }
+}
+
+@Composable
+private fun AboutTag(
+    icon: Int,
+    label: String,
+) {
+    Surface(shape = ShapeCache.smooth16, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                painterResource(icon),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(text = label, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+@Composable
+internal fun AboutSectionHeader(
+    title: String,
+    subtitle: String,
+) {
+    Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 22.dp, bottom = 10.dp)) {
+        Text(text = title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
 // the app's own launcher icon (adaptive, so read through PackageManager rather than painterResource)
 @Composable
-private fun ManagerIcon() {
+private fun KrateIcon() {
     val context = LocalContext.current
     val painter =
         remember {
@@ -145,10 +170,6 @@ private fun ManagerIcon() {
                 ?.let { BitmapPainter(it.asImageBitmap()) }
         }
     if (painter != null) {
-        Image(
-            painter = painter,
-            contentDescription = null,
-            modifier = Modifier.size(HERO_ICON_SIZE).clip(CircleShape),
-        )
+        Image(painter = painter, contentDescription = null, modifier = Modifier.size(HERO_ICON_SIZE).clip(CircleShape))
     }
 }

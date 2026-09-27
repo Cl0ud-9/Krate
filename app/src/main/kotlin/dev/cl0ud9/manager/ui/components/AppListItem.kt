@@ -21,12 +21,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.latestVersionName
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.pressScale
+
+private const val DESCRIPTION_ALPHA = 0.85f
 
 @Composable
 fun AppListItem(
@@ -59,6 +62,16 @@ fun AppListItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = app.displayName, style = MaterialTheme.typography.titleMedium)
+                app.description?.let { description ->
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = DESCRIPTION_ALPHA),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
+                    )
+                }
                 Text(
                     // the catalog's newest version - "Installed" below says whether it's on the device
                     text = app.latestVersionName?.let { "Latest $it" } ?: "Not available yet",

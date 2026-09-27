@@ -2,7 +2,6 @@ package dev.cl0ud9.manager.platform.selfupdate
 
 import android.content.Context
 import dev.cl0ud9.manager.data.downloads.UserFacingIOException
-import dev.cl0ud9.manager.data.downloads.friendlyHttpError
 import dev.cl0ud9.manager.data.downloads.friendlyNetworkError
 import dev.cl0ud9.manager.domain.version.isNewerVersion
 import kotlinx.coroutines.Dispatchers
@@ -11,7 +10,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -83,18 +81,22 @@ class ManagerUpdateChecker(
     context: Context,
     private val httpClient: OkHttpClient = defaultHttpClient(),
     private val releasesApiUrl: String = RELEASES_API_URL,
+    // a saved GitHub token lifts GitHub's limit from 60 to 5,000 requests an hour
+    private val tokenProvider: () -> String? = { null },
 ) {
     private val appContext = context.applicationContext
     private val json = Json { ignoreUnknownKeys = true }
+    private val source = GitHubReleasesSource(appContext.cacheDir, httpClient, releasesApiUrl, tokenProvider)
 
-    suspend fun check(): ManagerUpdateStatus =
+    // revalidate when the user asked: a check they tapped goes to GitHub even if a moment-old answer is on hand
+    suspend fun check(revalidate: Boolean = false): ManagerUpdateStatus =
         withContext(Dispatchers.IO) {
             val installedVersion = installedVersionName()
             if (installedVersion == null) {
                 ManagerUpdateStatus.Failed("Could not read the installed version.")
             } else {
                 try {
-                    toStatus(fetchAppReleases().firstOrNull(), installedVersion)
+                    toStatus(fetchAppReleases(revalidate = revalidate).firstOrNull(), installedVersion)
                 } catch (exception: IOException) {
                     ManagerUpdateStatus.Failed(friendlyNetworkError(exception))
                 }
@@ -119,19 +121,21 @@ class ManagerUpdateChecker(
     // user-facing message (see friendlyNetworkError) when GitHub can't be reached
     suspend fun recentReleases(): List<ManagerRelease> =
         withContext(Dispatchers.IO) {
-            fetchAppReleases().map { ManagerRelease(it.tagName.removePrefix("v"), it.publishedAt, it.body.orEmpty()) }
+            fetchAppReleases(allowStale = true).map {
+                ManagerRelease(it.tagName.removePrefix("v"), it.publishedAt, it.body.orEmpty())
+            }
         }
 
     // GitHub returns releases newest-first; the reserved manifest release tag is not a manager release
-    private fun fetchAppReleases(): List<GithubReleaseDto> {
-        httpClient.newCall(Request.Builder().url(releasesApiUrl).build()).execute().use { response ->
-            if (!response.isSuccessful) fail(friendlyHttpError(response.code))
-            val body = response.body?.string() ?: fail("GitHub sent an empty reply. Try again.")
-            val releases: List<GithubReleaseDto> =
-                runCatching { json.decodeFromString<List<GithubReleaseDto>>(body) }
-                    .getOrElse { fail("GitHub sent an unexpected reply. Try again later.") }
-            return releases.filter { it.tagName != MANIFEST_RELEASE_TAG }
-        }
+    private fun fetchAppReleases(
+        allowStale: Boolean = false,
+        revalidate: Boolean = false,
+    ): List<GithubReleaseDto> {
+        val body = source.fetch(allowStale, revalidate)
+        val releases: List<GithubReleaseDto> =
+            runCatching { json.decodeFromString<List<GithubReleaseDto>>(body) }
+                .getOrElse { fail("GitHub sent an unexpected reply. Try again later.") }
+        return releases.filter { it.tagName != MANIFEST_RELEASE_TAG }
     }
 
     private fun fail(message: String): Nothing = throw UserFacingIOException(message)

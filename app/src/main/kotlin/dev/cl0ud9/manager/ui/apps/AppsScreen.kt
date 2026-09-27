@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -27,31 +28,59 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.ui.components.AppListItem
 import dev.cl0ud9.manager.ui.components.EmptyState
+import dev.cl0ud9.manager.ui.components.KrateMessage
+import dev.cl0ud9.manager.ui.components.LocalNavBarClearance
 import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
 import dev.cl0ud9.manager.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.manager.ui.components.RefreshPillButton
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.StaggeredAppear
 import dev.cl0ud9.manager.ui.util.managerViewModel
+import dev.cl0ud9.manager.ui.util.plusBottom
 import dev.cl0ud9.manager.ui.util.rememberDebouncedOnClick
 import dev.cl0ud9.manager.voice.KrateVoice
 import dev.cl0ud9.manager.voice.Moment
 import dev.cl0ud9.manager.voice.rememberKrateLine
 
+// the tab's one ViewModel, shared by its header and its content
+@Composable
+fun rememberAppsViewModel(): AppsViewModel =
+    managerViewModel { container ->
+        AppsViewModel(
+            container.catalogRepository,
+            container.installedPackageReader,
+            container.githubCredentialStore,
+        )
+    }
+
+// the header line under "Apps"; blank while loading so the header keeps its height
+@Composable
+fun rememberAppsSubtitle(): String {
+    val uiState by rememberAppsViewModel().uiState.collectAsStateWithLifecycle()
+    return when (val state = uiState) {
+        is AppsUiState.Loading -> ""
+        is AppsUiState.Empty -> "Nothing on the shelves yet"
+        is AppsUiState.Content -> {
+            val installed = state.apps.count { it.packageName in state.installedPackageNames }
+            if (installed ==
+                state.apps.size
+            ) {
+                "All ${state.apps.size} installed"
+            } else {
+                "$installed of ${state.apps.size} installed"
+            }
+        }
+    }
+}
+
 // curated application catalog, section 30 of the spec
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppsScreen(onAppClick: (String) -> Unit) {
-    val viewModel =
-        managerViewModel { container ->
-            AppsViewModel(
-                container.catalogRepository,
-                container.installedPackageReader,
-                container.githubCredentialStore,
-            )
-        }
+    val viewModel = rememberAppsViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
@@ -70,7 +99,15 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
         }
         RefreshFailureSnackbar(
             refreshFailed = viewModel.refreshFailed,
-            message = { "${KrateVoice.line(Moment.REFRESH_FAILED)} Couldn't refresh, showing the last known catalog." },
+            message = {
+                KrateMessage(
+                    headline = KrateVoice.line(Moment.REFRESH_FAILED),
+                    detail = "Couldn't refresh the catalog, showing what Krate saw last.",
+                    icon = R.drawable.ic_cloud_off_rounded,
+                    actionLabel = "Retry",
+                )
+            },
+            onRetry = viewModel::refreshFromNetwork,
         )
     }
 }
@@ -93,13 +130,17 @@ private fun AppsContent(
     ) { state ->
         when (state) {
             is AppsUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(bottom = LocalNavBarClearance.current),
+                    contentAlignment = Alignment.Center,
+                ) {
                     LoadingIndicator()
                 }
             }
 
             is AppsUiState.Empty -> {
                 EmptyState(
+                    modifier = Modifier.padding(bottom = LocalNavBarClearance.current),
                     icon = rememberVectorPainter(Icons.Filled.Apps),
                     title = rememberKrateLine(Moment.EMPTY_CATALOG),
                     subtitle = "Apps will appear here once the catalog is populated.",
@@ -109,7 +150,7 @@ private fun AppsContent(
             is AppsUiState.Content -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(16.dp).plusBottom(LocalNavBarClearance.current),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     item(key = "apps-header") {
@@ -132,14 +173,16 @@ private fun AppsContent(
                             )
                         }
                     }
+                    item(key = "suggest") {
+                        StaggeredAppear(index = state.apps.size, modifier = Modifier.animateItem()) { SuggestAppCard() }
+                    }
                 }
             }
         }
     }
 }
 
-// the catalog's count on one side, the refresh pill on the other - persistently visible, a
-// count/label plus a pill action in one header row, not tucked away
+// the catalog's count on one side, the refresh pill on the other - always visible, not tucked away
 @Composable
 private fun AppsListHeader(
     appCount: Int,
@@ -152,7 +195,7 @@ private fun AppsListHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = if (appCount == 1) "1 app" else "$appCount apps",
+            text = if (appCount == 1) "1 app in the Krate" else "$appCount apps in the Krate",
             style = MaterialTheme.typography.titleMedium,
         )
         RefreshPillButton(isRefreshing = isRefreshing, onClick = onRefresh)

@@ -9,13 +9,20 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -23,18 +30,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dev.cl0ud9.manager.domain.model.ThemeMode
 import dev.cl0ud9.manager.platform.appContainer
+import dev.cl0ud9.manager.ui.components.KrateIntro
+import dev.cl0ud9.manager.ui.components.KrateIntroProgress
+import dev.cl0ud9.manager.ui.components.LocalIntroHeaderSlot
+import dev.cl0ud9.manager.ui.components.LocalIntroPlaying
 import dev.cl0ud9.manager.ui.navigation.ManagerNavHost
 import dev.cl0ud9.manager.ui.onboarding.OnboardingScreen
 import dev.cl0ud9.manager.ui.theme.ManagerTheme
 import dev.cl0ud9.manager.ui.theme.resolveDarkTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 const val EXTRA_TARGET_ROUTE = "target_route"
 const val EXTRA_APP_ID = "appId"
 
-class MainActivity : ComponentActivity() {
+class KrateActivity : ComponentActivity() {
     private val pendingRoute = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,10 +63,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current
             val settingsRepository = remember { context.appContainer().settingsRepository }
-            val themeMode by
-                settingsRepository.observeThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
-            val useSmoothCorners by
-                settingsRepository.observeUseSmoothCorners().collectAsStateWithLifecycle(initialValue = true)
+            // the saved theme from the first frame, so a rotation or reopen doesn't flash the system theme
+            val saved = remember { settingsRepository.currentSettings() }
+            val themeMode by settingsRepository.observeThemeMode().collectAsStateWithLifecycle(
+                initialValue = saved?.themeMode ?: ThemeMode.SYSTEM,
+            )
+            val useSmoothCorners by settingsRepository.observeUseSmoothCorners().collectAsStateWithLifecycle(
+                initialValue = saved?.useSmoothCorners ?: true,
+            )
             val route by pendingRoute.collectAsStateWithLifecycle()
 
             // enableEdgeToEdge() alone only ever picks status/nav bar icon color from the raw system
@@ -136,12 +152,70 @@ private fun AppRoot(
         remember { (context as? Activity)?.intent?.getBooleanExtra(BENCHMARK_EXTRA, false) == true }
     val settingsRepository = remember { context.appContainer().settingsRepository }
     val onboardingCompleted: Boolean? by
-        settingsRepository.observeOnboardingCompleted().collectAsStateWithLifecycle(initialValue = null)
+        settingsRepository.observeOnboardingCompleted().collectAsStateWithLifecycle(
+            initialValue = remember { settingsRepository.currentSettings()?.onboardingCompleted },
+        )
 
-    when {
-        isBenchmarkMode -> ManagerNavHost(pendingRoute = pendingRoute, onRouteHandled = onRouteHandled)
-        onboardingCompleted == null -> Unit
-        onboardingCompleted == false -> OnboardingScreen(onComplete = {})
-        else -> ManagerNavHost(pendingRoute = pendingRoute, onRouteHandled = onRouteHandled)
+    // the catalog loads while setup is on screen, so Home first draws with its content behind the intro, not mid-flight
+    LaunchedEffect(Unit) {
+        runCatching {
+            context
+                .appContainer()
+                .catalogRepository
+                .observeApps()
+                .first()
+        }
+    }
+
+    // after setup: setup stays until the intro covers it, Home loads beneath, Home's dialogs wait for the landing
+    val intro = remember { IntroState() }
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            isBenchmarkMode -> ManagerNavHost(pendingRoute = pendingRoute, onRouteHandled = onRouteHandled)
+            onboardingCompleted == null && !intro.started -> Unit
+            // a finished setup counts from the tap, not from when storage catches up, which can lag by seconds
+            (onboardingCompleted == false && !intro.started) || intro.holdsSetup ->
+                OnboardingScreen(markHidden = intro.started, onComplete = intro::start)
+            else ->
+                CompositionLocalProvider(
+                    LocalIntroPlaying provides intro.playing,
+                    LocalIntroHeaderSlot provides intro.headerSlot,
+                ) {
+                    // a setup that just ran starts Home fresh rather than restoring navigation saved before it
+                    key(intro.started) {
+                        ManagerNavHost(pendingRoute = pendingRoute, onRouteHandled = onRouteHandled)
+                    }
+                }
+        }
+        if (intro.started && !intro.finished) {
+            KrateIntro(
+                start = intro.markBounds,
+                progress = intro.progress,
+                onCovered = { intro.covered = true },
+                onLanded = { intro.landed = true },
+                onFinished = { intro.finished = true },
+            )
+        }
+    }
+}
+
+// where the post-setup intro is; not saved, so a process restart mid-intro just lands on Home
+private class IntroState {
+    var started by mutableStateOf(false)
+    var markBounds by mutableStateOf<Rect?>(null)
+    var covered by mutableStateOf(false)
+    var landed by mutableStateOf(false)
+    var finished by mutableStateOf(false)
+
+    val progress = KrateIntroProgress()
+
+    val holdsSetup: Boolean get() = started && !covered
+    val playing: Boolean get() = started && !landed
+    val headerSlot: (() -> Float)? get() = if (started && !finished) progress::headerSlot else null
+
+    fun start(bounds: Rect?) {
+        if (started) return
+        markBounds = bounds
+        started = true
     }
 }

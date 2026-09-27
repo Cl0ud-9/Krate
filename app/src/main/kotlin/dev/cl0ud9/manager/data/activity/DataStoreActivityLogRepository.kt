@@ -16,6 +16,10 @@ private val Context.activityDataStore by preferencesDataStore(name = "activity_l
 private val ENTRIES_KEY = stringPreferencesKey("entries")
 private const val MAX_ENTRIES = 20
 
+// how a failed download's detail starts (see AppDetailsViewModel), telling it apart from a failed install
+const val DOWNLOAD_FAILURE_PREFIX = "Download:"
+const val INSTALL_FAILURE_PREFIX = "Install:"
+
 @Serializable
 private data class ActivityEntryDto(
     val id: String,
@@ -55,13 +59,38 @@ class DataStoreActivityLogRepository(
         }
 
     override suspend fun record(entry: ActivityEntry) {
+        updateEntries { existing ->
+            val kept =
+                if (entry.action == ActivityAction.FAILED) {
+                    existing.filterNot { it.appId == entry.appId && it.action == ActivityAction.FAILED.name }
+                } else {
+                    existing
+                }
+            (listOf(entry.toDto()) + kept).take(MAX_ENTRIES)
+        }
+    }
+
+    override suspend fun clearFailures(
+        appId: String,
+        downloadsOnly: Boolean,
+    ) {
+        updateEntries { existing ->
+            existing.filterNot { entry ->
+                entry.appId == appId &&
+                    entry.action == ActivityAction.FAILED.name &&
+                    (!downloadsOnly || entry.detail?.startsWith(DOWNLOAD_FAILURE_PREFIX) == true)
+            }
+        }
+    }
+
+    private suspend fun updateEntries(transform: (List<ActivityEntryDto>) -> List<ActivityEntryDto>) {
         context.activityDataStore.edit { prefs ->
             val existing =
                 prefs[ENTRIES_KEY]?.let { raw ->
                     runCatching { json.decodeFromString<List<ActivityEntryDto>>(raw) }.getOrDefault(emptyList())
                 } ?: emptyList()
-            val updated = (listOf(entry.toDto()) + existing).take(MAX_ENTRIES)
-            prefs[ENTRIES_KEY] = json.encodeToString(updated)
+            val updated = transform(existing)
+            if (updated != existing) prefs[ENTRIES_KEY] = json.encodeToString(updated)
         }
     }
 }

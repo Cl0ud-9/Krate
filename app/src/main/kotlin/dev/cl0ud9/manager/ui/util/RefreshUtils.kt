@@ -8,7 +8,7 @@ import kotlinx.coroutines.delay
 // call, or one served from cache) often fails to re-arm - the exact "works once, then stops
 // responding" report this fixes. A guaranteed minimum visible duration also reads as more deliberate
 // than an instant flash on a fast refresh, and doesn't cost anything on a genuinely slow one.
-private const val MIN_REFRESH_VISIBLE_MS = 500L
+private const val MIN_REFRESH_VISIBLE_MS = 900L
 
 suspend fun <T> withMinimumDuration(
     minMillis: Long = MIN_REFRESH_VISIBLE_MS,

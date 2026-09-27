@@ -7,10 +7,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.InstallStatus
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
@@ -19,7 +17,6 @@ import dev.cl0ud9.manager.ui.components.HelperText
 import dev.cl0ud9.manager.ui.components.ManagerLinearProgress
 import dev.cl0ud9.manager.ui.components.ReopenPromptButton
 import dev.cl0ud9.manager.ui.util.DebouncedButtonState
-import dev.cl0ud9.manager.ui.util.rememberDebouncedButtonState
 
 // split out of SettingsScreen.kt purely to keep that file under detekt's per-file function-count
 // threshold, same reasoning as AppDetailsInstallSection.kt's own split - this half owns everything
@@ -135,22 +132,3 @@ private fun SelfUpdateInstallingContent(installStatus: InstallStatus) {
 }
 
 private const val PERCENT = 100
-
-// About with its manager-update section, reading that state itself so SettingsScreen only decides
-// where in the list it goes
-@Composable
-internal fun SettingsAboutRow(
-    viewModel: SettingsViewModel,
-    shape: Shape,
-) {
-    val managerUpdateState by viewModel.managerUpdateState.collectAsStateWithLifecycle()
-    val selfUpdateState by viewModel.selfUpdateState.collectAsStateWithLifecycle()
-    // idempotent in the ViewModel too - the debounce just stops a double tap reaching it at all
-    val checkForUpdateState = rememberDebouncedButtonState(onClick = viewModel::checkForManagerUpdate)
-    AboutRow(
-        versionName = rememberVersionName(),
-        managerUpdateState = managerUpdateState,
-        updateActions = ManagerUpdateActions(checkForUpdateState, selfUpdateState, viewModel::installManagerUpdate),
-        shape = shape,
-    )
-}

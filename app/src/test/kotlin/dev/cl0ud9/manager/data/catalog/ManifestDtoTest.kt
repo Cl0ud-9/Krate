@@ -53,6 +53,21 @@ class ManifestDtoTest {
         assertEquals("1.0", app!!.artifacts.single().versionName)
     }
 
+    @Test
+    fun `an app's description and highlights come through, and are simply absent from older catalogs`() {
+        val described =
+            """{"schemaVersion":2,"apps":[{"id":"a","displayName":"A","description":"Does a thing.",
+            "highlights":["One","Two"],"packageName":"p","supportStatus":"SUPPORTED","installationMode":"UPDATE"}]}"""
+
+        val app = parse(described).apps.single().toDomain(android12Arm64)!!
+        val plain = parse(manifest).apps.single().toDomain(android12Arm64)!!
+
+        assertEquals("Does a thing.", app.description)
+        assertEquals(listOf("One", "Two"), app.highlights)
+        assertNull(plain.description)
+        assertEquals(emptyList<String>(), plain.highlights)
+    }
+
     private fun parse(text: String) = json.decodeFromString<ManifestDto>(text)
 
     private val manifest =

@@ -18,6 +18,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import dev.cl0ud9.manager.R
+import dev.cl0ud9.manager.ui.util.steadyHeight
 
 // the Patched-style catalog entries (Videoapp, and any future sibling app built the same way) are
 // hosted as published releases on one shared *private* artifacts repo, never the public manager
@@ -43,11 +44,7 @@ internal fun GitHubAccessRow(
                     } else {
                         "Add a token to unlock catalog entries hosted privately."
                     },
-                colors =
-                    SettingsRowColors(
-                        MaterialTheme.colorScheme.tertiaryContainer,
-                        MaterialTheme.colorScheme.onTertiaryContainer,
-                    ),
+                colors = SettingsTint.INDIGO.colors(),
             ),
         shape = shape,
     ) {
@@ -85,7 +82,7 @@ private fun GitHubAccessRowContent(
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().steadyHeight(),
     )
     Button(
         onClick = {

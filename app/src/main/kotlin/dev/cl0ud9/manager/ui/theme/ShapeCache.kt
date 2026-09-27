@@ -25,9 +25,8 @@ fun ProvideUseSmoothCorners(
 }
 
 // squircle corners for the expressive look, cached to avoid recomputing the path per composition -
-// a 60% smoothness scale from 8dp to 32dp, extended with
-// smoothPill for the floating nav bar and pill-shaped buttons. Each shape is a composable getter
-// (same pattern as MaterialTheme.colorScheme) rather than a plain val, so every existing
+// 60% smoothness throughout, with smoothPill for the floating nav bar and pill-shaped buttons. Each
+// shape is a composable getter (same pattern as MaterialTheme.colorScheme) rather than a plain val, so every existing
 // `ShapeCache.smoothNN` call site keeps working unchanged while still reading the toggle above
 object ShapeCache {
     private val Smooth4 = AbsoluteSmoothCornerShape(cornerRadius = 4.dp, smoothnessAsPercent = 60)

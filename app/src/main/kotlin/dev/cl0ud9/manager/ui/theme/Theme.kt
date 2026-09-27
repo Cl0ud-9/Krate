@@ -118,7 +118,7 @@ private val DarkColors =
         surfaceContainerLowest = DarkSurfaceContainerLowest,
     )
 
-// the resolved light/dark boolean behind the theme mode setting - shared with MainActivity so the
+// the resolved light/dark boolean behind the theme mode setting - shared with KrateActivity so the
 // system status/navigation bar icon color can track the same decision instead of only ever
 // following the raw system setting (which drifts from an explicit in-app Light/Dark override)
 @Composable

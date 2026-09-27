@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import dev.cl0ud9.manager.R
+import dev.cl0ud9.manager.ui.util.ScrollClaim
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -131,9 +133,10 @@ fun rememberCollapsingHeaderState(scrollState: ScrollState): CollapsingHeaderSta
 fun collapsingHeaderNestedScrollConnection(
     state: CollapsingHeaderState,
     scrollState: ScrollState,
+    claim: ScrollClaim? = null,
 ): NestedScrollConnection {
     val scope = rememberCoroutineScope()
-    return remember(state, scrollState) {
+    return remember(state, scrollState, claim) {
         object : NestedScrollConnection {
             override fun onPreScroll(
                 available: Offset,
@@ -141,7 +144,8 @@ fun collapsingHeaderNestedScrollConnection(
             ): Offset {
                 val delta = available.y
                 val isScrollingDown = delta < 0
-                if (!isScrollingDown && scrollState.value > 0) return Offset.Zero
+                // a drag a box inside the page has claimed scrolls only that box
+                if (claim?.claimed == true || (!isScrollingDown && scrollState.value > 0)) return Offset.Zero
 
                 val previous = state.currentPx
                 val target = (previous + delta).coerceIn(state.minHeightPx, state.maxHeightPx)
@@ -183,7 +187,7 @@ fun CollapsingDetailHeader(
                 .background(backgroundColor)
                 .zIndex(1f),
     ) {
-        Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+        Box(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(SideInsets)) {
             HeaderTitle(
                 title = title,
                 scale = titleScale,

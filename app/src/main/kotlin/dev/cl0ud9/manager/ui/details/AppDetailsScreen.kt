@@ -1,6 +1,5 @@
 package dev.cl0ud9.manager.ui.details
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,9 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,12 +23,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -51,12 +44,10 @@ import dev.cl0ud9.manager.domain.repository.isNewerThan
 import dev.cl0ud9.manager.platform.packageinfo.InstalledVersion
 import dev.cl0ud9.manager.ui.components.AnnouncementCard
 import dev.cl0ud9.manager.ui.components.AppIconAvatar
-import dev.cl0ud9.manager.ui.components.SectionHeader
 import dev.cl0ud9.manager.ui.components.SupportStatusBadge
 import dev.cl0ud9.manager.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
-import dev.cl0ud9.manager.ui.util.formatMarkdownLite
 import dev.cl0ud9.manager.ui.util.managerViewModel
 import dev.cl0ud9.manager.ui.util.rememberDebouncedOnClick
 
@@ -282,7 +273,18 @@ private fun AppDetailsContent(
 
         AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
 
-        ReleaseNotesSection(app = app, selectedArtifact = state.selectedArtifact)
+        ReleaseNotesSection(
+            app = app,
+            builds =
+                releaseNotesBuilds(
+                    app,
+                    state.selectedArtifact,
+                    state.effectiveBaseline?.takeIf {
+                        state.installed !=
+                            null
+                    },
+                ),
+        )
     }
 }
 
@@ -348,6 +350,15 @@ private fun AppDetailsHeader(
                 }
             }
 
+            // the app's one-line summary, full width under the name block
+            app.description?.let { description ->
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
             InstalledStatusRow(installedVersionName = installedVersionName)
         }
     }
@@ -390,51 +401,3 @@ private fun InstalledStatusRow(installedVersionName: String?) {
         Text(text = text, style = MaterialTheme.typography.bodySmall, color = tint)
     }
 }
-
-// long release notes used to push the primary action further down the page and add a lot of scroll
-// distance for something most users only skim - collapsed to a few lines with an explicit expand
-// affordance keeps the information available without it dominating the page by default
-@Composable
-private fun ReleaseNotesSection(
-    app: AppProfile,
-    selectedArtifact: ArtifactInfo?,
-) {
-    var expanded by remember(app.id) { mutableStateOf(false) }
-    // the notes of whichever build is selected, so picking an older one shows what it contained
-    val notes = selectedArtifact?.releaseNotes ?: app.releaseNotes
-    val body = (notes ?: "No release notes available.").formatMarkdownLite()
-
-    Card(
-        modifier = Modifier.fillMaxWidth().animateContentSize(),
-        shape = ShapeCache.smooth16,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SectionHeader(
-                    title = "Release notes",
-                    icon = rememberVectorPainter(Icons.Filled.Description),
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-                IconButton(onClick = { expanded = !expanded }) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = if (expanded) "Show less" else "Show more",
-                    )
-                }
-            }
-            Text(
-                text = body,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = if (expanded) Int.MAX_VALUE else COLLAPSED_RELEASE_NOTES_LINES,
-            )
-        }
-    }
-}
-
-private const val COLLAPSED_RELEASE_NOTES_LINES = 4

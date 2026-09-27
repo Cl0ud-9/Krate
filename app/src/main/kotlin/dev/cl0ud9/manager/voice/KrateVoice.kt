@@ -191,6 +191,16 @@ enum class Moment(
             "Nothing on the shelves yet.",
         ),
     ),
+
+    // the line under "Welcome to Krate" in the intro right after setup
+    WELCOME(
+        listOf(
+            "No Play Store was harmed in this Krate.",
+            "All packed. Mind the bubble wrap.",
+            "Straight from the source. No middlemen.",
+            "Your apps, minus the waiting in line.",
+        ),
+    ),
 }
 
 object KrateVoice {

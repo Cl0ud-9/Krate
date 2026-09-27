@@ -1,7 +1,6 @@
 package dev.cl0ud9.manager.ui.settings
 
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
@@ -19,12 +18,8 @@ internal fun AppearanceRow(
             SettingsRowHeader(
                 icon = painterResource(R.drawable.ic_palette_rounded),
                 title = "Appearance",
-                subtitle = "Theme, navigation bar, effects",
-                colors =
-                    SettingsRowColors(
-                        MaterialTheme.colorScheme.primaryContainer,
-                        MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
+                subtitle = "Theme, navigation bar, corners",
+                colors = SettingsTint.ROSE.colors(),
             ),
         shape = shape,
         onClick = onClick,

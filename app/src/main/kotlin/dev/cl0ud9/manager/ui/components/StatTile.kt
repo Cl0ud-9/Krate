@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.pressScale
@@ -81,6 +82,8 @@ fun StatTile(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
                 color = contentColor.copy(alpha = LABEL_ALPHA),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

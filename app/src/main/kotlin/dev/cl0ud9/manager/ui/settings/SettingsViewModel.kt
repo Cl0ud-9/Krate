@@ -18,7 +18,9 @@ import dev.cl0ud9.manager.platform.selfupdate.ManagerSelfUpdateInstaller
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateChecker
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
+import dev.cl0ud9.manager.ui.util.withMinimumDuration
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -50,45 +52,40 @@ class SettingsViewModel(
     private val activityLogRepository: ActivityLogRepository,
     private val managerBaselineStore: ManagerBaselineStore,
 ) : ViewModel() {
+    // real values from the first frame, so a revisited page doesn't animate from defaults to the saved state
+    private val saved = settingsRepository.currentSettings()
+
     val automaticDownloads: StateFlow<Boolean> =
-        settingsRepository
-            .observeAutomaticDownloads()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
+        settingsRepository.observeAutomaticDownloads().stateInPage(saved?.automaticDownloads ?: true)
+
+    val downloadOnMobileData: StateFlow<Boolean> =
+        settingsRepository.observeDownloadOnMobileData().stateInPage(saved?.downloadOnMobileData ?: false)
 
     val themeMode: StateFlow<ThemeMode> =
-        settingsRepository
-            .observeThemeMode()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ThemeMode.SYSTEM)
+        settingsRepository.observeThemeMode().stateInPage(saved?.themeMode ?: ThemeMode.SYSTEM)
 
     val navBarStyle: StateFlow<NavBarStyle> =
-        settingsRepository
-            .observeNavBarStyle()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), NavBarStyle.FLOATING_PILL)
+        settingsRepository.observeNavBarStyle().stateInPage(saved?.navBarStyle ?: NavBarStyle.FLOATING_PILL)
 
     val navBarCornerRadius: StateFlow<Int> =
-        settingsRepository
-            .observeNavBarCornerRadius()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DEFAULT_NAV_BAR_CORNER_RADIUS)
+        settingsRepository.observeNavBarCornerRadius().stateInPage(
+            saved?.navBarCornerRadius ?: DEFAULT_NAV_BAR_CORNER_RADIUS,
+        )
 
     val navBarCompactMode: StateFlow<Boolean> =
-        settingsRepository
-            .observeNavBarCompactMode()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+        settingsRepository.observeNavBarCompactMode().stateInPage(saved?.navBarCompactMode ?: false)
 
     val useSmoothCorners: StateFlow<Boolean> =
-        settingsRepository
-            .observeUseSmoothCorners()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
+        settingsRepository.observeUseSmoothCorners().stateInPage(saved?.useSmoothCorners ?: true)
 
     val disableBlur: StateFlow<Boolean> =
-        settingsRepository
-            .observeDisableBlur()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+        settingsRepository.observeDisableBlur().stateInPage(saved?.disableBlur ?: false)
 
     val defaultLaunchTab: StateFlow<LaunchTab> =
-        settingsRepository
-            .observeDefaultLaunchTab()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LaunchTab.HOME)
+        settingsRepository.observeDefaultLaunchTab().stateInPage(saved?.defaultLaunchTab ?: LaunchTab.HOME)
+
+    private fun <T> Flow<T>.stateInPage(initial: T): StateFlow<T> =
+        stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initial)
 
     private val mutableCacheClearedMessage = MutableStateFlow<String?>(null)
     val cacheClearedMessage: StateFlow<String?> = mutableCacheClearedMessage.asStateFlow()
@@ -102,7 +99,7 @@ class SettingsViewModel(
     // checked as soon as Settings opens (a single small GitHub API call), so an available update is
     // shown straight away instead of waiting for a tap on "Check for updates"
     init {
-        checkForManagerUpdate()
+        checkForManagerUpdate(revalidate = false)
     }
 
     // never surfaces the token value itself back to the UI, only whether one is currently saved -
@@ -144,12 +141,24 @@ class SettingsViewModel(
                                         .installedVersion(
                                             app.packageName,
                                         )?.versionName,
-                                latest = app.latestArtifact?.let { it.buildId ?: it.versionName },
-                                installedByManager = baselines[app.packageName]?.let { it.buildId ?: it.versionName },
+                                latest = app.latestArtifact?.let { reportedVersion(it.versionName, it.buildId) },
+                                installedByManager =
+                                    baselines[app.packageName]?.let {
+                                        reportedVersion(
+                                            it.versionName,
+                                            it.buildId,
+                                        )
+                                    },
                             )
                         }
                     val recentActivity = activityLogRepository.observeRecent().first()
-                    formatDiagnosticReport(deviceSummary, apps, recentActivity)
+                    formatDiagnosticReport(
+                        deviceSummary = deviceSummary,
+                        apps = apps,
+                        recentActivity = recentActivity,
+                        hasGitHubToken = githubCredentialStore.getToken() != null,
+                        generatedAtMillis = System.currentTimeMillis(),
+                    )
                 }
             mutableDiagnosticReport.value = report
             mutableGeneratingReport.value = false
@@ -158,6 +167,10 @@ class SettingsViewModel(
 
     fun setAutomaticDownloads(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setAutomaticDownloads(enabled) }
+    }
+
+    fun setDownloadOnMobileData(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setDownloadOnMobileData(enabled) }
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -190,11 +203,18 @@ class SettingsViewModel(
 
     // amendment 44.2 of the spec: a manual, user-initiated check against the manager's own GitHub
     // Releases page - guarded so a second tap while one is already in flight is a no-op
-    fun checkForManagerUpdate() {
+    // revalidate is on for a tap, off for the automatic check when Settings opens
+    fun checkForManagerUpdate(revalidate: Boolean = true) {
         if (mutableManagerUpdateState.value is ManagerUpdateUiState.Checking) return
         viewModelScope.launch {
             mutableManagerUpdateState.value = ManagerUpdateUiState.Checking
-            val status = managerUpdateChecker.check()
+            // a tapped check stays on screen long enough to read, however fast GitHub answers
+            val status =
+                if (revalidate) {
+                    withMinimumDuration { managerUpdateChecker.check(revalidate = true) }
+                } else {
+                    managerUpdateChecker.check()
+                }
             mutableManagerUpdateState.value = ManagerUpdateUiState.Result(status)
         }
     }

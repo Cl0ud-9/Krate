@@ -436,6 +436,9 @@ def main():
             {
                 "id": app["id"],
                 "displayName": app["displayName"],
+                # what the app is for, in a line, and a few of the things it does
+                "description": app.get("description"),
+                "highlights": app.get("highlights", []),
                 "packageName": app["packageName"],
                 "supportStatus": app["supportStatus"],
                 "installationMode": app["installationMode"],

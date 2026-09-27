@@ -1,5 +1,10 @@
 package dev.cl0ud9.manager.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,16 +12,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,23 +44,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.ActivityAction
 import dev.cl0ud9.manager.domain.model.ActivityEntry
+import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.platform.selfupdate.ManagerUpdateStatus
 import dev.cl0ud9.manager.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.manager.ui.components.AnnouncementCard
+import dev.cl0ud9.manager.ui.components.AppIconAvatar
+import dev.cl0ud9.manager.ui.components.KrateMessage
+import dev.cl0ud9.manager.ui.components.LocalIntroPlaying
+import dev.cl0ud9.manager.ui.components.LocalNavBarClearance
 import dev.cl0ud9.manager.ui.components.ManagerPullToRefreshBox
 import dev.cl0ud9.manager.ui.components.ManagerUpdateAnnouncementDialog
 import dev.cl0ud9.manager.ui.components.RefreshFailureSnackbar
-import dev.cl0ud9.manager.ui.components.SectionHeader
-import dev.cl0ud9.manager.ui.components.StatTile
+import dev.cl0ud9.manager.ui.components.WhatsNewDialog
 import dev.cl0ud9.manager.ui.theme.ShapeCache
 import dev.cl0ud9.manager.ui.util.RefreshOnResume
 import dev.cl0ud9.manager.ui.util.formatRelativeTime
 import dev.cl0ud9.manager.ui.util.managerViewModel
+import dev.cl0ud9.manager.ui.util.rememberLastNonNull
 import dev.cl0ud9.manager.voice.KrateVoice
 import dev.cl0ud9.manager.voice.Moment
 import dev.cl0ud9.manager.voice.rememberKrateLine
 
 private const val MAX_ACTIVITY_ROWS = 5
+private val HOME_SECTION_GAP = 20.dp
 
 // overall status, updates available, recent activity - section 30 of the spec. led by a status
 // hero rather than a flat stat row, since "am I up to date, and what should I do about it" is the
@@ -80,6 +90,7 @@ fun HomeScreen(
                 container.managerBaselineStore,
                 container.announcementDismissalStore,
                 container.managerSelfUpdateInstaller,
+                container.whatsNewTracker,
             )
         }
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
@@ -87,7 +98,14 @@ fun HomeScreen(
     val selfUpdateState by viewModel.selfUpdateState.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
 
-    ManagerUpdatePrompt(updateAnnouncement, selfUpdateState, viewModel)
+    // held back while the post-setup intro plays, then shown the moment the Krate mark lands
+    val whatsNew by viewModel.whatsNew.collectAsStateWithLifecycle()
+    if (!LocalIntroPlaying.current) {
+        ManagerUpdatePrompt(updateAnnouncement, selfUpdateState, viewModel)
+        whatsNew?.takeIf { updateAnnouncement == null }?.let { release ->
+            WhatsNewDialog(release = release, onDismiss = viewModel::dismissWhatsNew)
+        }
+    }
 
     // the counts on this screen are derived from the same catalog data Apps/Updates show, so a stale
     // manifest shows up here first - refreshFromNetwork() shares its result with every other screen
@@ -102,7 +120,15 @@ fun HomeScreen(
         }
         RefreshFailureSnackbar(
             refreshFailed = viewModel.refreshFailed,
-            message = { "${KrateVoice.line(Moment.REFRESH_FAILED)} Couldn't refresh, showing what's already here." },
+            message = {
+                KrateMessage(
+                    headline = KrateVoice.line(Moment.REFRESH_FAILED),
+                    detail = "Couldn't refresh, so this is what Krate saw last.",
+                    icon = R.drawable.ic_cloud_off_rounded,
+                    actionLabel = "Retry",
+                )
+            },
+            onRetry = viewModel::refreshFromNetwork,
         )
     }
 }
@@ -119,37 +145,46 @@ private fun HomeContent(
     val installedCount by viewModel.installedCount.collectAsStateWithLifecycle()
     val recentActivity by viewModel.recentActivity.collectAsStateWithLifecycle()
     val announcements by viewModel.announcements.collectAsStateWithLifecycle()
+    val homeApps by viewModel.homeApps.collectAsStateWithLifecycle()
+    val checking by viewModel.isRefreshing.collectAsStateWithLifecycle()
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+                // the last section scrolls clear of the nav bar floating over the bottom
+                .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + LocalNavBarClearance.current),
+        verticalArrangement = Arrangement.spacedBy(HOME_SECTION_GAP),
     ) {
         // above the status hero - these only exist when something needs the user's attention
         announcements.forEach { item ->
             AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = viewModel::dismissAnnouncement)
         }
 
-        StatusHeroCard(pendingUpdateCount = pendingUpdateCount, onViewUpdates = onNavigateToUpdates)
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatTile(
-                label = "Apps in catalog",
-                value = catalogCount.toString(),
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToApps,
-            )
-            StatTile(
-                label = "Installed on device",
-                value = installedCount.toString(),
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToApps,
+        HomeAppear(order = 0) {
+            StatusHeroCard(
+                pendingUpdateCount = pendingUpdateCount,
+                checking = checking,
+                onViewUpdates = onNavigateToUpdates,
+                onCheckAgain = viewModel::refreshFromNetwork,
             )
         }
 
-        RecentActivitySection(entries = recentActivity.take(MAX_ACTIVITY_ROWS))
+        StatsAndYourApps(
+            counts = Triple(catalogCount, installedCount, pendingUpdateCount),
+            installedApps = homeApps.filter { it.installed },
+            onNavigateToApps = onNavigateToApps,
+            onNavigateToUpdates = onNavigateToUpdates,
+            onNavigateToApp = onNavigateToApp,
+        )
+
+        HomeAppear(order = 3) {
+            RecentActivitySection(
+                entries = recentActivity.take(MAX_ACTIVITY_ROWS),
+                appsById = homeApps.associate { it.app.id to it.app },
+                onOpenApp = onNavigateToApp,
+            )
+        }
     }
 }
 
@@ -169,64 +204,13 @@ private fun ManagerUpdatePrompt(
 }
 
 @Composable
-private fun StatusHeroCard(
-    pendingUpdateCount: Int,
-    onViewUpdates: () -> Unit,
+private fun RecentActivitySection(
+    entries: List<ActivityEntry>,
+    appsById: Map<String, AppProfile>,
+    onOpenApp: (String) -> Unit,
 ) {
-    val upToDate = pendingUpdateCount == 0
-    val containerColor =
-        if (upToDate) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.tertiaryContainer
-    val contentColor =
-        if (upToDate) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onTertiaryContainer
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth28,
-        colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
-    ) {
-        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            val heroIconRes =
-                if (upToDate) R.drawable.ic_check_circle_rounded else R.drawable.ic_system_update_alt_rounded
-            Icon(
-                painter = painterResource(heroIconRes),
-                contentDescription = null,
-                modifier = Modifier.size(36.dp),
-            )
-            Text(
-                text = rememberKrateLine(if (upToDate) Moment.ALL_CAUGHT_UP else Moment.UPDATES_WAITING),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text =
-                    when {
-                        upToDate -> "Every installed app is on its latest version."
-                        pendingUpdateCount == 1 -> "1 update is ready to install."
-                        else -> "$pendingUpdateCount updates are ready to install."
-                    },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (!upToDate) {
-                Button(
-                    onClick = onViewUpdates,
-                    colors = ButtonDefaults.buttonColors(containerColor = contentColor, contentColor = containerColor),
-                ) {
-                    Text("View updates")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecentActivitySection(entries: List<ActivityEntry>) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(
-            title = "Recent activity",
-            icon = rememberVectorPainter(Icons.Filled.History),
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        )
+        Text(text = "Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = ShapeCache.smooth16,
@@ -243,7 +227,7 @@ private fun RecentActivitySection(entries: List<ActivityEntry>) {
             } else {
                 Column {
                     entries.forEachIndexed { index, entry ->
-                        ActivityRow(entry)
+                        ActivityRow(entry = entry, app = appsById[entry.appId], onOpenApp = onOpenApp)
                         if (index != entries.lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 64.dp),
@@ -257,30 +241,49 @@ private fun RecentActivitySection(entries: List<ActivityEntry>) {
     }
 }
 
+// the app's own icon with a small badge for what happened; tapping the row opens that app
 @Composable
-private fun ActivityRow(entry: ActivityEntry) {
+private fun ActivityRow(
+    entry: ActivityEntry,
+    app: AppProfile?,
+    onOpenApp: (String) -> Unit,
+) {
     val presentation = activityPresentation(entry.action)
+    val rowModifier = if (app != null) Modifier.homeTappable { onOpenApp(entry.appId) } else Modifier
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().then(rowModifier).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Box(
-            modifier = Modifier.size(36.dp).clip(ShapeCache.smooth12).background(presentation.badgeColor),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                presentation.icon,
-                contentDescription = null,
-                tint = presentation.onBadgeColor,
-                modifier = Modifier.size(18.dp),
-            )
+        Box(modifier = Modifier.size(44.dp)) {
+            if (app != null) {
+                AppIconAvatar(app = app, size = 44.dp)
+            } else {
+                Box(modifier = Modifier.fillMaxSize().clip(ShapeCache.smooth12).background(presentation.badgeColor))
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 4.dp, y = 4.dp)
+                        .size(22.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape)
+                        .padding(2.dp)
+                        .background(presentation.badgeColor, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    presentation.icon,
+                    contentDescription = null,
+                    tint = presentation.onBadgeColor,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = entry.appName, style = MaterialTheme.typography.bodyLarge)
-            // a failure says why, not just that it happened
+            Text(text = entry.appName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             Text(
-                text = entry.detail?.let { "${presentation.label}. $it" } ?: presentation.label,
+                text = activitySummary(entry, presentation.label, canRetry = app != null),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -337,3 +340,31 @@ private fun activityPresentation(action: ActivityAction): ActivityPresentation =
                 "Failed",
             )
     }
+
+// one block, so the gap above Your apps folds with it instead of snapping when the row comes or goes
+@Composable
+private fun StatsAndYourApps(
+    counts: Triple<Int, Int, Int>,
+    installedApps: List<HomeApp>,
+    onNavigateToApps: () -> Unit,
+    onNavigateToUpdates: () -> Unit,
+    onNavigateToApp: (String) -> Unit,
+) {
+    val shownApps = rememberLastNonNull(installedApps.takeIf { it.isNotEmpty() })
+    Column {
+        HomeAppear(order = 1) {
+            StatTiles(counts = counts, onOpenApps = onNavigateToApps, onOpenUpdates = onNavigateToUpdates)
+        }
+        AnimatedVisibility(
+            visible = installedApps.isNotEmpty(),
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            Box(modifier = Modifier.padding(top = HOME_SECTION_GAP)) {
+                HomeAppear(order = 2) {
+                    YourAppsRow(apps = shownApps.orEmpty(), onOpenApp = onNavigateToApp, onSeeAll = onNavigateToApps)
+                }
+            }
+        }
+    }
+}

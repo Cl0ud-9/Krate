@@ -26,6 +26,8 @@ import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.manager.ui.util.rememberDebouncedButtonState
 
+private const val DOWNLOADS_ROWS = 3
+
 // the pages behind Settings' category rows - each holds one topic's controls, so the Settings list
 // itself stays a short, scannable index rather than every control stacked on one long page
 
@@ -91,6 +93,7 @@ fun DownloadsStoragePage(
 ) {
     val viewModel = rememberSettingsViewModel()
     val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
+    val onMobileData by viewModel.downloadOnMobileData.collectAsStateWithLifecycle()
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     // idempotent in the ViewModel too - the debounce stops a double tap reaching it at all
     val clearCacheState = rememberDebouncedButtonState(onClick = viewModel::clearCache)
@@ -98,12 +101,19 @@ fun DownloadsStoragePage(
         AutomaticDownloadsRow(
             checked = automaticDownloads,
             onCheckedChange = viewModel::setAutomaticDownloads,
-            shape = settingsGroupShape(0, 2),
+            shape = settingsGroupShape(0, DOWNLOADS_ROWS),
+            onMobileData = automaticDownloads && onMobileData,
+        )
+        MobileDataDownloadsRow(
+            checked = onMobileData,
+            available = automaticDownloads,
+            onCheckedChange = viewModel::setDownloadOnMobileData,
+            shape = settingsGroupShape(1, DOWNLOADS_ROWS),
         )
         StorageRow(
             cacheClearedMessage = cacheClearedMessage,
             clearCacheState = clearCacheState,
-            shape = settingsGroupShape(1, 2),
+            shape = settingsGroupShape(2, DOWNLOADS_ROWS),
         )
     }
 }

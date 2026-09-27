@@ -15,10 +15,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import dev.cl0ud9.manager.EXTRA_APP_ID
 import dev.cl0ud9.manager.EXTRA_TARGET_ROUTE
-import dev.cl0ud9.manager.MainActivity
+import dev.cl0ud9.manager.KrateActivity
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.platform.notifications.NotificationIcons
+import dev.cl0ud9.manager.platform.notifications.krateAccent
+import dev.cl0ud9.manager.platform.notifications.krateContent
 import dev.cl0ud9.manager.voice.KrateVoice
 import dev.cl0ud9.manager.voice.Moment
 
@@ -87,7 +89,8 @@ class AndroidDownloadProgressNotifier(
         val builder = progressBuilder(appId, "Downloading $appName")
         if (totalBytes != null && totalBytes > 0) {
             val percent = ((bytesDownloaded * PERCENT_MAX) / totalBytes).toInt().coerceIn(0, PERCENT_MAX)
-            builder.setContentText("$percent%").setProgress(PERCENT_MAX, percent, false)
+            val progress = "${bytesDownloaded / BYTES_PER_MB} of ${totalBytes / BYTES_PER_MB} MB \u00b7 $percent%"
+            builder.setContentText(progress).setProgress(PERCENT_MAX, percent, false)
         } else {
             // total size unknown (server didn't report Content-Length) - shown as an indeterminate
             // bar with the raw byte count instead of a fabricated percentage
@@ -109,8 +112,8 @@ class AndroidDownloadProgressNotifier(
 
         activeAppIds += appId
         val builder =
-            progressBuilder(appId, "Verifying $appName")
-                .setContentText("Checking the download...")
+            progressBuilder(appId, "Checking $appName")
+                .setContentText("Making sure the download is genuine...")
                 .setProgress(0, 0, true)
         NotificationManagerCompat.from(context).notify(notificationIdFor(appId), builder.build())
     }
@@ -124,9 +127,8 @@ class AndroidDownloadProgressNotifier(
         if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
         val text = "${app.displayName} is downloaded and checked. Tap to install."
         val notification =
-            terminalBuilder(app, KrateVoice.line(Moment.DOWNLOADED))
-                .setContentText(text)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            terminalBuilder(app, KrateVoice.line(Moment.DOWNLOADED), text)
+                .addAction(R.drawable.ic_stat_krate, "Install", openAppIntent(app.id))
                 .build()
         NotificationManagerCompat.from(context).notify(notificationIdFor(app.id), notification)
     }
@@ -140,9 +142,8 @@ class AndroidDownloadProgressNotifier(
         if (isAppInForeground() || granted != PackageManager.PERMISSION_GRANTED) return
         val text = "${app.displayName} couldn't be downloaded. $reason"
         val notification =
-            terminalBuilder(app, KrateVoice.line(Moment.DOWNLOAD_FAILED))
-                .setContentText(text)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            terminalBuilder(app, KrateVoice.line(Moment.DOWNLOAD_FAILED), text)
+                .addAction(R.drawable.ic_stat_krate, "Try again", openAppIntent(app.id))
                 .build()
         NotificationManagerCompat.from(context).notify(notificationIdFor(app.id), notification)
     }
@@ -161,6 +162,8 @@ class AndroidDownloadProgressNotifier(
             // the system's own animated download arrow - a status-bar icon has to be a single-color
             // silhouette, and the full-color launcher icon rendered as a blank circle
             .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setColor(krateAccent(context))
+            .setSubText("Downloads")
             .setContentTitle(title)
             .setContentIntent(openAppIntent(appId))
             .setOnlyAlertOnce(true)
@@ -173,13 +176,13 @@ class AndroidDownloadProgressNotifier(
     // icon as the large icon says which app it's about
     private fun terminalBuilder(
         app: AppProfile,
-        title: String,
+        headline: String,
+        fact: String,
     ): NotificationCompat.Builder =
         NotificationCompat
             .Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_krate)
+            .krateContent(context, headline, fact, "Downloads")
             .setLargeIcon(NotificationIcons.app(context, app))
-            .setContentTitle(title)
             .setContentIntent(openAppIntent(app.id))
             .setAutoCancel(true)
             .setOngoing(false)
@@ -191,7 +194,7 @@ class AndroidDownloadProgressNotifier(
         PendingIntent.getActivity(
             context,
             appId.hashCode(),
-            Intent(context, MainActivity::class.java).apply {
+            Intent(context, KrateActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(EXTRA_TARGET_ROUTE, "apps/$appId")
                 putExtra(EXTRA_APP_ID, appId)

@@ -116,6 +116,12 @@ internal fun AppInfoSection(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             )
+            if (app.highlights.isNotEmpty()) {
+                InfoRow(icon = painterResource(R.drawable.ic_info_rounded), title = "What it does") {
+                    WhatItDoes(highlights = app.highlights)
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = DIVIDER_ALPHA))
+            }
             InfoRow(icon = rememberVectorPainter(Icons.Filled.Build), title = "Updates") {
                 Text(
                     text = updatesDescription(app.installationMode),
@@ -232,5 +238,26 @@ private fun DependencyRow(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+// the app's highlights as a short dotted list
+@Composable
+private fun WhatItDoes(highlights: List<String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        highlights.forEach { highlight ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "\u2022",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = highlight,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }

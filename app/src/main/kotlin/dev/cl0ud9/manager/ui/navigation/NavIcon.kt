@@ -16,8 +16,8 @@ import androidx.compose.ui.unit.Dp
 // repo - see licenses/material-symbols-NOTICE.txt) rather than Compose's bundled Icons.Filled/
 // Icons.Outlined family. Compose's own "Rounded" icon set is missing plain Home and Settings
 // glyphs entirely (a known gap in its auto-generated subset), and Icons.Filled has noticeably
-// sharper terminals than the rounded look this app wants - matching that exactly needs the
-// Material Symbols Rounded asset family itself, bundled as drawables
+// sharper terminals than the rounded look wanted here - matching that needs the Material Symbols
+// Rounded asset family itself, bundled as drawables
 sealed interface NavIcon {
     data class Vector(
         val imageVector: ImageVector,

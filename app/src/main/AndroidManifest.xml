@@ -25,17 +25,38 @@
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="true">
 
+        <!-- INFO lets App info's Open button and installers start Krate while its icon is hidden -->
         <activity
-            android:name=".MainActivity"
+            android:name=".KrateActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:configChanges="uiMode"
             android:theme="@style/Theme.Manager">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.INFO" />
             </intent-filter>
         </activity>
+
+        <!-- the launcher icon, off here so hiding leaves no stand-in icon; Krate turns it on (see LauncherIcon) -->
+        <activity-alias
+            android:name=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity=".KrateActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <receiver
+            android:name=".platform.LauncherIconReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- receives the PackageInstaller session result, section 15 + 42.17 -->
         <receiver

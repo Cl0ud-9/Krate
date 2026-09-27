@@ -9,4 +9,10 @@ interface ActivityLogRepository {
     fun observeRecent(): Flow<List<ActivityEntry>>
 
     suspend fun record(entry: ActivityEntry)
+
+    // drops an app's earlier failures once it has since worked; downloadsOnly keeps a failed install on record
+    suspend fun clearFailures(
+        appId: String,
+        downloadsOnly: Boolean = false,
+    )
 }

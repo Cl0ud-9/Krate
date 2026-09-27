@@ -13,10 +13,11 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import dev.cl0ud9.manager.EXTRA_TARGET_ROUTE
-import dev.cl0ud9.manager.MainActivity
+import dev.cl0ud9.manager.KrateActivity
 import dev.cl0ud9.manager.R
 import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.platform.notifications.NotificationIcons
+import dev.cl0ud9.manager.platform.notifications.krateContent
 import dev.cl0ud9.manager.voice.KrateVoice
 import dev.cl0ud9.manager.voice.Moment
 
@@ -35,6 +36,7 @@ private const val UPDATE_ALL_RESULT_NOTIFICATION_ID = 1003
 private const val MANAGER_UPDATED_NOTIFICATION_ID = 1004
 private const val STATE_PREFS = "update_notifier"
 private const val KEY_PENDING_SIGNATURE = "pending_signature"
+private const val KEY_PENDING_READY = "pending_ready"
 private const val KEY_MANAGER_VERSION = "manager_version"
 
 // local notifications for update-related events the user might not be watching the app for -
@@ -61,18 +63,31 @@ object UpdateNotifier {
         downloaded: Boolean,
     ) {
         val prefs = state(context)
-        if (prefs.getString(KEY_PENDING_SIGNATURE, null) == signature) return
-        prefs.edit().putString(KEY_PENDING_SIGNATURE, signature).apply()
+        val sameUpdates = prefs.getString(KEY_PENDING_SIGNATURE, null) == signature
+        val wasReady = sameUpdates && prefs.getBoolean(KEY_PENDING_READY, false)
+        // the same updates stay quiet, unless they've since been downloaded - that's worth one more "ready" notice
+        if (sameUpdates && wasReady == downloaded) return
+        prefs
+            .edit()
+            .putString(KEY_PENDING_SIGNATURE, signature)
+            .putBoolean(KEY_PENDING_READY, downloaded)
+            .apply()
+        // a "ready" notice whose file has gone (cache cleared) is corrected in place, never raised again once dismissed
+        if (sameUpdates && !downloaded && !isShowing(context, PENDING_UPDATES_NOTIFICATION_ID)) return
         // names the apps instead of only counting them - "Videoapp (Patched) has an update" says what
         // to do with it at a glance, a bare "1 update available" doesn't
         val single = apps.singleOrNull()
         notify(
-            context = context,
-            id = PENDING_UPDATES_NOTIFICATION_ID,
-            title = KrateVoice.line(Moment.UPDATES_WAITING),
-            text = pendingUpdatesText(apps.map { it.displayName }, downloaded),
-            targetRoute = "updates",
-            largeIcon = single?.let { NotificationIcons.app(context, it) },
+            context,
+            PENDING_UPDATES_NOTIFICATION_ID,
+            KrateNotification(
+                headline = KrateVoice.line(Moment.UPDATES_WAITING),
+                fact = pendingUpdatesText(apps.map { it.displayName }, downloaded),
+                category = "Updates",
+                targetRoute = "updates",
+                actionLabel = if (single != null) "Update" else "Update all",
+                largeIcon = single?.let { NotificationIcons.app(context, it) },
+            ),
         )
     }
 
@@ -92,7 +107,11 @@ object UpdateNotifier {
     // nothing pending anymore (installed, or the catalog withdrew it) - a leftover notification
     // would point at updates that no longer exist, and the next real one should alert again
     fun clearPendingUpdates(context: Context) {
-        state(context).edit().remove(KEY_PENDING_SIGNATURE).apply()
+        state(context)
+            .edit()
+            .remove(KEY_PENDING_SIGNATURE)
+            .remove(KEY_PENDING_READY)
+            .apply()
         NotificationManagerCompat.from(context).cancel(PENDING_UPDATES_NOTIFICATION_ID)
     }
 
@@ -106,13 +125,17 @@ object UpdateNotifier {
         if (prefs.getString(KEY_MANAGER_VERSION, null) == version) return
         prefs.edit().putString(KEY_MANAGER_VERSION, version).apply()
         notify(
-            context = context,
-            id = MANAGER_UPDATE_NOTIFICATION_ID,
-            title = KrateVoice.line(Moment.KRATE_UPDATE_AVAILABLE),
-            text = "Krate $version is available. Tap to update.",
-            // Settings checks on open and offers the in-app Update button right there
-            targetRoute = "settings",
-            largeIcon = NotificationIcons.krate(context),
+            context,
+            MANAGER_UPDATE_NOTIFICATION_ID,
+            KrateNotification(
+                headline = KrateVoice.line(Moment.KRATE_UPDATE_AVAILABLE),
+                fact = "Krate $version is available. Tap to update.",
+                category = "Krate update",
+                // About checks on open and offers the Update button right there
+                targetRoute = "settings/about",
+                actionLabel = "Update now",
+                largeIcon = NotificationIcons.krate(context),
+            ),
         )
     }
 
@@ -123,12 +146,16 @@ object UpdateNotifier {
     ) {
         NotificationManagerCompat.from(context).cancel(MANAGER_UPDATE_NOTIFICATION_ID)
         notify(
-            context = context,
-            id = MANAGER_UPDATED_NOTIFICATION_ID,
-            title = KrateVoice.line(Moment.KRATE_UPDATED),
-            text = version?.let { "Krate $it is installed. Tap to open." } ?: "Krate is updated. Tap to open.",
-            targetRoute = "home",
-            largeIcon = NotificationIcons.krate(context),
+            context,
+            MANAGER_UPDATED_NOTIFICATION_ID,
+            KrateNotification(
+                headline = KrateVoice.line(Moment.KRATE_UPDATED),
+                fact = version?.let { "Krate $it is installed. Tap to open." } ?: "Krate is updated. Tap to open.",
+                category = "Krate update",
+                targetRoute = "home",
+                actionLabel = "Open Krate",
+                largeIcon = NotificationIcons.krate(context),
+            ),
         )
     }
 
@@ -160,11 +187,15 @@ object UpdateNotifier {
                 else -> "$succeeded updated, $failed failed. Tap to see what went wrong."
             }
         notify(
-            context = context,
-            id = UPDATE_ALL_RESULT_NOTIFICATION_ID,
-            title = KrateVoice.line(moment),
-            text = text,
-            targetRoute = "updates",
+            context,
+            UPDATE_ALL_RESULT_NOTIFICATION_ID,
+            KrateNotification(
+                headline = KrateVoice.line(moment),
+                fact = text,
+                category = "Updates",
+                targetRoute = "updates",
+                actionLabel = if (failed == 0) "View" else "See what happened",
+            ),
         )
     }
 
@@ -172,14 +203,16 @@ object UpdateNotifier {
     // a declined/never-granted permission means silently skipping the notification, not a failure.
     // Checked inline, not via a helper function - lint's flow analysis for NotificationManagerCompat
     // .notify() doesn't trace a permission check across a function boundary.
-    @Suppress("LongParameterList")
+    private fun isShowing(
+        context: Context,
+        id: Int,
+    ): Boolean =
+        context.getSystemService(NotificationManager::class.java)?.activeNotifications?.any { it.id == id } == true
+
     private fun notify(
         context: Context,
         id: Int,
-        title: String,
-        text: String,
-        targetRoute: String,
-        largeIcon: Bitmap? = null,
+        message: KrateNotification,
     ) {
         val granted =
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -192,20 +225,18 @@ object UpdateNotifier {
             PendingIntent.getActivity(
                 context,
                 id,
-                Intent(context, MainActivity::class.java).apply {
+                Intent(context, KrateActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    putExtra(EXTRA_TARGET_ROUTE, targetRoute)
+                    putExtra(EXTRA_TARGET_ROUTE, message.targetRoute)
                 },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         val notification =
             NotificationCompat
                 .Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_krate)
-                .setLargeIcon(largeIcon)
-                .setContentTitle(title)
-                .setContentText(text)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                .krateContent(context, message.headline, message.fact, message.category)
+                .setLargeIcon(message.largeIcon)
+                .addAction(R.drawable.ic_stat_krate, message.actionLabel, openApp)
                 .setContentIntent(openApp)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
@@ -216,3 +247,13 @@ object UpdateNotifier {
         NotificationManagerCompat.from(context).notify(id, notification)
     }
 }
+
+// what one notification says and where its tap and its button lead
+private class KrateNotification(
+    val headline: String,
+    val fact: String,
+    val category: String,
+    val targetRoute: String,
+    val actionLabel: String,
+    val largeIcon: Bitmap? = null,
+)

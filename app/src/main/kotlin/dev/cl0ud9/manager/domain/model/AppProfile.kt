@@ -43,6 +43,9 @@ data class AppProfile(
     val artifacts: List<ArtifactInfo>,
     // launcher icon from the catalog (base64 PNG), shown until the app is installed on the device
     val iconPng: String? = null,
+    // what the app is for, in a line, and a few things it does - absent from older catalogs
+    val description: String? = null,
+    val highlights: List<String> = emptyList(),
 )
 
 // a withdrawn build stays listed in version history but is never the one offered as the update

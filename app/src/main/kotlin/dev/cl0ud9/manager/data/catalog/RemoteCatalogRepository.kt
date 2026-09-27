@@ -7,7 +7,9 @@ import dev.cl0ud9.manager.domain.model.AppProfile
 import dev.cl0ud9.manager.domain.model.DeviceProfile
 import dev.cl0ud9.manager.domain.repository.CatalogRepository
 import dev.cl0ud9.manager.security.manifest.ManifestVerifier
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -89,6 +92,7 @@ class RemoteCatalogRepository(
     private val apps = MutableStateFlow<List<AppProfile>?>(null)
     private val announcements = MutableStateFlow<List<Announcement>>(emptyList())
     private val loadMutex = Mutex()
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun observeApps(): Flow<List<AppProfile>> = apps.onSubscription { ensureLoaded() }.filterNotNull()
 
@@ -119,7 +123,15 @@ class RemoteCatalogRepository(
         if (apps.value != null) return
         loadMutex.withLock {
             if (apps.value != null) return
-            publish(loadManifest())
+            // the last verified catalog shows instantly and the network catches up behind it, instead of
+            // every cold start waiting on the network before anything appears
+            val cached = withContext(Dispatchers.IO) { loadCachedManifest() }
+            if (cached != null) {
+                publish(cached)
+                backgroundScope.launch { runCatching { refresh() } }
+            } else {
+                publish(loadManifest())
+            }
         }
     }
 

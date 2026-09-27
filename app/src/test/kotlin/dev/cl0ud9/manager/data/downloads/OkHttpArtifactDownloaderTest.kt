@@ -174,6 +174,25 @@ class OkHttpArtifactDownloaderTest {
         assertEquals(0L, downloader.clearCache())
     }
 
+    @Test
+    fun `pruning keeps only the kept build of that app`() {
+        val dir = tempFolder.newFolder()
+        val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256), dir)
+        val app = appProfile()
+        listOf(
+            "sample-app-1.0.0.apk",
+            "sample-app-0.9.0.apk",
+            "sample-app-0.8.0.apk.part",
+            "sample-app-music-2.0.0.apk",
+            "other-app-1.0.0.apk",
+        ).forEach { File(dir, it).writeText("x") }
+        downloader.pruneOtherBuilds(app, app.artifacts.first(), listOf("sample-app", "sample-app-music", "other-app"))
+        assertEquals(
+            listOf("other-app-1.0.0.apk", "sample-app-1.0.0.apk", "sample-app-music-2.0.0.apk"),
+            dir.list()!!.sorted(),
+        )
+    }
+
     // the downloader issues a HEAD request for storage preflight before the real GET, so queue both;
     // the HEAD response must carry no body bytes on the wire or MockWebServer corrupts the reused connection
     private fun enqueuePayloadTwice() {

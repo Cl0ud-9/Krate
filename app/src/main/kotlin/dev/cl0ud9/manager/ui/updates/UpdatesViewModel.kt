@@ -163,6 +163,7 @@ class UpdatesViewModel(
             )
         }
         outcomes.filter { it.succeeded }.forEach { outcome ->
+            activityLogRepository.clearFailures(outcome.app.id)
             activityLogRepository.record(
                 ActivityEntry(
                     id = UUID.randomUUID().toString(),

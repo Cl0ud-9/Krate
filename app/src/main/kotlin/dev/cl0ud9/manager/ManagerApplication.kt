@@ -1,12 +1,15 @@
 package dev.cl0ud9.manager
 
 import android.app.Application
+import androidx.compose.ui.AndroidComposeUiFlags
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dev.cl0ud9.manager.platform.AppContainer
+import dev.cl0ud9.manager.platform.LauncherIcon
 import dev.cl0ud9.manager.platform.workers.ManifestCheckWorker
 import dev.cl0ud9.manager.platform.workers.UpdateNotifier
 import java.util.concurrent.TimeUnit
@@ -22,9 +25,13 @@ class ManagerApplication : Application() {
     lateinit var container: AppContainer
         private set
 
+    @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate() {
         super.onCreate()
+        // frame-based text input scheduling, so moving between text fields doesn't drop and re-show the keyboard
+        AndroidComposeUiFlags.isOutOfFrameSchedulerForTextInputEventsEnabled = false
         container = AppContainer(this)
+        LauncherIcon.showUnlessHidden(this)
         UpdateNotifier.ensureChannel(this)
         scheduleManifestCheck()
     }
