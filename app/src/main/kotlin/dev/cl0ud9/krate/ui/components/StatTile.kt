@@ -46,7 +46,7 @@ fun StatTile(
             val debouncedClick = rememberDebouncedOnClick(onClick = onClick)
             Modifier
                 .pressScale(interactionSource)
-                .clip(ShapeCache.smooth20)
+                .clip(ShapeCache.rounded20)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = LocalIndication.current,
@@ -58,7 +58,7 @@ fun StatTile(
     val contentColor = MaterialTheme.colorScheme.onSurface
     Card(
         modifier = modifier.fillMaxWidth().then(tapModifier),
-        shape = ShapeCache.smooth20,
+        shape = ShapeCache.rounded20,
         colors =
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,

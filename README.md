@@ -24,7 +24,7 @@
   <img src="docs/screenshots/home.png" width="23%" alt="Home">
   <img src="docs/screenshots/apps.png" width="23%" alt="Apps">
   <img src="docs/screenshots/app-details.png" width="23%" alt="App details">
-  <img src="docs/screenshots/app-details-about.png" width="23%" alt="What's in the box">
+  <img src="docs/screenshots/app-details-about.png" width="23%" alt="What's in the Krate">
 </p>
 <p align="center">
   <img src="docs/screenshots/setup-welcome.png" width="23%" alt="Welcome to Krate">

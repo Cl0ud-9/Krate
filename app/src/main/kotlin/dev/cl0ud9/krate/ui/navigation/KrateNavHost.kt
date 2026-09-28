@@ -150,8 +150,6 @@ fun KrateNavHost(
     val navBarCompactMode by settingsRepository.observeNavBarCompactMode().collectAsStateWithLifecycle(
         initialValue = saved?.navBarCompactMode ?: false,
     )
-    val disableBlur by
-        settingsRepository.observeDisableBlur().collectAsStateWithLifecycle(initialValue = saved?.disableBlur ?: false)
     // NavHost always starts at Home immediately (see KrateNavGraph below) rather than waiting on
     // this DataStore read - gating NavHost's own existence on it meant every cold start (including
     // reopening from Recents after Android killed the process mid-download) hit a real frame-or-more
@@ -179,9 +177,9 @@ fun KrateNavHost(
     // tabs run behind the bar and pad their own lists by its footprint, so the bar floats over the content
     // the shorter, icon-only bar when chosen for the pill, and always on a phone on its side
     val barCompact = isShortScreen() || (navBarCompactMode && navBarStyle == NavBarStyle.FLOATING_PILL)
-    val navBarClearance = navBarFootprint(barCompact)
+    val navBarClearance = navBarFootprint(barCompact, floating = navBarStyle == NavBarStyle.FLOATING_PILL)
 
-    CompositionLocalProvider(LocalDisableBlur provides disableBlur, LocalNavBarClearance provides navBarClearance) {
+    CompositionLocalProvider(LocalNavBarClearance provides navBarClearance) {
         // contentWindowInsets defaults to WindowInsets.systemBars, which would reserve the status
         // bar's top inset here AND again inside every TabScreen/DetailScreen's own TopAppBar (that's
         // the default inset every M3 TopAppBar carries) - zeroing it out here leaves exactly one

@@ -83,7 +83,7 @@ private fun KrateSnackbar(data: SnackbarData) {
     val krate = visuals as? KrateMessage
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth24,
+        shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 6.dp,

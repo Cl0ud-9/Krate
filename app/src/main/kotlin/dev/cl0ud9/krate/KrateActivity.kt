@@ -74,9 +74,6 @@ class KrateActivity : ComponentActivity() {
             val themeMode by settingsRepository.observeThemeMode().collectAsStateWithLifecycle(
                 initialValue = saved?.themeMode ?: ThemeMode.SYSTEM,
             )
-            val useSmoothCorners by settingsRepository.observeUseSmoothCorners().collectAsStateWithLifecycle(
-                initialValue = saved?.useSmoothCorners ?: true,
-            )
             val route by pendingRoute.collectAsStateWithLifecycle()
 
             // enableEdgeToEdge() alone only ever picks status/nav bar icon color from the raw system
@@ -90,7 +87,7 @@ class KrateActivity : ComponentActivity() {
                 controller.isAppearanceLightNavigationBars = !darkTheme
             }
 
-            KrateTheme(themeMode = themeMode, useSmoothCorners = useSmoothCorners) {
+            KrateTheme(themeMode = themeMode) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     AppRoot(
                         pendingRoute = route,
@@ -117,9 +114,10 @@ class KrateActivity : ComponentActivity() {
     // deep-linked route permanently, with no way to actually reach Home again from the bottom nav
     // that redirect keeps winning against
     private fun handleIntent(intent: Intent?) {
-        // Android only dismisses a notification on a tap of its body, not of its button, so Krate does it itself
-        intent?.getIntExtra(EXTRA_NOTIFICATION_ID, -1)?.takeIf { it >= 0 }?.let { id ->
-            NotificationManagerCompat.from(this).cancel(id)
+        // Android only dismisses a notification on a tap of its body, not of its button, so Krate does it itself;
+        // any int is a real id (a download's is based on its app's hash, often negative), so presence is the test
+        if (intent?.hasExtra(EXTRA_NOTIFICATION_ID) == true) {
+            NotificationManagerCompat.from(this).cancel(intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0))
             intent.removeExtra(EXTRA_NOTIFICATION_ID)
         }
         // Krate is open now, which is all "Krate updated, tap to open" was asking for

@@ -47,6 +47,7 @@ import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
 import dev.cl0ud9.krate.ui.components.SupportStatusBadge
+import dev.cl0ud9.krate.ui.components.systemNavBarClearance
 import dev.cl0ud9.krate.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
@@ -274,7 +275,12 @@ private fun AppDetailsContent(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(top = topContentPadding + DetailContentTopGap, start = 20.dp, end = 20.dp, bottom = 20.dp),
+                .padding(
+                    top = topContentPadding + DetailContentTopGap,
+                    start = 20.dp,
+                    end = 20.dp,
+                    bottom = 20.dp + systemNavBarClearance,
+                ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // name, version and installed status as one compact block
@@ -363,7 +369,7 @@ private fun AppDetailsHeader(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth16,
+        shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.ui.components.systemNavBarClearance
 import dev.cl0ud9.krate.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.krate.ui.util.rememberDebouncedButtonState
 
@@ -47,7 +48,7 @@ internal fun SettingsPage(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         content()
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(24.dp + systemNavBarClearance))
     }
 }
 

@@ -6,7 +6,8 @@ License: Apache License, Version 2.0
 The following files in app/src/main/res/drawable were downloaded directly
 from Google's public material-design-icons repository (path
 symbols/android/<name>/materialsymbolsrounded/) and are unmodified except
-for the filename:
+for the filename and the tint attribute (Android's own ?android:attr/colorControlNormal
+instead of the AppCompat one):
 
   ic_nav_home_outline.xml     <- home/materialsymbolsrounded/home_24px.xml
   ic_nav_home_filled.xml      <- home/materialsymbolsrounded/home_fill1_24px.xml
@@ -48,7 +49,6 @@ for the filename:
   ic_rounded_corner_rounded.xml     <- rounded_corner/materialsymbolsrounded/rounded_corner_fill1_24px.xml
   ic_density_medium_rounded.xml     <- density_medium/materialsymbolsrounded/density_medium_fill1_24px.xml
   ic_tab_rounded.xml                <- tab/materialsymbolsrounded/tab_fill1_24px.xml
-  ic_shapes_rounded.xml             <- shapes/materialsymbolsrounded/shapes_fill1_24px.xml
   ic_restart_alt_rounded.xml        <- restart_alt/materialsymbolsrounded/restart_alt_fill1_24px.xml
   ic_public_rounded.xml             <- public/materialsymbolsrounded/public_fill1_24px.xml
   ic_groups_rounded.xml             <- groups/materialsymbolsrounded/groups_fill1_24px.xml

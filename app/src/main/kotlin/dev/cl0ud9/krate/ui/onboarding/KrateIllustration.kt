@@ -143,7 +143,7 @@ private fun BoxScope.Tile(
                 .graphicsLayer { translationY = (((bob + tile.phase) % 1f) - 0.5f) * 2f * BOB_PX }
                 .rotate(tile.rotation)
                 .size(tile.size),
-        shape = if (tile.style.square) ShapeCache.smooth20 else ShapeCache.smoothPill,
+        shape = if (tile.style.square) ShapeCache.rounded20 else ShapeCache.pill,
         color = container,
         shadowElevation = 3.dp,
     ) {

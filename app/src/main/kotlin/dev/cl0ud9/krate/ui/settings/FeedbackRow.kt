@@ -207,7 +207,7 @@ private fun DiagnosticReportPreview(report: String) {
         }
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = ShapeCache.smooth12,
+            shape = ShapeCache.rounded12,
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             SelectionContainer {

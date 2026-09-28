@@ -76,12 +76,12 @@ internal fun AppInfoSection(
     val source = packedFrom(latest?.downloadUrl, latest?.requiresAuth == true)
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth16,
+        shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(
-                title = "What's in the box",
+                title = "What's in the Krate",
                 icon = painterResource(R.drawable.ic_krate),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -177,7 +177,7 @@ private fun InfoRow(
             modifier =
                 Modifier
                     .size(36.dp)
-                    .clip(ShapeCache.smooth12)
+                    .clip(ShapeCache.rounded12)
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center,
         ) {

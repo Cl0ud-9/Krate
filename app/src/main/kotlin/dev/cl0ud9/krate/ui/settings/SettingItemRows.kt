@@ -182,7 +182,7 @@ private fun <T> OptionRow(
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp),
-        shape = ShapeCache.smooth24,
+        shape = ShapeCache.rounded24,
         color = container,
         contentColor = content,
     ) {

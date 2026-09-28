@@ -66,19 +66,6 @@ fun AppearanceRoute(
         NavigationRows(viewModel = viewModel, navBarStyle = navBarStyle, onOpenSheet = {
             openSheet = it
         }, onOpenCornerRadius = onOpenCornerRadius)
-        SettingsSectionLabel("Effects")
-        val useSmoothCorners by viewModel.useSmoothCorners.collectAsStateWithLifecycle()
-        SettingSwitchRow(
-            item =
-                SettingItem(
-                    painterResource(R.drawable.ic_shapes_rounded),
-                    "Smooth corners",
-                    "Squircle shapes across the app. Off is lighter on older phones.",
-                ),
-            checked = useSmoothCorners,
-            shape = settingsGroupShape(0, 1),
-            onCheckedChange = viewModel::setUseSmoothCorners,
-        )
         SettingsSectionLabel("Personality")
         val context = LocalContext.current
         SettingSwitchRow(

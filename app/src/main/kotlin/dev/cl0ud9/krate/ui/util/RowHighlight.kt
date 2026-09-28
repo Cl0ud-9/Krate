@@ -29,7 +29,7 @@ internal fun Modifier.tappableRow(
         val placeable = measurable.measure(constraints.offset(horizontal = extra))
         layout(placeable.width - extra, placeable.height) { placeable.place(-extra / 2, 0) }
     }.pressScale(interactionSource)
-        .clip(ShapeCache.smooth12)
+        .clip(ShapeCache.rounded12)
         .clickable(
             enabled = enabled,
             interactionSource = interactionSource,

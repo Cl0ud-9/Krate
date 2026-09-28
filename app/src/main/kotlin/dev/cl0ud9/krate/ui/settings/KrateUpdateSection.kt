@@ -155,7 +155,7 @@ internal fun KrateUpdateStatusRow(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(
-            modifier = Modifier.size(36.dp).clip(ShapeCache.smooth12).background(badgeColor),
+            modifier = Modifier.size(36.dp).clip(ShapeCache.rounded12).background(badgeColor),
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))

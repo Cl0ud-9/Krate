@@ -68,7 +68,7 @@ fun AboutPage(
         SettingsNavRow(
             icon = painterResource(R.drawable.ic_gavel_rounded),
             title = "Licenses",
-            subtitle = "Fonts and icons Krate uses, and their licenses",
+            subtitle = "Krate's own, and the open source work it's built on",
             colors = SettingsTint.INDIGO.colors(),
             shape = settingsGroupShape(1, PROJECT_ROWS),
             onClick = { showLicenses = true },
@@ -82,7 +82,7 @@ fun AboutPage(
 private fun AboutHeroCard(versionName: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth28,
+        shape = ShapeCache.rounded28,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(
@@ -126,7 +126,7 @@ private fun AboutTag(
     icon: Int,
     label: String,
 ) {
-    Surface(shape = ShapeCache.smooth16, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+    Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,

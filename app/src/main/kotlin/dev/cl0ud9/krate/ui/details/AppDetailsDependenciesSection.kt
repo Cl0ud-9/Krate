@@ -39,7 +39,7 @@ internal fun MissingDependencyWarning(
     if (unmetDependencies.isEmpty()) return
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth16,
+        shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

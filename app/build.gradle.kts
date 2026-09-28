@@ -27,8 +27,8 @@ android {
         applicationId = "dev.cl0ud9.krate"
         minSdk = 30
         targetSdk = 37
-        versionCode = 24
-        versionName = "0.4.5"
+        versionCode = 25
+        versionName = "0.4.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -76,6 +76,38 @@ kotlin {
     jvmToolchain(17)
 }
 
+// the license texts the app has to carry ship inside the APK (assets/licenses/), shown in Settings > About > Licenses
+abstract class BundleLicensesTask : DefaultTask() {
+    @get:InputFiles
+    abstract val licenseFiles: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun bundle() {
+        val target = outputDir.get().asFile.resolve("licenses")
+        target.deleteRecursively()
+        target.mkdirs()
+        licenseFiles.files.forEach { it.copyTo(target.resolve(it.name), overwrite = true) }
+    }
+}
+
+val bundleLicenses =
+    tasks.register<BundleLicensesTask>("bundleLicenses") {
+        licenseFiles.from(
+            rootProject.file("LICENSE"),
+            rootProject.file("licenses/google-sans-flex-OFL.txt"),
+            rootProject.file("licenses/protobuf-BSD-3-Clause.txt"),
+        )
+    }
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(bundleLicenses, BundleLicensesTask::outputDir)
+    }
+}
+
 dependencies {
     implementation(libs.core.ktx)
     implementation(libs.activity.compose)
@@ -93,7 +125,6 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.datastore.preferences)
-    implementation(libs.smooth.corner.rect)
     implementation(libs.tink.android)
     implementation(libs.okhttp)
     implementation(libs.work.runtime.ktx)

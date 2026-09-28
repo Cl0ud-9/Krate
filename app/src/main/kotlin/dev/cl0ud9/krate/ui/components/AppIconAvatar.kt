@@ -3,6 +3,7 @@ package dev.cl0ud9.krate.ui.components
 import android.graphics.BitmapFactory
 import android.graphics.drawable.Drawable
 import android.util.Base64
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -59,9 +60,12 @@ fun AppIconAvatar(
     val packageName = app.packageName
     val catalogIconPng = app.iconPng
     val context = LocalContext.current
+    val cacheKey = packageName + ":" + catalogIconPng.hashCode()
+    // the last icon seen shows at once, so a list scrolled back or a screen returned to never flashes letters first;
+    // it's still reloaded, so an app updated in the meantime shows its new icon
     val realIcon by
-        produceState<ImageBitmap?>(initialValue = null, packageName, catalogIconPng) {
-            value =
+        produceState(initialValue = AppIconCache.get(cacheKey), packageName, catalogIconPng) {
+            val loaded =
                 withContext(Dispatchers.IO) {
                     val installed =
                         runCatching { context.packageManager.getApplicationIcon(packageName) }
@@ -70,6 +74,8 @@ fun AppIconAvatar(
                             ?.asImageBitmap()
                     installed ?: catalogIconPng?.let(::decodeCatalogIcon)
                 }
+            if (loaded != null) AppIconCache.put(cacheKey, loaded)
+            value = loaded
         }
 
     val icon = realIcon
@@ -112,6 +118,21 @@ fun AppIconAvatar(
 }
 
 private const val CONTRAST_LUMINANCE_THRESHOLD = 0.5f
+private const val ICON_CACHE_SIZE = 24
+
+// icons already loaded this run, a few dozen at most (the catalog is small)
+private object AppIconCache {
+    private val icons = LruCache<String, ImageBitmap>(ICON_CACHE_SIZE)
+
+    fun get(key: String): ImageBitmap? = icons.get(key)
+
+    fun put(
+        key: String,
+        icon: ImageBitmap,
+    ) {
+        icons.put(key, icon)
+    }
+}
 
 private fun decodeCatalogIcon(base64Png: String): ImageBitmap? =
     runCatching {

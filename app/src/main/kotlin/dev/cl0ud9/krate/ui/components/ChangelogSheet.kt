@@ -1,6 +1,5 @@
 package dev.cl0ud9.krate.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,8 +33,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -112,26 +109,18 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
         // full height from the start, so the sheet has a half-height peek to open at even while the notes load
         Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                // the notes fade out above the screen's bottom edge and the system bar, even at the half-height peek
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .fadeAboveSystemBar(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 ChangelogHeader()
                 ReleasesContent(state = state, onRetry = { attempt++ })
             }
             ViewOnGitHubButton(modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp))
-            // content fades out under the button instead of being cut by the sheet's edge
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(30.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, MaterialTheme.colorScheme.surfaceContainerLow),
-                            ),
-                        ),
-            )
         }
     }
 }
@@ -167,7 +156,7 @@ private fun ViewOnGitHubButton(modifier: Modifier = Modifier) {
     val uriHandler = LocalUriHandler.current
     MediumExtendedFloatingActionButton(
         onClick = { uriHandler.openUri(RELEASES_URL) },
-        shape = ShapeCache.smooth16,
+        shape = ShapeCache.rounded16,
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
         icon = { Icon(painterResource(R.drawable.ic_github), contentDescription = null) },

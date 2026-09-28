@@ -27,15 +27,12 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.cl0ud9.krate.ui.theme.LocalUseSmoothCorners
-import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 
 private val ROW_MIN_HEIGHT = 88.dp
 private val BADGE_SIZE = 56.dp
 private val BADGE_ICON_SIZE = 24.dp
 private val GROUP_OUTER_RADIUS = 24.dp
 private val GROUP_INNER_RADIUS = 4.dp
-private const val GROUP_SMOOTHNESS = 60
 
 // bundles the badge's container/content color pair - keeps SettingsRow under detekt's
 // parameter-count threshold without collapsing them into a single ambiguous "tint" value
@@ -126,7 +123,7 @@ internal fun SettingsRow(
 
 // the first row in a group is square-round outside/nearly-square inside, the last is the mirror,
 // everything in between is nearly square on all sides, and a lone row is fully rounded all around.
-// Remembered per corner set and smooth-corners setting, so a recomposition reuses the same shape
+// Remembered per corner set, so a recomposition reuses the same shape
 @Composable
 internal fun settingsGroupShape(
     index: Int,
@@ -151,22 +148,7 @@ private fun groupCorners(
     topEnd: Dp,
     bottomStart: Dp,
     bottomEnd: Dp,
-): Shape {
-    val useSmoothCorners = LocalUseSmoothCorners.current
-    return remember(topStart, topEnd, bottomStart, bottomEnd, useSmoothCorners) {
-        if (useSmoothCorners) {
-            AbsoluteSmoothCornerShape(
-                cornerRadiusTL = topStart,
-                smoothnessAsPercentTL = GROUP_SMOOTHNESS,
-                cornerRadiusTR = topEnd,
-                smoothnessAsPercentTR = GROUP_SMOOTHNESS,
-                cornerRadiusBL = bottomStart,
-                smoothnessAsPercentBL = GROUP_SMOOTHNESS,
-                cornerRadiusBR = bottomEnd,
-                smoothnessAsPercentBR = GROUP_SMOOTHNESS,
-            )
-        } else {
-            RoundedCornerShape(topStart = topStart, topEnd = topEnd, bottomStart = bottomStart, bottomEnd = bottomEnd)
-        }
+): Shape =
+    remember(topStart, topEnd, bottomStart, bottomEnd) {
+        RoundedCornerShape(topStart = topStart, topEnd = topEnd, bottomStart = bottomStart, bottomEnd = bottomEnd)
     }
-}

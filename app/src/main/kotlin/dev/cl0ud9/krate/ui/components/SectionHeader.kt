@@ -39,7 +39,7 @@ fun SectionHeader(
             modifier =
                 Modifier
                     .size(30.dp)
-                    .clip(ShapeCache.smooth12)
+                    .clip(ShapeCache.rounded12)
                     .background(containerColor),
             contentAlignment = Alignment.Center,
         ) {

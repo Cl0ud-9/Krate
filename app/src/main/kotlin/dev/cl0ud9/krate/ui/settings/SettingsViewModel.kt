@@ -78,12 +78,6 @@ class SettingsViewModel(
     val navBarCompactMode: StateFlow<Boolean> =
         settingsRepository.observeNavBarCompactMode().stateInPage(saved?.navBarCompactMode ?: false)
 
-    val useSmoothCorners: StateFlow<Boolean> =
-        settingsRepository.observeUseSmoothCorners().stateInPage(saved?.useSmoothCorners ?: true)
-
-    val disableBlur: StateFlow<Boolean> =
-        settingsRepository.observeDisableBlur().stateInPage(saved?.disableBlur ?: false)
-
     val defaultLaunchTab: StateFlow<LaunchTab> =
         settingsRepository.observeDefaultLaunchTab().stateInPage(saved?.defaultLaunchTab ?: LaunchTab.HOME)
 
@@ -190,14 +184,6 @@ class SettingsViewModel(
 
     fun setNavBarCompactMode(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setNavBarCompactMode(enabled) }
-    }
-
-    fun setUseSmoothCorners(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setUseSmoothCorners(enabled) }
-    }
-
-    fun setDisableBlur(disabled: Boolean) {
-        viewModelScope.launch { settingsRepository.setDisableBlur(disabled) }
     }
 
     fun setDefaultLaunchTab(tab: LaunchTab) {

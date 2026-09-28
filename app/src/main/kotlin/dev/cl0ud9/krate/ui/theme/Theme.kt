@@ -134,7 +134,6 @@ fun ThemeMode.resolveDarkTheme(): Boolean =
 @Composable
 fun KrateTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
-    useSmoothCorners: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = themeMode.resolveDarkTheme()
@@ -156,18 +155,14 @@ fun KrateTheme(
             }
         }
 
-    // the smooth-corners toggle has to be live before ShapeCache.materialShapes() is read below, so
-    // it's built here (inside the provider) instead of as a top-level val
-    ProvideUseSmoothCorners(enabled = useSmoothCorners) {
-        // expressive() over standard() - springier, more energetic defaults for stock M3 components'
-        // own built-in animations (Switch, dialogs, etc.), matching the hand-rolled spring motion
-        // already used for the nav bar and screen transitions rather than fighting calmer stock timing
-        MaterialExpressiveTheme(
-            colorScheme = colorScheme,
-            motionScheme = MotionScheme.expressive(),
-            shapes = ShapeCache.materialShapes(),
-            typography = KrateTypography,
-            content = content,
-        )
-    }
+    // expressive() over standard() - springier, more energetic defaults for stock M3 components'
+    // own built-in animations (Switch, dialogs, etc.), matching the hand-rolled spring motion
+    // already used for the nav bar and screen transitions rather than fighting calmer stock timing
+    MaterialExpressiveTheme(
+        colorScheme = colorScheme,
+        motionScheme = MotionScheme.expressive(),
+        shapes = ShapeCache.materialShapes,
+        typography = KrateTypography,
+        content = content,
+    )
 }

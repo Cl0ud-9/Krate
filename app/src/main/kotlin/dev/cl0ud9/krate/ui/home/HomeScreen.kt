@@ -213,7 +213,7 @@ private fun RecentActivitySection(
         Text(text = "Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = ShapeCache.smooth16,
+            shape = ShapeCache.rounded16,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         ) {
             if (entries.isEmpty()) {
@@ -256,7 +256,7 @@ private fun ActivityRow(
         if (app !=
             null
         ) {
-            Modifier.homeTappable(ShapeCache.smooth16) { onOpenApp(entry.appId) }
+            Modifier.homeTappable(ShapeCache.rounded16) { onOpenApp(entry.appId) }
         } else {
             Modifier
         }
@@ -269,7 +269,7 @@ private fun ActivityRow(
             if (app != null) {
                 AppIconAvatar(app = app, size = 44.dp)
             } else {
-                Box(modifier = Modifier.fillMaxSize().clip(ShapeCache.smooth12).background(presentation.badgeColor))
+                Box(modifier = Modifier.fillMaxSize().clip(ShapeCache.rounded12).background(presentation.badgeColor))
             }
             Box(
                 modifier =
