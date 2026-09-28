@@ -12,15 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -58,7 +55,7 @@ internal fun MaintainerCard() {
     val uriHandler = LocalUriHandler.current
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth24,
+        shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Row(
@@ -158,12 +155,12 @@ internal fun KrateUpdatesCard(viewModel: SettingsViewModel) {
     val checkForUpdateState = rememberDebouncedButtonState(onClick = { viewModel.checkForKrateUpdate() })
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth24,
+        shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Surface(shape = ShapeCache.smooth16, color = MaterialTheme.colorScheme.primaryContainer) {
+                Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.primaryContainer) {
                     Icon(
                         painterResource(R.drawable.ic_krate),
                         contentDescription = null,
@@ -188,65 +185,6 @@ internal fun KrateUpdatesCard(viewModel: SettingsViewModel) {
                 state = krateUpdateState,
                 actions = KrateUpdateActions(checkForUpdateState, selfUpdateState, viewModel::installKrateUpdate),
             )
-        }
-    }
-}
-
-private class LicenseEntry(
-    val name: String,
-    val license: String,
-    val use: String,
-)
-
-private val LICENSES =
-    listOf(
-        LicenseEntry("Google Sans Flex", "SIL Open Font License 1.1", "The typeface used throughout Krate."),
-        LicenseEntry("Font Awesome Free", "CC BY 4.0", "The Krate mark, the notification rocket and the GitHub mark."),
-        LicenseEntry("Material Symbols", "Apache License 2.0", "Icons across the app."),
-    )
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun LicensesSheet(onDismiss: () -> Unit) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = "Licenses",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-            )
-            LICENSES.forEach { entry ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = ShapeCache.smooth20,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = entry.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = entry.license,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = entry.use,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
         }
     }
 }

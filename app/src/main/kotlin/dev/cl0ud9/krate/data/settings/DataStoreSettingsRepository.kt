@@ -93,20 +93,6 @@ class DataStoreSettingsRepository(
         context.settingsDataStore.edit { prefs -> prefs[NAV_BAR_COMPACT_MODE] = enabled }
     }
 
-    override fun observeUseSmoothCorners(): Flow<Boolean> =
-        context.settingsDataStore.data.map { prefs -> prefs.useSmoothCorners() }
-
-    override suspend fun setUseSmoothCorners(enabled: Boolean) {
-        context.settingsDataStore.edit { prefs -> prefs[USE_SMOOTH_CORNERS] = enabled }
-    }
-
-    override fun observeDisableBlur(): Flow<Boolean> =
-        context.settingsDataStore.data.map { prefs -> prefs.disableBlur() }
-
-    override suspend fun setDisableBlur(disabled: Boolean) {
-        context.settingsDataStore.edit { prefs -> prefs[DISABLE_BLUR] = disabled }
-    }
-
     override fun observeDefaultLaunchTab(): Flow<LaunchTab> =
         context.settingsDataStore.data.map { prefs -> prefs.toLaunchTab() }
 
@@ -123,8 +109,6 @@ class DataStoreSettingsRepository(
             navBarStyle = toNavBarStyle(),
             navBarCornerRadius = navBarCornerRadius(),
             navBarCompactMode = navBarCompactMode(),
-            useSmoothCorners = useSmoothCorners(),
-            disableBlur = disableBlur(),
             defaultLaunchTab = toLaunchTab(),
         )
 
@@ -138,10 +122,6 @@ class DataStoreSettingsRepository(
             .coerceIn(MIN_NAV_BAR_CORNER_RADIUS, MAX_NAV_BAR_CORNER_RADIUS)
 
     private fun Preferences.navBarCompactMode() = this[NAV_BAR_COMPACT_MODE] ?: false
-
-    private fun Preferences.useSmoothCorners() = this[USE_SMOOTH_CORNERS] ?: true
-
-    private fun Preferences.disableBlur() = this[DISABLE_BLUR] ?: false
 
     private fun Preferences.toThemeMode(): ThemeMode =
         this[THEME_MODE]?.let { stored -> runCatching { ThemeMode.valueOf(stored) }.getOrNull() } ?: ThemeMode.SYSTEM
@@ -163,8 +143,6 @@ class DataStoreSettingsRepository(
         val NAV_BAR_STYLE = stringPreferencesKey("nav_bar_style")
         val NAV_BAR_CORNER_RADIUS = intPreferencesKey("nav_bar_corner_radius")
         val NAV_BAR_COMPACT_MODE = booleanPreferencesKey("nav_bar_compact_mode")
-        val USE_SMOOTH_CORNERS = booleanPreferencesKey("use_smooth_corners")
-        val DISABLE_BLUR = booleanPreferencesKey("disable_blur")
         val DEFAULT_LAUNCH_TAB = stringPreferencesKey("default_launch_tab")
     }
 }

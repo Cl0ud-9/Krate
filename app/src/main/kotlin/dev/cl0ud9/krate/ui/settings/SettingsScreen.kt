@@ -34,6 +34,7 @@ import dev.cl0ud9.krate.ui.components.KrateSwitch
 import dev.cl0ud9.krate.ui.util.DebouncedButtonState
 import dev.cl0ud9.krate.ui.util.KOFI_URL
 import dev.cl0ud9.krate.ui.util.rememberLastNonNull
+import dev.cl0ud9.krate.voice.KrateVoice
 
 // an index of categories, each opening its own page - a short list you can take in at a glance,
 // grouped under section labels, instead of every control stacked on one long page. A waiting
@@ -47,6 +48,7 @@ fun SettingsScreen(
     val viewModel = rememberSettingsViewModel()
     val krateUpdateState by viewModel.krateUpdateState.collectAsStateWithLifecycle()
     val hasGitHubToken by viewModel.hasGitHubToken.collectAsStateWithLifecycle()
+    val inviteStatus by viewModel.inviteStatus.collectAsStateWithLifecycle()
     val update = (krateUpdateState as? KrateUpdateUiState.Result)?.status as? KrateUpdateStatus.UpdateAvailable
     var showSuggest by rememberSaveable { mutableStateOf(false) }
     if (showSuggest) SuggestAppSheet(onDismiss = { showSuggest = false })
@@ -81,7 +83,7 @@ fun SettingsScreen(
         SettingsNavRow(
             icon = painterResource(R.drawable.ic_key_rounded),
             title = "GitHub access",
-            subtitle = if (hasGitHubToken) "Token saved" else "Unlocks invite-only apps",
+            subtitle = gitHubAccessSummary(hasGitHubToken, inviteStatus, KrateVoice.playful),
             colors = SettingsTint.INDIGO.colors(),
             shape = settingsGroupShape(0, 1),
             onClick = { onNavigate(SettingsPageRoute.GITHUB) },

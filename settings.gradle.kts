@@ -19,8 +19,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // smooth-corner-rect-android-compose, for the Material 3 Expressive squircle shape
-        maven("https://jitpack.io")
     }
 }
 

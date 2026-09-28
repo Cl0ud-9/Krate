@@ -58,7 +58,7 @@ fun RefreshPillButton(
         // a tap mid-refresh is ignored rather than disabling the pill, which would flash it grey
         onClick = { if (!isRefreshing) onClick() },
         modifier = modifier.height(BUTTON_HEIGHT),
-        shape = ShapeCache.smoothPill,
+        shape = ShapeCache.pill,
         colors =
             ButtonDefaults.filledTonalButtonColors(
                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,

@@ -3,8 +3,11 @@ package dev.cl0ud9.krate.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
@@ -17,6 +20,10 @@ import androidx.compose.ui.unit.dp
 
 // how much of a tab's bottom edge the nav bar covers (the bar plus the system bar under it); tab content runs behind it
 val LocalNavBarClearance = compositionLocalOf { 0.dp }
+
+// the system navigation bar under a pushed page (no floating bar there): a gesture handle is thin, 3-button nav is not
+val systemNavBarClearance: Dp
+    @Composable get() = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
 // how far the fade reaches above the bar, so the list dims into it instead of meeting a hard edge
 private val FADE_ABOVE_BAR = 56.dp

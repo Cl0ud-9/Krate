@@ -11,5 +11,18 @@ This product includes third-party material distributed under its own license:
   Font Awesome Free    CC BY 4.0 (icons)           licenses/font-awesome-NOTICE.txt
   Material Symbols     Apache License 2.0          licenses/material-symbols-NOTICE.txt
 
+The Android app (APK) also bundles these libraries, each under its own license (the Apache
+License 2.0 text is in licenses/apache-2.0.txt):
+
+  AndroidX, Jetpack Compose                          Apache License 2.0
+  Kotlin, kotlinx.coroutines, kotlinx.serialization  Apache License 2.0
+  OkHttp, Okio                                       Apache License 2.0
+  Google Tink, Guava, Gson, Error Prone, JSpecify    Apache License 2.0
+  Protocol Buffers (inside Tink)    BSD 3-Clause     licenses/protobuf-BSD-3-Clause.txt
+
+The APK carries the license texts these require (the Apache License 2.0, the Google Sans
+Flex OFL and the Protocol Buffers BSD license) and Krate's own LICENSE, and shows them in
+Settings > About > Licenses.
+
 These files keep their original licenses; LICENSE covers Krate's own source
 code only.

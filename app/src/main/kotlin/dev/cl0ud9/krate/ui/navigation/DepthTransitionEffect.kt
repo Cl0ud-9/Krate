@@ -10,10 +10,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -27,10 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
-
-// Settings > Appearance's "disable blur" toggle - cheaper to draw on low-end devices, at the cost
-// of a heavier dim standing in for the lost blur. Defaults off
-val LocalDisableBlur: ProvidableCompositionLocal<Boolean> = compositionLocalOf { false }
 
 private const val DEPTH_TRANSITION_MS = 350
 private val DimBlurEasing = CubicBezierEasing(0.5f, 0f, 0.8f, 0.2f)
@@ -93,11 +87,8 @@ fun AnimatedContentScope.rememberDepthEffect(
     navController: NavHostController,
     entry: NavBackStackEntry,
 ): DepthEffect {
-    // below API 31 there's no RenderEffect/BlurEffect at all, so a blur-less pushed screen would
-    // just sit there dimmed with no compensation - same visual gap the user's own toggle exists to
-    // avoid, so a device that can't blur is treated exactly like a user who turned blur off
-    val blurUnsupported = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
-    val disableBlur = LocalDisableBlur.current || blurUnsupported
+    // below API 31 there's no RenderEffect/BlurEffect at all, so a heavier dim stands in for the missing blur
+    val disableBlur = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
     val canRound = shouldRunDepthEffects(navController, entry)
     val canDim = canRound && shouldDim(navController, entry)
     val canBlur = canDim && !disableBlur

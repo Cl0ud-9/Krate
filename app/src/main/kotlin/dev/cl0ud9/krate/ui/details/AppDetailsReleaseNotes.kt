@@ -104,7 +104,7 @@ private fun NotesCard(
     val missingPage = shown.firstOrNull()?.takeIf { notesFor(app, builds, it) == null }?.releasePageUrl()
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
-        shape = ShapeCache.smooth16,
+        shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(CARD_PADDING), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -195,7 +195,7 @@ private fun BuildNotes(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Surface(shape = ShapeCache.smoothPill, color = MaterialTheme.colorScheme.secondaryContainer) {
+            Surface(shape = ShapeCache.pill, color = MaterialTheme.colorScheme.secondaryContainer) {
                 Text(
                     text = build.patchesVersionName?.let { "${build.versionName}, patches $it" } ?: build.versionName,
                     style = MaterialTheme.typography.labelLarge,

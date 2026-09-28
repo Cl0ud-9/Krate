@@ -53,7 +53,7 @@ internal fun DownloadSection(
     // boxed in a card like every other detail section, instead of sitting bare on the screen background
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth16,
+        shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -35,7 +35,7 @@ fun KrateDialog(
     BasicAlertDialog(onDismissRequest = onDismissRequest) {
         Surface(
             modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
-            shape = ShapeCache.smooth32,
+            shape = ShapeCache.rounded32,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 8.dp,
         ) {
@@ -47,7 +47,7 @@ fun KrateDialog(
                 if (detail != null) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = ShapeCache.smooth24,
+                        shape = ShapeCache.rounded24,
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                     ) {
                         Column(
@@ -72,7 +72,7 @@ fun KrateDialog(
 private fun HeaderBlock(header: KrateDialogHeader) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth24,
+        shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -81,7 +81,7 @@ private fun HeaderBlock(header: KrateDialogHeader) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Surface(shape = ShapeCache.smooth12, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Surface(shape = ShapeCache.rounded12, color = MaterialTheme.colorScheme.secondaryContainer) {
                     Text(
                         text = header.tag,
                         modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
@@ -90,7 +90,7 @@ private fun HeaderBlock(header: KrateDialogHeader) {
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                 }
-                Surface(shape = ShapeCache.smooth16, color = MaterialTheme.colorScheme.primaryContainer) {
+                Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.primaryContainer) {
                     Icon(
                         painter = header.icon,
                         contentDescription = null,

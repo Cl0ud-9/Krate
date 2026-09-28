@@ -44,13 +44,13 @@ fun AppListItem(
             modifier
                 .fillMaxWidth()
                 .pressScale(interactionSource)
-                .clip(ShapeCache.smooth20)
+                .clip(ShapeCache.rounded20)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = LocalIndication.current,
                     onClick = onClick,
                 ),
-        shape = ShapeCache.smooth20,
+        shape = ShapeCache.rounded20,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Row(

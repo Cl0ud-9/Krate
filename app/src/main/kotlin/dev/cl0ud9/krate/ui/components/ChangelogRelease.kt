@@ -65,7 +65,7 @@ private fun ReleaseNotesCard(notes: List<String>) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = ShapeCache.smooth24,
+        shape = ShapeCache.rounded24,
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)) {
             Text(

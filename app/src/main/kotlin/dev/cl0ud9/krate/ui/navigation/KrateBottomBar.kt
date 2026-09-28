@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableIntState
@@ -30,8 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import dev.cl0ud9.krate.domain.model.NavBarStyle
 import dev.cl0ud9.krate.ui.components.KrateNavigationBarItem
-import dev.cl0ud9.krate.ui.theme.LocalUseSmoothCorners
-import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 
 @Composable
 internal fun KrateBottomBar(
@@ -56,8 +54,8 @@ internal fun KrateBottomBar(
                 .then(if (full) Modifier else Modifier.windowInsetsPadding(SideInsets))
                 .padding(horizontal = geometry.sideMargin),
         shape = navBarShape(geometry.topRadius, geometry.bottomRadius),
-        // surfaceContainerHighest keeps the bar distinct from the surface-toned panel behind it in both themes
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        // Material's own navigation bar color: a tone above the surface panel behind it, plus the shadow
+        color = NavigationBarDefaults.containerColor,
         shadowElevation = 3.dp,
     ) {
         Row(
@@ -83,11 +81,12 @@ internal fun KrateBottomBar(
     }
 }
 
-// the floating bar sits as far from the screen's bottom and sides as the system bar is tall, so a matching
-// corner radius lines up with the phone's own screen corners; full width runs edge to edge over the system bar
+// over a gesture handle the floating bar sits as far from the screen's bottom and sides as the handle is tall, so a
+// matching corner radius lines up with the phone's own screen corners; above 3-button nav it keeps a gap of its own
+// instead of resting on the buttons. Full width runs edge to edge over the system bar
 internal val NavBarContentHeight = 90.dp
 internal val NavBarCompactContentHeight = 64.dp
-private val MAX_SIDE_MARGIN = 14.dp
+private val FLOATING_GAP = 14.dp
 private val WIDE_INSET = 30.dp
 private const val NAV_BAR_MORPH_MS = 400
 
@@ -101,18 +100,27 @@ private class NavBarGeometry(
     val bottomRadius: Dp,
 )
 
-// the strip the bar takes up at the bottom of the screen: its content plus the system bar, the same in both styles
+// the strip the bar takes up at the bottom of the screen: its content plus everything below it
 @Composable
-internal fun navBarFootprint(compact: Boolean): Dp =
-    (if (compact) NavBarCompactContentHeight else NavBarContentHeight) +
-        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+internal fun navBarFootprint(
+    compact: Boolean,
+    floating: Boolean,
+): Dp {
+    val content = if (compact) NavBarCompactContentHeight else NavBarContentHeight
+    val below = if (floating) floatingNavBarMargins().second else WindowInsets.navigationBars.bottomDp()
+    return content + below
+}
 
-// the gap below and beside the floating bar, the same as the system navigation bar's height (capped for 3-button bars)
+// the gaps beside and below the floating bar: a gesture handle's own height, or over 3-button nav (and in landscape,
+// where its buttons move to the side and leave no bottom bar) a fixed gap clear of the buttons and the screen edge
 @Composable
 internal fun floatingNavBarMargins(): Pair<Dp, Dp> {
-    val inset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    return (if (inset > WIDE_INSET) MAX_SIDE_MARGIN else inset) to inset
+    val inset = WindowInsets.navigationBars.bottomDp()
+    return if (inset > 0.dp && inset <= WIDE_INSET) inset to inset else FLOATING_GAP to inset + FLOATING_GAP
 }
+
+@Composable
+private fun WindowInsets.bottomDp(): Dp = asPaddingValues().calculateBottomPadding()
 
 @Composable
 private fun rememberNavBarGeometry(appearance: NavBarAppearance): NavBarGeometry {
@@ -142,28 +150,7 @@ private fun navBarShape(
 ): Shape {
     val topDp = top.value.toInt()
     val bottomDp = bottom.value.toInt()
-    val smooth = LocalUseSmoothCorners.current
-    return remember(topDp, bottomDp, smooth) {
-        if (smooth) {
-            AbsoluteSmoothCornerShape(
-                cornerRadiusTL = topDp.dp,
-                smoothnessAsPercentTL = SMOOTHNESS,
-                cornerRadiusTR = topDp.dp,
-                smoothnessAsPercentTR = SMOOTHNESS,
-                cornerRadiusBL = bottomDp.dp,
-                smoothnessAsPercentBL = SMOOTHNESS,
-                cornerRadiusBR = bottomDp.dp,
-                smoothnessAsPercentBR = SMOOTHNESS,
-            )
-        } else {
-            RoundedCornerShape(
-                topStart = topDp.dp,
-                topEnd = topDp.dp,
-                bottomStart = bottomDp.dp,
-                bottomEnd = bottomDp.dp,
-            )
-        }
+    return remember(topDp, bottomDp) {
+        RoundedCornerShape(topStart = topDp.dp, topEnd = topDp.dp, bottomStart = bottomDp.dp, bottomEnd = bottomDp.dp)
     }
 }
-
-private const val SMOOTHNESS = 60

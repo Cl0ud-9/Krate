@@ -47,16 +47,6 @@ interface SettingsRepository {
 
     suspend fun setNavBarCompactMode(enabled: Boolean)
 
-    // squircle corners (ShapeCache) app-wide vs plain rounded corners
-    fun observeUseSmoothCorners(): Flow<Boolean>
-
-    suspend fun setUseSmoothCorners(enabled: Boolean)
-
-    // skips the App Details/Settings push depth blur - cheaper on low-end devices
-    fun observeDisableBlur(): Flow<Boolean>
-
-    suspend fun setDisableBlur(disabled: Boolean)
-
     fun observeDefaultLaunchTab(): Flow<LaunchTab>
 
     suspend fun setDefaultLaunchTab(tab: LaunchTab)

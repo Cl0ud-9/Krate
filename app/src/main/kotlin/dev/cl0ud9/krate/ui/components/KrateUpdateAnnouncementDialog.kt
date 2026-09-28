@@ -101,7 +101,7 @@ private fun RowScope.UpdateFooter(
         Spacer(modifier = Modifier.weight(1f))
         Button(
             onClick = { status.downloadUrl?.let(onUpdate) ?: uriHandler.openUri(status.releaseUrl) },
-            shape = ShapeCache.smooth16,
+            shape = ShapeCache.rounded16,
         ) {
             Icon(
                 painterResource(R.drawable.ic_arrow_forward_rounded),

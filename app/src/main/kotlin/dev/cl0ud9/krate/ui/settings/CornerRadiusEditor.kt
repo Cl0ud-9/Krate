@@ -185,7 +185,7 @@ private fun EditorTopBar(
         }
         Button(
             onClick = onDone,
-            shape = ShapeCache.smoothPill,
+            shape = ShapeCache.pill,
             colors =
                 ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -214,7 +214,7 @@ private fun RadiusControls(
     val haptic = LocalHapticFeedback.current
     Surface(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 32.dp),
-        shape = ShapeCache.smooth24,
+        shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(modifier = Modifier.padding(14.dp)) {

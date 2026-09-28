@@ -90,8 +90,8 @@ internal fun StatusHeroCard(
     val content = if (upToDate) colors.onPrimaryContainer else colors.onTertiaryContainer
     val action = if (upToDate) onCheckAgain else onViewUpdates
     Card(
-        modifier = Modifier.fillMaxWidth().homeTappable(ShapeCache.smooth28, action),
-        shape = ShapeCache.smooth28,
+        modifier = Modifier.fillMaxWidth().homeTappable(ShapeCache.rounded28, action),
+        shape = ShapeCache.rounded28,
         colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
     ) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -165,7 +165,7 @@ private fun AppTile(
         modifier =
             Modifier
                 .width(76.dp)
-                .homeTappable(ShapeCache.smooth16, onClick)
+                .homeTappable(ShapeCache.rounded16, onClick)
                 .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),

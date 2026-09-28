@@ -41,7 +41,7 @@ fun AnnouncementCard(
     val (container, content) = severityColors(announcement.severity)
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth16,
+        shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

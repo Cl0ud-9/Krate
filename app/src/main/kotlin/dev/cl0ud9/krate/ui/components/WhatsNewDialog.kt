@@ -33,7 +33,7 @@ fun WhatsNewDialog(
         detail = { ReleaseNotesHint(title = "What's new", notes = releaseNoteItems(release.notes)) },
         footer = {
             Spacer(modifier = Modifier.weight(1f))
-            Button(onClick = onDismiss, shape = ShapeCache.smooth16) {
+            Button(onClick = onDismiss, shape = ShapeCache.rounded16) {
                 Icon(
                     painterResource(R.drawable.ic_arrow_forward_rounded),
                     contentDescription = null,

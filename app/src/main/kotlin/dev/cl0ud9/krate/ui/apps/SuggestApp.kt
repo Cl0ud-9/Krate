@@ -53,12 +53,12 @@ fun SuggestAppCard(modifier: Modifier = Modifier) {
     var open by rememberSaveable { mutableStateOf(false) }
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth24,
+        shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(shape = ShapeCache.smooth16, color = MaterialTheme.colorScheme.tertiaryContainer) {
+                Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.tertiaryContainer) {
                     Icon(
                         painterResource(R.drawable.ic_campaign_rounded),
                         contentDescription = null,

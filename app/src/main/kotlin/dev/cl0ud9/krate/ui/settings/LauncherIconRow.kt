@@ -93,7 +93,7 @@ private fun HideIconDialog(
             Spacer(modifier = Modifier.weight(1f))
             TextButton(onClick = onDismiss) { Text("Keep it") }
             Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = onConfirm, shape = ShapeCache.smooth16) { Text("Hide icon") }
+            Button(onClick = onConfirm, shape = ShapeCache.rounded16) { Text("Hide icon") }
         },
     )
 }

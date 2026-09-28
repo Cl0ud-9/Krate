@@ -71,10 +71,10 @@ internal fun OnboardingCollage(
         )
     val shapes: List<Shape> =
         listOf(
-            ShapeCache.smooth32,
+            ShapeCache.rounded32,
             CircleShape,
             CircleShape,
-            ShapeCache.smooth24,
+            ShapeCache.rounded24,
             MaterialShapes.Cookie9Sided.toShape(),
         )
     BoxWithConstraints(modifier = modifier.fillMaxWidth().height(COLLAGE_HEIGHT)) {

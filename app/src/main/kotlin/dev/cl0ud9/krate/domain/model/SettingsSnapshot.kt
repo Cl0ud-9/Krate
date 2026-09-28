@@ -9,7 +9,5 @@ data class SettingsSnapshot(
     val navBarStyle: NavBarStyle,
     val navBarCornerRadius: Int,
     val navBarCompactMode: Boolean,
-    val useSmoothCorners: Boolean,
-    val disableBlur: Boolean,
     val defaultLaunchTab: LaunchTab,
 )

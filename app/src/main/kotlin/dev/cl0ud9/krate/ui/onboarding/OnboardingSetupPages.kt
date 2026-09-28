@@ -71,7 +71,7 @@ internal fun NavigationPage(
         Spacer(modifier = Modifier.height(24.dp))
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = ShapeCache.smooth28,
+            shape = ShapeCache.rounded28,
             color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -119,7 +119,7 @@ internal fun UpdatesPage(viewModel: SettingsViewModel) {
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = ShapeCache.smooth28,
+            shape = ShapeCache.rounded28,
             color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
             Box(modifier = Modifier.padding(20.dp)) {
@@ -243,7 +243,7 @@ private fun NavBarPreview(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().height(200.dp),
-        shape = ShapeCache.smooth32,
+        shape = ShapeCache.rounded32,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Box {
@@ -251,7 +251,7 @@ private fun NavBarPreview(
                 PLACEHOLDER_LINES.forEach { fraction ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(fraction).height(12.dp),
-                        shape = ShapeCache.smoothPill,
+                        shape = ShapeCache.pill,
                         color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     ) {}
                 }

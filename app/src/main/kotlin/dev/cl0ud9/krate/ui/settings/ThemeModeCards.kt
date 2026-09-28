@@ -90,7 +90,7 @@ private fun ThemeModeCard(
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCache.smooth28,
+        shape = ShapeCache.rounded28,
         color = container,
         contentColor = content,
     ) {
@@ -100,7 +100,7 @@ private fun ThemeModeCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Surface(
-                shape = ShapeCache.smooth20,
+                shape = ShapeCache.rounded20,
                 color = if (selected) content.copy(alpha = 0.12f) else MaterialTheme.colorScheme.secondaryContainer,
             ) {
                 Icon(
