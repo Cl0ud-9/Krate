@@ -106,8 +106,7 @@ private fun ApplyPendingRoute(
 ) {
     LaunchedEffect(pendingRoute) {
         val route = pendingRoute ?: return@LaunchedEffect
-        // compared with its arguments, so a notification for one app opens it even over another app's details
-        if (navController.currentBackStackEntry?.let(::currentRouteOf) != route) navController.navigate(route)
+        navController.navigateFromOutside(route)
         onRouteHandled()
     }
 }
@@ -260,8 +259,18 @@ internal object LiveNavigation {
     // false when there's no running nav host yet (a cold start), which then goes through the pending route
     fun open(route: String): Boolean {
         val navController = controller ?: return false
-        if (navController.currentBackStackEntry?.let(::currentRouteOf) != route) navController.navigate(route)
+        navController.navigateFromOutside(route)
         return true
+    }
+}
+
+// a notification's target: a tab is switched to the way the bottom bar does it, never stacked over another tab (which
+// left the tabs' saved history tangled), and any other screen opens on top unless it's already the one showing;
+// compared with its arguments, so a notification for one app opens it even over another app's details
+private fun NavHostController.navigateFromOutside(route: String) {
+    when {
+        KrateBottomNavDestinations.any { it.route == route } -> navigateToTab(route)
+        currentBackStackEntry?.let(::currentRouteOf) != route -> navigate(route)
     }
 }
 

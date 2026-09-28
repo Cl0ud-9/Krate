@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.AppProfile
@@ -30,8 +29,7 @@ import dev.cl0ud9.krate.domain.model.latestVersionName
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.pressScale
 
-private const val DESCRIPTION_ALPHA = 0.85f
-
+// name, newest version and status only; the description lives on the app's own page, keeping the list easy to scan
 @Composable
 fun AppListItem(
     app: AppProfile,
@@ -64,21 +62,12 @@ fun AppListItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = app.displayName, style = MaterialTheme.typography.titleMedium)
-                app.description?.let { description ->
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = DESCRIPTION_ALPHA),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
-                    )
-                }
                 Text(
                     // the catalog's newest version - "Installed" below says whether it's on the device
                     text = app.latestVersionName?.let { "Latest $it" } ?: "Not available yet",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

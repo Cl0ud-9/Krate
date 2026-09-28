@@ -37,6 +37,7 @@ import dev.cl0ud9.krate.ui.util.StaggeredAppear
 import dev.cl0ud9.krate.ui.util.krateViewModel
 import dev.cl0ud9.krate.ui.util.plusBottom
 import dev.cl0ud9.krate.ui.util.rememberDebouncedOnClick
+import dev.cl0ud9.krate.ui.util.rememberListShownAt
 import dev.cl0ud9.krate.voice.KrateVoice
 import dev.cl0ud9.krate.voice.Moment
 import dev.cl0ud9.krate.voice.rememberKrateLine
@@ -163,6 +164,7 @@ private fun UpdatesContent(
             }
 
             is UpdatesUiState.Content -> {
+                val listShownAt = rememberListShownAt()
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp).plusBottom(LocalNavBarClearance.current),
@@ -178,7 +180,7 @@ private fun UpdatesContent(
                     }
 
                     itemsIndexed(state.apps, key = { _, app -> app.id }) { index, app ->
-                        StaggeredAppear(index = index, modifier = Modifier.animateItem()) {
+                        StaggeredAppear(index = index, listShownAt = listShownAt, modifier = Modifier.animateItem()) {
                             AppListItem(
                                 app = app,
                                 installed = true,

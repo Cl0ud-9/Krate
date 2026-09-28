@@ -35,7 +35,7 @@ class DownloadKeepAliveService : Service() {
             // the download already ended: a requested foreground service still has to call startForeground or
             // the app is killed, so it does, under an id no download uses, and goes straight away
             DownloadKeepAlive.lastShown()?.let { show(PLACEHOLDER_NOTIFICATION_ID, it) }
-            stop(keepNotification = false)
+            stop()
         }
         return START_NOT_STICKY
     }
@@ -52,10 +52,9 @@ class DownloadKeepAliveService : Service() {
         ServiceCompat.startForeground(this, id, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     }
 
-    // kept, it stays up as an ordinary notification showing whatever the service last showed; otherwise it goes
-    internal fun stop(keepNotification: Boolean) {
-        val mode = if (keepNotification) ServiceCompat.STOP_FOREGROUND_DETACH else ServiceCompat.STOP_FOREGROUND_REMOVE
-        ServiceCompat.stopForeground(this, mode)
+    // takes its notification down with it; a result is posted separately, so it's never left marked as the service's
+    internal fun stop() {
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
@@ -94,28 +93,17 @@ object DownloadKeepAlive {
     @Synchronized
     fun isHeld(key: String): Boolean = key in held
 
-    // ends a download's hold. When it was the one the service shows, the service itself ends its notification,
-    // swapping in [result] before letting go (so Android can't put the old progress back over it) or removing it.
-    // Returns false when the caller still has to post [result] or cancel the notification itself
+    // ends a download's hold: the service moves on to the next download still running, or stops and takes its
+    // notification away. The caller posts any result itself, under its own id
     @Synchronized
-    fun release(
-        key: String,
-        result: Notification? = null,
-    ): Boolean {
-        val entry = held.remove(key)
-        val service = DownloadKeepAliveService.running
+    fun release(key: String) {
+        val wasShowing = held.keys.lastOrNull() == key
+        if (held.remove(key) == null) return
+        val service = DownloadKeepAliveService.running ?: return
         val next = held.values.lastOrNull()
-        return when {
-            entry == null || service == null -> false
-            next != null -> {
-                service.show(next.first, next.second)
-                false
-            }
-            else -> {
-                if (result != null) service.show(entry.first, result)
-                service.stop(keepNotification = result != null)
-                true
-            }
+        when {
+            next == null -> service.stop()
+            wasShowing -> service.show(next.first, next.second)
         }
     }
 

@@ -41,6 +41,7 @@ import dev.cl0ud9.krate.ui.util.StaggeredAppear
 import dev.cl0ud9.krate.ui.util.krateViewModel
 import dev.cl0ud9.krate.ui.util.plusBottom
 import dev.cl0ud9.krate.ui.util.rememberDebouncedOnClick
+import dev.cl0ud9.krate.ui.util.rememberListShownAt
 import dev.cl0ud9.krate.voice.KrateVoice
 import dev.cl0ud9.krate.voice.Moment
 import dev.cl0ud9.krate.voice.rememberKrateLine
@@ -149,36 +150,53 @@ private fun AppsContent(
                 )
             }
 
-            is AppsUiState.Content -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp).plusBottom(LocalNavBarClearance.current),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    item(key = "apps-header") {
-                        AppsListHeader(
-                            appCount = state.apps.size,
-                            isRefreshing = isRefreshing,
-                            onRefresh = viewModel::refreshFromNetwork,
-                        )
-                    }
+            is AppsUiState.Content ->
+                AppsList(state = state, isRefreshing = isRefreshing, viewModel = viewModel, onAppClick = onAppClick)
+        }
+    }
+}
 
-                    itemsIndexed(state.apps, key = { _, app -> app.id }) { index, app ->
-                        StaggeredAppear(index = index, modifier = Modifier.animateItem()) {
-                            AppListItem(
-                                app = app,
-                                installed = app.packageName in state.installedPackageNames,
-                                // a fast double-tap could otherwise reach the nav controller twice
-                                // before the first navigate() call's recomposition landed, pushing
-                                // App Details onto the back stack twice
-                                onClick = rememberDebouncedOnClick(onClick = { onAppClick(app.id) }),
-                            )
-                        }
-                    }
-                    item(key = "suggest") {
-                        StaggeredAppear(index = state.apps.size, modifier = Modifier.animateItem()) { SuggestAppCard() }
-                    }
-                }
+// the catalog's apps, alphabetical, each rising in once when the list first shows
+@Composable
+private fun AppsList(
+    state: AppsUiState.Content,
+    isRefreshing: Boolean,
+    viewModel: AppsViewModel,
+    onAppClick: (String) -> Unit,
+) {
+    val listShownAt = rememberListShownAt()
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp).plusBottom(LocalNavBarClearance.current),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(key = "apps-header") {
+            AppsListHeader(
+                appCount = state.apps.size,
+                isRefreshing = isRefreshing,
+                onRefresh = viewModel::refreshFromNetwork,
+            )
+        }
+
+        itemsIndexed(state.apps, key = { _, app -> app.id }) { index, app ->
+            StaggeredAppear(index = index, listShownAt = listShownAt, modifier = Modifier.animateItem()) {
+                AppListItem(
+                    app = app,
+                    installed = app.packageName in state.installedPackageNames,
+                    // a fast double-tap could otherwise reach the nav controller twice
+                    // before the first navigate() call's recomposition landed, pushing
+                    // App Details onto the back stack twice
+                    onClick = rememberDebouncedOnClick(onClick = { onAppClick(app.id) }),
+                )
+            }
+        }
+        item(key = "suggest") {
+            StaggeredAppear(
+                index = state.apps.size,
+                listShownAt = listShownAt,
+                modifier = Modifier.animateItem(),
+            ) {
+                SuggestAppCard()
             }
         }
     }
