@@ -1,0 +1,38 @@
+Krate Proprietary License
+
+Copyright (c) 2026 Cloud/9 (https://github.com/Cl0ud-9). All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software") to study and review the Software, and to build and use it for personal,
+non-commercial purposes only, subject to the following conditions:
+
+1. The above copyright notice and this permission notice shall be included in all copies or substantial portions
+   of the Software.
+
+2. Redistribution of the Software or any derivative work, in source or binary form, including modified, renamed or
+   rebranded builds, is strictly prohibited without prior written permission from the author.
+
+3. Commercial use of the Software or any derivative work is strictly prohibited. This includes, but is not limited
+   to, selling it, or publishing it on the Google Play Store, F-Droid, any other app store or download site, or
+   any other commercial platform.
+
+4. The Software may not be used, in whole or in part, to train, fine-tune or evaluate any machine learning or
+   artificial intelligence model, or be supplied to an AI tool or agent to produce a derivative or competing work,
+   without prior written permission from the author.
+
+5. The name "Krate", its logo and its icon may not be used to name, brand or promote any derivative work.
+
+6. The right to sell, sublicense and distribute the Software, for profit or otherwise, is reserved exclusively by
+   the author, Cloud/9.
+
+7. By submitting a contribution to the Software (for example a pull request), you grant the author a perpetual,
+   worldwide, irrevocable, royalty-free license to use, modify, sublicense and distribute that contribution as part
+   of the Software under any terms the author chooses.
+
+This license covers every version of the Software. Third-party material included with the Software stays under its own
+license, listed in NOTICE.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

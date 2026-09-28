@@ -1,0 +1,15 @@
+Krate
+Copyright 2026 Cloud/9 (https://github.com/Cl0ud-9)
+
+Krate's own source code is proprietary: all rights reserved, with personal, non-commercial use
+allowed under the terms in LICENSE. Redistribution, rebranded builds and publishing it anywhere need
+written permission from the author.
+
+This product includes third-party material distributed under its own license:
+
+  Google Sans Flex     SIL Open Font License 1.1   licenses/google-sans-flex-OFL.txt
+  Font Awesome Free    CC BY 4.0 (icons)           licenses/font-awesome-NOTICE.txt
+  Material Symbols     Apache License 2.0          licenses/material-symbols-NOTICE.txt
+
+These files keep their original licenses; LICENSE covers Krate's own source
+code only.

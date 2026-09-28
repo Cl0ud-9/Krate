@@ -178,4 +178,15 @@ much.
 
 Full notices are in [licenses/](licenses).
 
+## License
+
+Krate is **proprietary** software: Copyright 2026 Cloud/9, all rights reserved. The source is published so you can read
+it and build it for your own personal, non-commercial use. Redistributing it or anything built from it, publishing
+rebranded or modified builds, putting it on any app store, or using it to train AI models is not allowed without
+written permission. See [LICENSE](LICENSE) for the full terms.
+
+Bundled fonts, icons and libraries keep their own licenses, listed above and in [NOTICE](NOTICE).
+
+Forks are not supported. If you use one, ask whoever made it for help.
+
 <p align="center"><sub>Made by <a href="https://github.com/Cl0ud-9">Cloud/9</a>, for friends, shaped by what they ask for.</sub></p>

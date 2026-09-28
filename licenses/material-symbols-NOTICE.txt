@@ -27,7 +27,6 @@ for the filename:
   ic_verified_user_rounded.xml      <- verified_user/materialsymbolsrounded/verified_user_fill1_24px.xml
   ic_lock_rounded.xml               <- lock/materialsymbolsrounded/lock_fill1_24px.xml
   ic_gpp_good_rounded.xml           <- verified/materialsymbolsrounded/verified_fill1_24px.xml
-  ic_notifications_rounded.xml      <- notifications/materialsymbolsrounded/notifications_fill1_24px.xml
   ic_notifications_active_rounded.xml <- notifications_active/materialsymbolsrounded/notifications_active_fill1_24px.xml
   ic_notifications_none_rounded.xml <- notifications/materialsymbolsrounded/notifications_24px.xml
   ic_campaign_rounded.xml           <- campaign/materialsymbolsrounded/campaign_fill1_24px.xml
@@ -54,6 +53,10 @@ for the filename:
   ic_public_rounded.xml             <- public/materialsymbolsrounded/public_fill1_24px.xml
   ic_groups_rounded.xml             <- groups/materialsymbolsrounded/groups_fill1_24px.xml
   ic_gavel_rounded.xml              <- gavel/materialsymbolsrounded/gavel_fill1_24px.xml
+  ic_coffee_rounded.xml             <- coffee/materialsymbolsrounded/coffee_fill1_24px.xml
+  ic_visibility_off_rounded.xml     <- visibility_off/materialsymbolsrounded/visibility_off_24px.xml
+  ic_signal_cellular_alt_rounded.xml <- signal_cellular_alt/materialsymbolsrounded (earlier upstream
+                                        revision of the glyph, with slightly narrower bars)
 
 Note: Compose's legacy Icons.Filled.GppGood has no "gpp_good" glyph in Material Symbols (checked
 the source repository directly - that name doesn't exist there); Material Symbols renamed it to
