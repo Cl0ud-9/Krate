@@ -178,4 +178,9 @@ much.
 
 Full notices are in [licenses/](licenses).
 
+## License
+
+Krate is licensed under the [Apache License 2.0](LICENSE). Bundled fonts and icons keep their own licenses, listed
+above and in [NOTICE](NOTICE).
+
 <p align="center"><sub>Made by <a href="https://github.com/Cl0ud-9">Cloud/9</a>, for friends, shaped by what they ask for.</sub></p>

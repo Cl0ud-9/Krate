@@ -1,0 +1,13 @@
+Krate
+Copyright 2026 Cloud/9 (https://github.com/Cl0ud-9)
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes third-party material distributed under its own license:
+
+  Google Sans Flex     SIL Open Font License 1.1   licenses/google-sans-flex-OFL.txt
+  Font Awesome Free    CC BY 4.0 (icons)           licenses/font-awesome-NOTICE.txt
+  Material Symbols     Apache License 2.0          licenses/material-symbols-NOTICE.txt
+
+These files keep their original licenses; the Apache License 2.0 above covers
+Krate's own source code only.
