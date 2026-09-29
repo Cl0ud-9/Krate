@@ -277,6 +277,10 @@ private fun NavHostController.navigateFromOutside(route: String) {
 internal fun NavHostController.navigateToTab(route: String) {
     // re-selecting the tab already showing would pop and rebuild it, replaying its entrance
     if (currentBackStackEntry?.destination?.route == route) return
+    // from a pushed page (Settings, App Details) to a tab already underneath it, going there is going back; a tab
+    // switch from there did nothing when the tab was Home right below (a notification asking for Home, say)
+    val onPushedPage = KrateBottomNavDestinations.none { it.route == currentBackStackEntry?.destination?.route }
+    if (onPushedPage && popBackStack(route, inclusive = false)) return
     navigate(route) {
         popUpTo(graph.startDestinationId) { saveState = true }
         launchSingleTop = true
