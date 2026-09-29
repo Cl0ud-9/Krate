@@ -118,9 +118,15 @@ class RemoteCatalogRepository(
 
     // a failed download keeps what's already showing and throws, so pull-to-refresh can say so
     override suspend fun refresh() {
-        val bytes = withContext(Dispatchers.IO) { fetchVerifiedManifestBytes() }
-        // the invite-only catalog stands on its own: a saved token is checked even if the public one is unreachable
-        withContext(Dispatchers.IO) { privateSource?.refresh() }
+        // the invite-only catalog stands on its own: a saved token is checked alongside the public catalog, never
+        // after it, so a slow or unreachable public fetch can't hold up (or skip) the token check
+        val bytes =
+            coroutineScope {
+                val invite = async(Dispatchers.IO) { privateSource?.refresh() }
+                val public = withContext(Dispatchers.IO) { fetchVerifiedManifestBytes() }
+                invite.await()
+                public
+            }
         if (bytes == null) {
             ensureLoaded()
             // what's already known, with whatever the invite-only check just found

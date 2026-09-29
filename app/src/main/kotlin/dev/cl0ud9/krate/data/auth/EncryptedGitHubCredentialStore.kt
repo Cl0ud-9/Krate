@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 private const val PREFS_FILE_NAME = "github_credentials"
 private const val KEY_TOKEN = "github_pat"
@@ -15,6 +17,9 @@ class EncryptedGitHubCredentialStore(
 ) : GitHubCredentialStore {
     private val prefs: SharedPreferences by lazy { buildEncryptedPrefs(context) }
 
+    private val mutableTokenSaved by lazy { MutableStateFlow(getToken() != null) }
+    override val tokenSaved: StateFlow<Boolean> get() = mutableTokenSaved
+
     // .trim() here too, not just in setToken - an already-saved token from before that trim existed
     // would otherwise keep failing every download until the user notices and manually re-enters it
     override fun getToken(): String? = prefs.getString(KEY_TOKEN, null)?.trim()?.takeIf { it.isNotBlank() }
@@ -25,10 +30,12 @@ class EncryptedGitHubCredentialStore(
     // user notices and manually re-types it
     override fun setToken(token: String) {
         prefs.edit().putString(KEY_TOKEN, token.trim()).apply()
+        mutableTokenSaved.value = getToken() != null
     }
 
     override fun clearToken() {
         prefs.edit().remove(KEY_TOKEN).apply()
+        mutableTokenSaved.value = false
     }
 
     private fun buildEncryptedPrefs(context: Context): SharedPreferences {

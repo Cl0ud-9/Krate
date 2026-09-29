@@ -101,8 +101,8 @@ class SettingsViewModel(
 
     // never surfaces the token value itself back to the UI, only whether one is currently saved -
     // EncryptedSharedPreferences has no Flow of its own, so this is refreshed manually on set/clear
-    private val mutableHasGitHubToken = MutableStateFlow(githubCredentialStore.getToken() != null)
-    val hasGitHubToken: StateFlow<Boolean> = mutableHasGitHubToken.asStateFlow()
+    // the store's own state, so the Settings row and the GitHub access page agree the moment a token changes
+    val hasGitHubToken: StateFlow<Boolean> = githubCredentialStore.tokenSaved
 
     private val mutableFeedbackText = MutableStateFlow("")
     val feedbackText: StateFlow<String> = mutableFeedbackText.asStateFlow()
@@ -239,14 +239,12 @@ class SettingsViewModel(
     // the invite-only entries come and go with the token, so the catalog is fetched again either way
     fun setGitHubToken(token: String) {
         githubCredentialStore.setToken(token)
-        mutableHasGitHubToken.value = true
         // app-wide, so leaving this page straight after saving doesn't cancel the check
         catalogRepository.refreshInBackground()
     }
 
     fun clearGitHubToken() {
         githubCredentialStore.clearToken()
-        mutableHasGitHubToken.value = false
         catalogRepository.refreshInBackground()
     }
 
