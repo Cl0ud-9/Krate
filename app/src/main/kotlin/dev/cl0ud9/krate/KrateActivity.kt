@@ -32,6 +32,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dev.cl0ud9.krate.domain.model.ThemeMode
 import dev.cl0ud9.krate.platform.appContainer
+import dev.cl0ud9.krate.platform.selfupdate.PLAY_PROTECT_ROUTE
+import dev.cl0ud9.krate.platform.selfupdate.PlayProtect
 import dev.cl0ud9.krate.platform.workers.KRATE_UPDATED_NOTIFICATION_ID
 import dev.cl0ud9.krate.ui.apps.SharedSuggestions
 import dev.cl0ud9.krate.ui.apps.parseSharedSuggestion
@@ -142,6 +144,13 @@ class KrateActivity : ComponentActivity() {
         val route =
             intent?.getStringExtra(EXTRA_TARGET_ROUTE)
                 ?: intent?.getStringExtra(EXTRA_APP_ID)?.let { "apps/$it" }
+        // "turn Play Protect back on" from the Krate-updated notification: Google's screen, over Krate
+        if (route == PLAY_PROTECT_ROUTE) {
+            PlayProtect.open(this)
+            PlayProtect.clearReminder(this)
+            intent?.removeExtra(EXTRA_TARGET_ROUTE)
+            return
+        }
         if (!route.isNullOrEmpty()) {
             // a tap while Krate is already on screen keeps the normal push animation
             val fromOutside = !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)

@@ -107,4 +107,34 @@ class InstallResultMappingTest {
         val reason = (status as InstallStatus.Failed).reason
         assertTrue(reason.startsWith("The installed version is newer"))
     }
+
+    // what Android reported on device when Play Protect rejected Krate's own update: "aborted", like Cancel, with the
+    // verification failure only in the message
+    @Test
+    fun `a Play Protect block is told apart from a cancel and from other failures`() {
+        val blocked =
+            interpretInstallResult(
+                PackageInstaller.STATUS_FAILURE_ABORTED,
+                message = "INSTALL_FAILED_VERIFICATION_FAILURE: Install not allowed for file:///data/app/vmdl1.tmp",
+                WaitingForUserStep.INSTALL_CONFIRM,
+            )
+        val cancelled =
+            interpretInstallResult(
+                PackageInstaller.STATUS_FAILURE_ABORTED,
+                message = null,
+                WaitingForUserStep.INSTALL_CONFIRM,
+            )
+        val other =
+            interpretInstallResult(
+                PackageInstaller.STATUS_FAILURE_STORAGE,
+                message = "INSTALL_FAILED_INSUFFICIENT_STORAGE",
+                WaitingForUserStep.INSTALL_CONFIRM,
+            )
+
+        assertTrue((blocked as InstallStatus.Failed).blockedByPlayProtect)
+        assertEquals("Google Play Protect stopped this install.", blocked.reason)
+        assertTrue(!(other as InstallStatus.Failed).blockedByPlayProtect)
+        assertTrue((cancelled as InstallStatus.Failed).userCancelled)
+        assertTrue(!cancelled.blockedByPlayProtect)
+    }
 }

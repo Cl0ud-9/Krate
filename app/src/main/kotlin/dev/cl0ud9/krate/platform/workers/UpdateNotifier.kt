@@ -19,6 +19,8 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.platform.notifications.NotificationIcons
 import dev.cl0ud9.krate.platform.notifications.krateContent
+import dev.cl0ud9.krate.platform.selfupdate.PLAY_PROTECT_ROUTE
+import dev.cl0ud9.krate.platform.selfupdate.PlayProtect
 import dev.cl0ud9.krate.voice.KrateVoice
 import dev.cl0ud9.krate.voice.Moment
 
@@ -146,15 +148,18 @@ object UpdateNotifier {
         version: String?,
     ) {
         NotificationManagerCompat.from(context).cancel(KRATE_UPDATE_NOTIFICATION_ID)
+        // Play Protect was paused for this update: the tap takes the user straight back to switch it on
+        val reminder = PlayProtect.reminderPending(context)
+        val installed = version?.let { "Krate $it is installed." } ?: "Krate is updated."
         notify(
             context,
             KRATE_UPDATED_NOTIFICATION_ID,
             KrateNotification(
                 headline = KrateVoice.line(Moment.KRATE_UPDATED),
-                fact = version?.let { "Krate $it is installed. Tap to open." } ?: "Krate is updated. Tap to open.",
+                fact = if (reminder) "$installed Turn Play Protect back on." else "$installed Tap to open.",
                 category = "Krate update",
-                targetRoute = "home",
-                actionLabel = "Open Krate",
+                targetRoute = if (reminder) PLAY_PROTECT_ROUTE else "home",
+                actionLabel = if (reminder) "Turn Play Protect back on" else "Open Krate",
                 largeIcon = NotificationIcons.krate(context),
             ),
         )

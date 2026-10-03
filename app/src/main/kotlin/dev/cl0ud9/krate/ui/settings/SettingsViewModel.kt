@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.krate.data.auth.GitHubCredentialStore
 import dev.cl0ud9.krate.data.downloads.ArtifactDownloader
 import dev.cl0ud9.krate.data.settings.DEFAULT_NAV_BAR_CORNER_RADIUS
+import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.InviteStatus
 import dev.cl0ud9.krate.domain.model.LaunchTab
 import dev.cl0ud9.krate.domain.model.NavBarStyle
@@ -237,7 +238,9 @@ class SettingsViewModel(
     // second tap while one is already running is a no-op rather than starting a duplicate download
     fun installKrateUpdate(downloadUrl: String) {
         val current = mutableSelfUpdateState.value
-        if (current is SelfUpdateState.Downloading || current is SelfUpdateState.Installing) return
+        // one already under way is left alone; one that failed (Play Protect, say) can be tried again
+        val failed = current is SelfUpdateState.Installing && current.installStatus is InstallStatus.Failed
+        if ((current is SelfUpdateState.Downloading || current is SelfUpdateState.Installing) && !failed) return
         viewModelScope.launch {
             krateSelfUpdateInstaller.downloadAndInstall(downloadUrl).collect { state ->
                 mutableSelfUpdateState.value = state

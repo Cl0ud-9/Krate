@@ -35,5 +35,7 @@ sealed interface InstallStatus {
         val rolledBack: Boolean = false,
         // the user said no in Android's confirmation dialog - not something that went wrong
         val userCancelled: Boolean = false,
+        // Google Play Protect stopped it; pausing Play Protect and trying again is the way through
+        val blockedByPlayProtect: Boolean = false,
     ) : InstallStatus
 }

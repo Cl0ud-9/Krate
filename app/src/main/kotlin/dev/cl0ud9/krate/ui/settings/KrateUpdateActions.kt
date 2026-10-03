@@ -6,6 +6,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -67,7 +70,11 @@ internal fun SelfUpdateAction(
             )
         }
 
-        is SelfUpdateState.Installing -> SelfUpdateInstallingContent(installStatus = selfUpdateState.installStatus)
+        is SelfUpdateState.Installing ->
+            SelfUpdateInstallingContent(
+                installStatus = selfUpdateState.installStatus,
+                retry = status.downloadUrl?.let { url -> { onInstallUpdate(url) } },
+            )
     }
 }
 
@@ -78,8 +85,15 @@ private fun SelfUpdateStartButton(
     onInstallUpdate: (String) -> Unit,
 ) {
     val downloadUrl = status.downloadUrl
-    if (downloadUrl != null) {
-        Button(onClick = { onInstallUpdate(downloadUrl) }, modifier = Modifier.fillMaxWidth()) {
+    // the Play Protect steps come first; a retry after a failed download has already been through them
+    var guide by rememberSaveable { mutableStateOf(false) }
+    if (downloadUrl != null && guide && !retrying) {
+        PlayProtectUpdateGuide(blocked = false, onUpdate = { onInstallUpdate(downloadUrl) })
+    } else if (downloadUrl != null) {
+        Button(
+            onClick = { if (retrying) onInstallUpdate(downloadUrl) else guide = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(if (retrying) "Try again" else "Update now")
         }
     } else {
@@ -91,7 +105,11 @@ private fun SelfUpdateStartButton(
 }
 
 @Composable
-private fun SelfUpdateInstallingContent(installStatus: InstallStatus) {
+private fun SelfUpdateInstallingContent(
+    installStatus: InstallStatus,
+    // starts the update over; null when this release has no apk to download
+    retry: (() -> Unit)?,
+) {
     when (installStatus) {
         is InstallStatus.WaitingForUser -> {
             KrateLinearProgress(progress = null)
@@ -113,12 +131,19 @@ private fun SelfUpdateInstallingContent(installStatus: InstallStatus) {
         }
 
         is InstallStatus.Failed -> {
-            KrateUpdateStatusRow(
-                icon = painterResource(R.drawable.ic_error_rounded),
-                badgeColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                text = installStatus.reason,
-            )
+            if (installStatus.blockedByPlayProtect && retry != null) {
+                PlayProtectUpdateGuide(blocked = true, onUpdate = retry)
+            } else {
+                KrateUpdateStatusRow(
+                    icon = painterResource(R.drawable.ic_error_rounded),
+                    badgeColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    text = installStatus.reason,
+                )
+                if (retry != null) {
+                    Button(onClick = retry, modifier = Modifier.fillMaxWidth()) { Text("Try again") }
+                }
+            }
         }
 
         // Installing, plus the clean-install-only states (Idle/PreparingRollback/Uninstalling/

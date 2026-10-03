@@ -14,6 +14,18 @@ fun interpretInstallResult(
     message: String?,
     waitingForUserStep: WaitingForUserStep,
 ): InstallStatus =
+    // Play Protect rejecting it comes back as "aborted", the same status as Cancel, so the message decides first
+    if (isBlockedByVerifier(status, message)) {
+        InstallStatus.Failed("Google Play Protect stopped this install.", blockedByPlayProtect = true)
+    } else {
+        statusOutcome(status, message, waitingForUserStep)
+    }
+
+private fun statusOutcome(
+    status: Int,
+    message: String?,
+    waitingForUserStep: WaitingForUserStep,
+): InstallStatus =
     when (status) {
         PackageInstaller.STATUS_SUCCESS -> InstallStatus.Success
         PackageInstaller.STATUS_PENDING_USER_ACTION -> InstallStatus.WaitingForUser(waitingForUserStep)
@@ -31,6 +43,13 @@ fun interpretInstallResult(
 
         else -> InstallStatus.Failed(friendlyFailure(message))
     }
+
+private fun isBlockedByVerifier(
+    status: Int,
+    message: String?,
+): Boolean =
+    status == PackageInstaller.STATUS_FAILURE_BLOCKED ||
+        message?.contains("INSTALL_FAILED_VERIFICATION_FAILURE") == true
 
 // the two failures a user can actually act on get plain wording - both are fixed by the clean install
 // App Details offers next to them. Anything else keeps Android's own message

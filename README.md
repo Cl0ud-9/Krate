@@ -83,7 +83,8 @@ Know an app that belongs here? Suggest it from **Settings > Suggest an app**, or
 ## Get Krate
 
 1. **Download** the latest APK from [Releases](https://github.com/Cl0ud-9/Krate/releases/latest).
-2. **Open it** and let your browser or files app install it when Android asks.
+2. **Pause Play Protect, then open it** and let your browser or files app install it when Android asks. See
+   [Play Protect](#play-protect) below for why and how.
 3. **Follow the setup.** It takes about a minute and asks for what Krate needs: permission to install apps, and on
    Android 13 or newer, notifications.
 
@@ -91,8 +92,21 @@ After that, Krate updates itself, so you only ever download it once.
 
 **Needs:** Android 11 or newer.
 
-> **About Play Protect:** apps from outside the Play Store can prompt Play Protect to offer a scan. That's expected,
-> not a sign of a broken app.
+### Play Protect
+
+Google Play Protect currently blocks Krate with a "Harmful app blocked" message. It flags Krate because Krate installs
+apps from outside the Play Store. Krate checks every app it installs against a signed list, and its code is public
+right here, so you can see exactly what it does. If you'd rather not continue, that's a fine choice too.
+
+To install or update Krate:
+
+1. Open the **Play Store**, tap your profile picture, then **Play Protect** and the settings icon at the top right.
+2. Turn off **Scan apps with Play Protect**.
+3. Install or update Krate.
+4. Turn **Scan apps with Play Protect** back on.
+
+Krate walks you through this when it updates itself, opens the Play Protect screen for you, and reminds you to switch
+scanning back on once the update is in. Apps you install through Krate aren't affected.
 
 ## How it works
 
@@ -107,7 +121,8 @@ GitHub releases ──► catalog (built every 2 hours, signed) ──► Krate 
 - A GitHub Actions workflow reads each app's releases and publishes a signed catalog.
 - Krate refuses any catalog whose signature doesn't match the key built into the app.
 - Downloads come straight from each app's own GitHub releases.
-- Installing uses Android's own installer, so you confirm every install and nothing happens silently.
+- Installing uses Android's own installer. You confirm every new app; updates to apps Krate installed can go on
+  by themselves if you leave automatic updates on.
 
 ## Privacy
 
@@ -121,8 +136,9 @@ GitHub releases ──► catalog (built every 2 hours, signed) ──► Krate 
 <details>
 <summary><b>Does Krate install things on its own?</b></summary>
 
-No. Automatic downloads only fetch updates ahead of time. Every install still needs your tap and Android's
-confirmation.
+Only updates, and only if you want it. Every new app needs your tap and Android's confirmation. With automatic
+updates on, updates to apps Krate installed go on by themselves a day after release, while you're not using the
+app. You can switch that off in <b>Settings > Downloads & storage</b>, or per app in its details.
 </details>
 
 <details>

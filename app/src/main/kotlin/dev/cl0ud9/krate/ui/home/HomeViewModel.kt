@@ -6,6 +6,7 @@ import dev.cl0ud9.krate.data.auth.GitHubCredentialStore
 import dev.cl0ud9.krate.domain.model.ActivityEntry
 import dev.cl0ud9.krate.domain.model.AnnouncementItem
 import dev.cl0ud9.krate.domain.model.AppProfile
+import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.isActive
 import dev.cl0ud9.krate.domain.model.isVisible
 import dev.cl0ud9.krate.domain.repository.ActivityLogRepository
@@ -174,7 +175,9 @@ class HomeViewModel(
     // the same in-app download + system install prompt Settings offers, straight from the dialog
     fun installKrateUpdate(downloadUrl: String) {
         val current = mutableSelfUpdateState.value
-        if (current is SelfUpdateState.Downloading || current is SelfUpdateState.Installing) return
+        // one already under way is left alone; one that failed (Play Protect, say) can be tried again
+        val failed = current is SelfUpdateState.Installing && current.installStatus is InstallStatus.Failed
+        if ((current is SelfUpdateState.Downloading || current is SelfUpdateState.Installing) && !failed) return
         viewModelScope.launch {
             krateSelfUpdateInstaller.downloadAndInstall(downloadUrl).collect { mutableSelfUpdateState.value = it }
         }

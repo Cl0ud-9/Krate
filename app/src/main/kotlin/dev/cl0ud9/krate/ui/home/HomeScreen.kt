@@ -167,6 +167,8 @@ private fun HomeContent(
         }
         // once, for anyone who had Krate before it could update apps by itself
         AutoUpdateOffer()
+        // after Krate's own update, if Play Protect was paused for it
+        PlayProtectReminder()
 
         HomeAppear(order = 0) {
             StatusHeroCard(

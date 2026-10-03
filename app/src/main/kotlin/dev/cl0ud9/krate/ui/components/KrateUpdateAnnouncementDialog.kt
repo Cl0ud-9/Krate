@@ -15,6 +15,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -22,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateStatus
 import dev.cl0ud9.krate.platform.selfupdate.SelfUpdateState
+import dev.cl0ud9.krate.ui.settings.PlayProtectUpdateGuide
 import dev.cl0ud9.krate.ui.settings.SelfUpdateAction
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.formatMarkdownLite
@@ -95,12 +100,20 @@ private fun RowScope.UpdateFooter(
     onUpdate: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    if (selfUpdateState == null) {
+    // the Play Protect steps come first, then the update itself
+    var guide by rememberSaveable { mutableStateOf(false) }
+    val downloadUrl = status.downloadUrl
+    if (selfUpdateState == null && guide && downloadUrl != null) {
+        Column(modifier = Modifier.weight(1f)) {
+            PlayProtectUpdateGuide(blocked = false, onUpdate = { onUpdate(downloadUrl) })
+            TextButton(onClick = onDismiss) { Text("Later") }
+        }
+    } else if (selfUpdateState == null) {
         val uriHandler = LocalUriHandler.current
         TextButton(onClick = onDismiss) { Text("Later") }
         Spacer(modifier = Modifier.weight(1f))
         Button(
-            onClick = { status.downloadUrl?.let(onUpdate) ?: uriHandler.openUri(status.releaseUrl) },
+            onClick = { if (downloadUrl != null) guide = true else uriHandler.openUri(status.releaseUrl) },
             shape = ShapeCache.rounded16,
         ) {
             Icon(
