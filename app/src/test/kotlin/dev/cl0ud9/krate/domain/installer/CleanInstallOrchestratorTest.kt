@@ -55,6 +55,8 @@ class CleanInstallOrchestratorTest {
             )
             assertEquals(listOf(newApk), engine.installedFiles)
             assertEquals(1, rollbackStore.captureCalls)
+            // the old apk's copy isn't kept once the new build is installed
+            assertEquals(1, rollbackStore.discarded)
         }
 
     @Test
@@ -98,6 +100,28 @@ class CleanInstallOrchestratorTest {
             assertEquals("corrupt apk", (last as InstallStatus.Failed).reason)
             assertTrue(last.rolledBack)
             assertEquals(listOf(newApk, rollbackApk), engine.installedFiles)
+            // the old app is back on, so its copy isn't needed any more
+            assertEquals(1, rollbackStore.discarded)
+        }
+
+    @Test
+    fun `when even the rollback fails the copy is kept, the last one left`() =
+        runBlocking {
+            val engine =
+                FakeInstallationEngine(
+                    uninstallResult = flowOf(InstallStatus.Success),
+                    installResults =
+                        mutableListOf(
+                            flowOf(InstallStatus.Failed("corrupt apk")),
+                            flowOf(InstallStatus.Failed("still broken")),
+                        ),
+                )
+            val rollbackStore = FakeRollbackStore(captureResult = true, rollbackFile = rollbackApk)
+
+            val last = CleanInstallOrchestrator(engine, rollbackStore).cleanInstall(app, newApk).toList().last()
+
+            assertTrue(last is InstallStatus.Failed && !last.rolledBack)
+            assertEquals(0, rollbackStore.discarded)
         }
 
     @Test
@@ -149,5 +173,14 @@ class CleanInstallOrchestratorTest {
         }
 
         override fun rollbackFile(packageName: String): File? = rollbackFile
+
+        var discarded = 0
+            private set
+
+        override fun discard(packageName: String) {
+            discarded++
+        }
+
+        override fun clearAll(): Long = 0L
     }
 }

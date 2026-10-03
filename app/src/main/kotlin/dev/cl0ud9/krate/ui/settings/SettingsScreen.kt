@@ -155,14 +155,17 @@ internal fun AutomaticDownloadsRow(
     onCheckedChange: (Boolean) -> Unit,
     shape: Shape,
     onMobileData: Boolean = false,
+    autoInstall: Boolean = false,
 ) {
     val networks = if (onMobileData) "on Wi-Fi or mobile data" else "on Wi-Fi"
+    val installing =
+        if (autoInstall) "Krate then installs them for you." else "Installing always needs your confirmation."
     SettingsRow(
         header =
             SettingsRowHeader(
                 icon = painterResource(R.drawable.ic_update_rounded),
                 title = "Automatic downloads",
-                subtitle = "Download updates in the background $networks. Installing always needs your confirmation.",
+                subtitle = "Download updates in the background $networks. $installing",
                 colors = SettingsTint.GREEN.colors(),
             ),
         shape = shape,

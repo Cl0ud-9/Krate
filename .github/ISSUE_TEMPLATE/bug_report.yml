@@ -1,0 +1,69 @@
+name: Bug report
+description: Something in Krate doesn't work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. The quickest way is from inside Krate: **Settings > Feedback & bug reports** fills
+        in your device details for you. If you're here instead, please fill in the form below.
+
+        Security problems go through [SECURITY.md](https://github.com/Cl0ud-9/Krate/blob/main/SECURITY.md), not here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what you expected to happen instead.
+      placeholder: I tapped Update on an app and the download stopped at 40%.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The steps that lead to the problem, so it can be seen happening.
+      placeholder: |
+        1. Open Krate and go to Apps
+        2. Open an app with an update
+        3. Tap Update
+    validations:
+      required: true
+  - type: input
+    id: krate-version
+    attributes:
+      label: Krate version
+      description: Settings > About shows it.
+      placeholder: 0.4.8
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and Android version
+      placeholder: Pixel 8, Android 16
+    validations:
+      required: true
+  - type: dropdown
+    id: navigation
+    attributes:
+      label: Navigation style
+      description: Helps with anything to do with the screen's bottom edge.
+      options:
+        - Gesture navigation
+        - 3-button navigation
+        - Not sure
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostic report or screenshots
+      description: >-
+        Optional. Paste the report from Settings > Feedback & bug reports, or attach screenshots or a screen recording.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I'm on the latest version of Krate.
+          required: true
+        - label: I searched the existing issues and this hasn't been reported yet.
+          required: true

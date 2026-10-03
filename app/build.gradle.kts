@@ -131,6 +131,7 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.kyant.backdrop)
 
     "baselineProfile"(project(":baselineprofile"))
 

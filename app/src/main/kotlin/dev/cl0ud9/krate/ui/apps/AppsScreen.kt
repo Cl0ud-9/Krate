@@ -36,6 +36,8 @@ import dev.cl0ud9.krate.ui.components.KratePullToRefreshBox
 import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
 import dev.cl0ud9.krate.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.krate.ui.components.RefreshPillButton
+import dev.cl0ud9.krate.ui.navigation.glassSource
+import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
 import dev.cl0ud9.krate.ui.util.StaggeredAppear
 import dev.cl0ud9.krate.ui.util.krateViewModel
@@ -91,10 +93,12 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
         // is the primary list screen for it - refreshFromNetwork() re-fetches the shared manifest cache
         // rather than just re-checking local installed state, so every other screen sharing that cache
         // benefits too
+        // the list, for the snackbar to turn to glass over
+        val pageGlass = rememberPageGlass()
         KratePullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refreshFromNetwork,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().glassSource(pageGlass),
         ) {
             AppsContent(uiState = uiState, isRefreshing = isRefreshing, viewModel = viewModel, onAppClick = onAppClick)
         }
@@ -109,6 +113,7 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
                 )
             },
             onRetry = viewModel::refreshFromNetwork,
+            glass = pageGlass,
         )
     }
 }

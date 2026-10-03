@@ -18,9 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +33,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,7 +42,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
+import com.kyant.backdrop.backdrops.LayerBackdrop
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.ui.components.HeaderButtonColors
+import dev.cl0ud9.krate.ui.components.HeaderIconButton
 import dev.cl0ud9.krate.ui.util.ScrollClaim
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -50,6 +53,8 @@ import kotlin.math.roundToInt
 // a detail page's heading lives below the back button and rides up with the content as the user
 // scrolls, instead of sitting fixed in a conventional toolbar - the min/max bounds and the snap
 // halfway through are the same shape as the app's other scrollable sections, just without a subtitle
+// square, but a corner-based shape: the glass's bent edge only accepts those
+private val SquareCorners = RoundedCornerShape(0.dp)
 private val HeaderMinHeight = 64.dp
 private val HeaderMaxHeight = 128.dp
 
@@ -169,10 +174,10 @@ fun CollapsingDetailHeader(
     state: CollapsingHeaderState,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    glass: LayerBackdrop? = null,
 ) {
     val fraction = state.collapseFraction
     val solidAlpha = (fraction * 2f).coerceIn(0f, 1f)
-    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = solidAlpha)
     val titleScale = lerp(EXPANDED_TITLE_SCALE, COLLAPSED_TITLE_SCALE, fraction)
     val titleStartPadding =
         ExpandedTitleStartPadding + (CollapsedTitleStartPadding - ExpandedTitleStartPadding) * fraction
@@ -184,9 +189,12 @@ fun CollapsingDetailHeader(
             modifier
                 .fillMaxWidth()
                 .height(state.headerHeight)
-                .background(backgroundColor)
-                .zIndex(1f),
+                .zIndex(1f)
+                // the header owns its own area: a tap on it never reaches the page scrolled underneath
+                .pointerInput(Unit) {},
     ) {
+        // nothing behind the title while open; collapsing fades in the bar, solid or glass
+        if (solidAlpha > 0f) HeaderSurface(glass = glass, alpha = solidAlpha)
         Box(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(SideInsets)) {
             HeaderTitle(
                 title = title,
@@ -194,7 +202,7 @@ fun CollapsingDetailHeader(
                 startPadding = titleStartPadding,
                 centerY = titleCenterY,
             )
-            IconButton(
+            HeaderIconButton(
                 onClick = onBack,
                 modifier =
                     Modifier
@@ -202,15 +210,36 @@ fun CollapsingDetailHeader(
                         .padding(start = 12.dp, top = BackButtonTopPadding)
                         .size(BackButtonSize),
                 colors =
-                    IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    HeaderButtonColors(
+                        MaterialTheme.colorScheme.surfaceContainerLow,
+                        MaterialTheme.colorScheme.onSurface,
                     ),
             ) {
                 Icon(painterResource(R.drawable.ic_arrow_back_rounded), contentDescription = "Back")
             }
         }
     }
+}
+
+@Composable
+private fun BoxScope.HeaderSurface(
+    glass: LayerBackdrop?,
+    alpha: Float,
+) {
+    val color = MaterialTheme.colorScheme.surfaceContainerHigh
+    Box(
+        modifier =
+            Modifier
+                .matchParentSize()
+                .graphicsLayer { this.alpha = alpha }
+                .then(
+                    if (glass == null) {
+                        Modifier.background(color)
+                    } else {
+                        Modifier.liquidGlass(glass, SquareCorners, GlassEdge.BOTTOM, color = color)
+                    },
+                ),
+    )
 }
 
 // vertically centered on centerY via a fixed-height box + offset, rather than top/bottom alignment,

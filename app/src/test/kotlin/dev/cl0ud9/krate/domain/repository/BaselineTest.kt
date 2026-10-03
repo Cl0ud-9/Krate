@@ -111,6 +111,63 @@ class BaselineTest {
         assertTrue(isUpdateAvailable(diverged, moved, recordedBaseline = null))
     }
 
+    // what Krate recorded was 20.40.45, but an older build went on outside Krate: that's behind, not up to date
+    @Test
+    fun `an older build installed outside Krate is behind, whatever was recorded`() {
+        val app = app(build("20.40.45", "b2"), build("20.37.48", "a1"))
+        val older = InstalledVersion("20.14.43", 1)
+
+        assertTrue(isUpdateAvailable(older, app, Baseline("20.40.45", "b2")))
+    }
+
+    // installed before Krate kept records, and older than anything the catalog still lists
+    @Test
+    fun `an older build installed before Krate is behind the catalog`() {
+        val app = app(build("20.40.45", "b2", publishedAt = 1_000))
+        val older = InstalledVersion("20.14.43", 1, lastUpdateTimeMillis = 5_000)
+
+        assertTrue(isUpdateAvailable(older, app, recordedBaseline = null))
+    }
+
+    @Test
+    fun `an app removed outside Krate has no baseline`() {
+        val app = app(build("20.40.45", "b2"))
+
+        assertEquals(null, effectiveBaseline(Baseline("20.40.45", "b2"), app, installed = null))
+    }
+
+    // a newer build from outside (MicroG RE's beta) still isn't nagged about
+    @Test
+    fun `a newer build installed outside Krate keeps the recorded baseline`() {
+        val app = app(build("7.1.1", "v7.1.1"))
+        val beta = InstalledVersion("7.2.1-dev.2", 9)
+
+        assertEquals(Baseline("7.1.1", "v7.1.1"), effectiveBaseline(Baseline("7.1.1", "v7.1.1"), app, beta))
+        assertFalse(isUpdateAvailable(beta, app, Baseline("7.1.1", "v7.1.1")))
+    }
+
+    // an app that reports its version as "v7.1.1" isn't taken to be older than the recorded 7.1.1
+    @Test
+    fun `a differently written version is not mistaken for an older one`() {
+        val app = app(build("7.1.1", "v7.1.1"))
+
+        assertFalse(isUpdateAvailable(InstalledVersion("v7.1.1", 1), app, Baseline("7.1.1", "v7.1.1")))
+    }
+
+    // two themes side by side: a downgrade outside Krate stays on its own theme's updates
+    @Test
+    fun `an older build outside Krate keeps its theme`() {
+        val app =
+            app(
+                build("20.40.45", "you2").copy(label = "Material You"),
+                build("20.40.45", "classic2").copy(label = "Classic"),
+            )
+        val baseline = effectiveBaseline(Baseline("20.40.45", "you2"), app, InstalledVersion("20.14.43", 1))
+
+        assertEquals(Baseline("20.14.43", null, "Material You"), baseline)
+        assertEquals("you2", app.forTrack(baseline).latestArtifact?.buildId)
+    }
+
     private fun build(
         version: String,
         buildId: String,

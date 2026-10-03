@@ -412,6 +412,19 @@ def load_cache():
         return {}
 
 
+def app_text(app):
+    text = {
+        "displayName": app["displayName"],
+        # what the app is for, in a line, and a few of the things it does
+        "description": app.get("description"),
+        "highlights": app.get("highlights", []),
+    }
+    # what it needs after installing, the settings worth knowing and how to back them up (shown in Krate's setup card)
+    if app.get("guide"):
+        text["guide"] = app["guide"]
+    return text
+
+
 def main():
     metadata = json.loads(METADATA_PATH.read_text(encoding="utf-8"))
     overrides = json.loads(OVERRIDES_PATH.read_text(encoding="utf-8")).get("overrides", []) if OVERRIDES_PATH.exists() else []
@@ -432,7 +445,8 @@ def main():
                 failures.append(f"{app['id']}: {exc}")
             else:
                 degraded.append(f"{app['id']}: {exc}")
-                apps_out.append(previous)
+                # the builds stay as last published, but the words about the app always come from the metadata
+                apps_out.append({**previous, **app_text(app)})
             continue
 
         apply_overrides(app["id"], artifacts, overrides)
@@ -443,10 +457,7 @@ def main():
         apps_out.append(
             {
                 "id": app["id"],
-                "displayName": app["displayName"],
-                # what the app is for, in a line, and a few of the things it does
-                "description": app.get("description"),
-                "highlights": app.get("highlights", []),
+                **app_text(app),
                 "packageName": app["packageName"],
                 "supportStatus": app["supportStatus"],
                 "installationMode": app["installationMode"],

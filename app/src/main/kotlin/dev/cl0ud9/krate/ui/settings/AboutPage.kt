@@ -56,7 +56,7 @@ fun AboutPage(
         MaintainerCard()
         AboutSectionHeader(title = "Updates", subtitle = "Krate keeps itself current too.")
         KrateUpdatesCard(viewModel = viewModel)
-        AboutSectionHeader(title = "Project", subtitle = "Open source, and built on open work.")
+        AboutSectionHeader(title = "Project", subtitle = "Source available, and built on open source work.")
         SettingsNavRow(
             icon = painterResource(R.drawable.ic_github),
             title = "Source code",
@@ -113,7 +113,7 @@ private fun AboutHeroCard(versionName: String) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                AboutTag(icon = R.drawable.ic_public_rounded, label = "Open source")
+                AboutTag(icon = R.drawable.ic_public_rounded, label = "Source available")
                 AboutTag(icon = R.drawable.ic_gpp_good_rounded, label = "Handpicked apps")
                 AboutTag(icon = R.drawable.ic_palette_rounded, label = "Material 3 Expressive")
             }

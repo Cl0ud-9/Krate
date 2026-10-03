@@ -47,15 +47,42 @@ fun effectiveBaseline(
     app: AppProfile,
     installed: InstalledVersion?,
 ): Baseline? {
-    val installedVersionName = installed?.versionName
-    return when {
-        recordedBaseline != null -> recordedBaseline
-        installed == null -> null
-        installedVersionName != null && app.artifacts.any { it.versionName == installedVersionName } ->
-            matchingBuild(app, installedVersionName, installed.lastUpdateTimeMillis)
-        else -> guessFromCatalog(app, installed.lastUpdateTimeMillis)
-    }
+    // removed outside Krate: whatever was recorded no longer describes anything on the phone
+    if (installed == null) return null
+    val installedVersionName = installed.versionName
+    val baseline =
+        when {
+            recordedBaseline != null -> recordedBaseline
+            installedVersionName != null && app.artifacts.any { it.versionName == installedVersionName } ->
+                matchingBuild(app, installedVersionName, installed.lastUpdateTimeMillis)
+            else -> guessFromCatalog(app, installed.lastUpdateTimeMillis)
+        }
+    return baseline?.notNewerThan(installedVersionName, app)
 }
+
+// only versions that both start with a number are compared; a "v7.1.1" against "7.1.1" would read as older
+private fun isClearlyOlder(
+    installed: String,
+    than: String,
+): Boolean =
+    installed.firstOrNull()?.isDigit() == true &&
+        than.firstOrNull()?.isDigit() == true &&
+        isNewerVersion(than, installed)
+
+// never ahead of what's actually installed: an older build put on outside Krate (or one installed before Krate) is
+// behind, whatever was recorded or guessed, so the newer builds show as updates. A newer one outside Krate (a beta)
+// keeps the baseline as it is, so it isn't nagged about
+private fun Baseline.notNewerThan(
+    installedVersionName: String?,
+    app: AppProfile,
+): Baseline =
+    if (installedVersionName != null && isClearlyOlder(installedVersionName, versionName)) {
+        // the theme it was on stays known, so only that theme's builds count as its updates
+        val theme = label ?: buildId?.let { id -> app.artifacts.firstOrNull { it.buildId == id }?.label }
+        Baseline(installedVersionName, buildId = null, label = theme)
+    } else {
+        this
+    }
 
 // the installed version is one the catalog knows, but several builds can share a version (patched
 // rebuilds with newer patches) - the one it is, is the newest of them already published when it was

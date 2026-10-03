@@ -97,12 +97,16 @@ fun SuggestAppCard(modifier: Modifier = Modifier) {
 // name, where to find it, and why - sent from any app, or as a GitHub issue
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SuggestAppSheet(onDismiss: () -> Unit) {
+fun SuggestAppSheet(
+    onDismiss: () -> Unit,
+    // filled in from a link shared to Krate
+    initial: SharedSuggestion? = null,
+) {
     val context = LocalContext.current
     // name, then link, then why - the keyboard's Next key walks through them in order
-    val name = rememberTextFieldState()
-    val link = rememberTextFieldState()
-    val why = rememberTextFieldState()
+    val name = rememberTextFieldState(initial?.name.orEmpty())
+    val link = rememberTextFieldState(initial?.link.orEmpty())
+    val why = rememberTextFieldState(initial?.why.orEmpty())
     val whyScroll = rememberScrollState()
     val suggestion = Suggestion(name.text.trim().toString(), link.text.trim().toString(), why.text.trim().toString())
     ModalBottomSheet(

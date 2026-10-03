@@ -204,13 +204,13 @@ object UpdateNotifier {
     // a declined/never-granted permission means silently skipping the notification, not a failure.
     // Checked inline, not via a helper function - lint's flow analysis for NotificationManagerCompat
     // .notify() doesn't trace a permission check across a function boundary.
-    private fun isShowing(
+    internal fun isShowing(
         context: Context,
         id: Int,
     ): Boolean =
         context.getSystemService(NotificationManager::class.java)?.activeNotifications?.any { it.id == id } == true
 
-    private fun notify(
+    internal fun notify(
         context: Context,
         id: Int,
         message: KrateNotification,
@@ -251,7 +251,7 @@ object UpdateNotifier {
 }
 
 // what one notification says and where its tap and its button lead
-private class KrateNotification(
+internal class KrateNotification(
     val headline: String,
     val fact: String,
     val category: String,

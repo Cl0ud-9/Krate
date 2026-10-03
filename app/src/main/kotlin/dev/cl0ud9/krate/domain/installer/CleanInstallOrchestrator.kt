@@ -41,9 +41,16 @@ class CleanInstallOrchestrator(
             installationEngine.install(app, apkFile).collect { status ->
                 if (status is InstallStatus.Failed) installFailure = status else emit(status)
             }
-            val failure = installFailure ?: return@flow
-
-            emit(attemptRollback(app, failure, rollbackCaptured))
+            val failure = installFailure
+            if (failure == null) {
+                // the new build is on; the copy of the old one has done its job (it can be over 100 MB)
+                rollbackStore.discard(app.packageName)
+                return@flow
+            }
+            val outcome = attemptRollback(app, failure, rollbackCaptured)
+            // restored, so the old app is back on the phone; when even that failed the copy stays, the last one left
+            if (outcome.rolledBack) rollbackStore.discard(app.packageName)
+            emit(outcome)
         }
 
     private suspend fun attemptRollback(

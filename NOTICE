@@ -1,9 +1,10 @@
 Krate
 Copyright 2026 Cloud/9 (https://github.com/Cl0ud-9)
 
-Krate's own source code is proprietary: all rights reserved, with personal, non-commercial use
-allowed under the terms in LICENSE. Redistribution, rebranded builds and publishing it anywhere need
-written permission from the author.
+Krate's own source code is source-available: all rights reserved, with reading it, building it for
+personal non-commercial use, and contributing to it allowed under the terms in LICENSE (from version
+0.4.8 on; earlier versions were Apache License 2.0). Redistribution, rebranded builds and publishing
+it anywhere need written permission from the author.
 
 This product includes third-party material distributed under its own license:
 

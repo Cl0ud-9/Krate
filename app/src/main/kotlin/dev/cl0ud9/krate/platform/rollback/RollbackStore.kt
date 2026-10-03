@@ -9,4 +9,10 @@ interface RollbackStore {
     fun capture(packageName: String): Boolean
 
     fun rollbackFile(packageName: String): File?
+
+    // the copy is only kept while it can still matter; once the app is safely installed again it goes
+    fun discard(packageName: String)
+
+    // every kept copy, for Settings' Clear download cache; returns the bytes freed
+    fun clearAll(): Long
 }

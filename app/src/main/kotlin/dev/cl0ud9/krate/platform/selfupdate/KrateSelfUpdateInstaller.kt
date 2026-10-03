@@ -67,7 +67,7 @@ class KrateSelfUpdateInstaller(
     fun downloadAndInstall(downloadUrl: String): Flow<SelfUpdateState> =
         flow {
             emit(SelfUpdateState.Downloading(null))
-            val apkFile = File(context.cacheDir, "krate-update.apk")
+            val apkFile = selfUpdateApk(context)
             val failure =
                 try {
                     download(downloadUrl, apkFile)
@@ -134,3 +134,6 @@ class KrateSelfUpdateInstaller(
             artifacts = emptyList(),
         )
 }
+
+// where Krate's own update is downloaded to; deleted once that update is installed (KrateUpdatedReceiver)
+internal fun selfUpdateApk(context: Context): File = File(context.cacheDir, "krate-update.apk")

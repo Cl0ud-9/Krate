@@ -93,6 +93,29 @@ class AppDetailsUiStateTest {
         assertTrue(state(clean, installed = v229, selected = v230).installsFromScratch)
     }
 
+    // one tap does the whole thing where Android can install over what's there, so the button names the result
+    @Test
+    fun `the button says what one tap will do`() {
+        assertEquals("Update", downloadLabelFor(state(app, installed = v229, selected = v230)))
+        assertEquals("Reinstall", downloadLabelFor(state(app, installed = v230, selected = v230)))
+        val notInstalled = state(app, installed = v230, selected = v230).copy(installed = null, recordedBaseline = null)
+        assertEquals("Install", downloadLabelFor(notInstalled))
+        assertTrue(notInstalled.installsInPlace)
+    }
+
+    // a rollback erases data first, so the first tap only downloads and the rollback stays its own step
+    @Test
+    fun `steps that erase data first only download on the first tap`() {
+        val rollback = state(app, installed = v230, selected = v229)
+        assertFalse(rollback.installsInPlace)
+        assertEquals("Download", downloadLabelFor(rollback))
+        assertEquals("Roll back", actionLabelFor(rollback))
+
+        val clean =
+            state(app.copy(installationMode = InstallationMode.CLEAN_INSTALL), installed = v229, selected = v230)
+        assertEquals("Download", downloadLabelFor(clean))
+    }
+
     @Test
     fun `a public release asset links to its release page, a private one doesn't`() {
         val public = build("1.0", 1).copy(downloadUrl = "https://github.com/owner/repo/releases/download/v1.0/app.apk")

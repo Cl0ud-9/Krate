@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.ui.components.KrateLinearProgress
 import dev.cl0ud9.krate.ui.components.SectionHeader
+import dev.cl0ud9.krate.ui.navigation.heroGlow
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.voice.Moment
 import dev.cl0ud9.krate.voice.rememberKrateLeadIn
@@ -40,7 +41,10 @@ fun UpdateAllBar(
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().heroGlow().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             when (state) {
                 is UpdateAllUiState.Idle -> IdleContent(pendingCount = pendingCount, onStart = onStart)
                 is UpdateAllUiState.Running -> RunningContent(state)

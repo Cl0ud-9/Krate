@@ -5,9 +5,11 @@ data class SettingsSnapshot(
     val onboardingCompleted: Boolean,
     val automaticDownloads: Boolean,
     val downloadOnMobileData: Boolean,
+    val autoInstallUpdates: Boolean = false,
     val themeMode: ThemeMode,
     val navBarStyle: NavBarStyle,
     val navBarCornerRadius: Int,
     val navBarCompactMode: Boolean,
+    val liquidGlass: Boolean = false,
     val defaultLaunchTab: LaunchTab,
 )

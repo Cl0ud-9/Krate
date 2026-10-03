@@ -1,15 +1,12 @@
 package dev.cl0ud9.krate.ui.onboarding
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -39,16 +35,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.NavBarStyle
+import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
 import dev.cl0ud9.krate.ui.components.KrateSwitch
+import dev.cl0ud9.krate.ui.navigation.liquidGlass
+import dev.cl0ud9.krate.ui.navigation.liquidGlassSupported
 import dev.cl0ud9.krate.ui.settings.SettingsViewModel
 import dev.cl0ud9.krate.ui.settings.ThemeModeCards
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.isShortScreen
-
-private const val PREVIEW_MORPH_MS = 400
-
-// widths of the pretend content lines in the bar preview
-private val PLACEHOLDER_LINES = listOf(1f, 0.6f, 0.85f)
 
 @Composable
 internal fun ThemePage(viewModel: SettingsViewModel) {
@@ -65,9 +59,13 @@ internal fun NavigationPage(
 ) {
     val style by viewModel.navBarStyle.collectAsStateWithLifecycle()
     val radius by viewModel.navBarCornerRadius.collectAsStateWithLifecycle()
+    val glass by viewModel.liquidGlass.collectAsStateWithLifecycle()
     val pill = style == NavBarStyle.FLOATING_PILL
-    CustomizePageLayout(title = "Navigation bar", description = "Choose how the bar at the bottom looks.") {
-        NavBarPreview(pill = pill, radius = radius)
+    CustomizePageLayout(
+        title = "Navigation bar",
+        description = "Choose how the bar at the bottom looks, and whether Krate turns to glass.",
+    ) {
+        NavBarPreview(pill = pill, radius = radius, glass = glass && liquidGlassSupported)
         Spacer(modifier = Modifier.height(24.dp))
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -85,6 +83,16 @@ internal fun NavigationPage(
                         )
                     },
                 )
+                // only where the phone can draw it; anywhere else the page is as it always was
+                if (liquidGlassSupported) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SwitchLine(
+                        title = "Liquid glass",
+                        subtitle = "Frosted, see-through materials across the app, tinted by your colours",
+                        checked = glass,
+                        onCheckedChange = viewModel::setLiquidGlass,
+                    )
+                }
                 // the gap above the button folds with it rather than snapping shut; timed with the preview
                 AnimatedVisibility(
                     visible = pill,
@@ -112,6 +120,7 @@ internal fun NavigationPage(
 @Composable
 internal fun UpdatesPage(viewModel: SettingsViewModel) {
     val automatic by viewModel.automaticDownloads.collectAsStateWithLifecycle()
+    val autoInstall by viewModel.autoInstallUpdates.collectAsStateWithLifecycle()
     StepPageLayout(
         title = "Staying up to date",
         description = "Krate checks for new versions in the background and tells you when something's waiting.",
@@ -122,13 +131,29 @@ internal fun UpdatesPage(viewModel: SettingsViewModel) {
             shape = ShapeCache.rounded28,
             color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
-            Box(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SwitchLine(
                     title = "Download automatically",
-                    subtitle = "On Wi-Fi, so updates install in seconds. Installing always asks you first.",
+                    subtitle = "On Wi-Fi, so updates are ready to install in seconds.",
                     checked = automatic,
                     onCheckedChange = viewModel::setAutomaticDownloads,
                 )
+                // Android 12 is the first that lets Krate update an app without asking, so earlier it isn't offered
+                if (autoUpdatesSupported) {
+                    SwitchLine(
+                        title = "Install them automatically",
+                        subtitle =
+                            if (automatic) {
+                                "Updates to apps from Krate install a day after release, while you're not using " +
+                                    "them. It never rolls an app back or erases its data."
+                            } else {
+                                "Turn on Download automatically first. It fetches the updates this installs."
+                            },
+                        checked = autoInstall && automatic,
+                        onCheckedChange = viewModel::setAutoInstallUpdates,
+                        enabled = automatic,
+                    )
+                }
             }
         }
     }
@@ -221,6 +246,7 @@ private fun SwitchLine(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(modifier = Modifier.weight(1f)) {
@@ -231,85 +257,6 @@ private fun SwitchLine(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        KrateSwitch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-// a small phone screen with the bar drawn the way it'll look
-@Composable
-private fun NavBarPreview(
-    pill: Boolean,
-    radius: Int,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().height(200.dp),
-        shape = ShapeCache.rounded32,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Box {
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                PLACEHOLDER_LINES.forEach { fraction ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(fraction).height(12.dp),
-                        shape = ShapeCache.pill,
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    ) {}
-                }
-            }
-            PreviewBar(pill = pill, radius = radius)
-        }
-    }
-}
-
-@Composable
-private fun BoxScope.PreviewBar(
-    pill: Boolean,
-    radius: Int,
-) {
-    val margin by animateDpAsState(if (pill) 14.dp else 0.dp, tween(PREVIEW_MORPH_MS), label = "previewMargin")
-    val bottomRadius by animateDpAsState(
-        if (pill) radius.dp else 0.dp,
-        tween(PREVIEW_MORPH_MS),
-        label = "previewBottom",
-    )
-    Surface(
-        modifier =
-            Modifier
-                .align(Alignment.BottomCenter)
-                .padding(margin)
-                .fillMaxWidth()
-                .height(64.dp),
-        shape =
-            RoundedCornerShape(
-                topStart = radius.dp,
-                topEnd = radius.dp,
-                bottomStart = bottomRadius,
-                bottomEnd = bottomRadius,
-            ),
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-    ) {
-        Row(horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            listOf(
-                R.drawable.ic_nav_home_filled,
-                R.drawable.ic_nav_apps_outline,
-                R.drawable.ic_nav_update_outline,
-            ).forEachIndexed {
-                index,
-                icon,
-                ->
-                Icon(
-                    painterResource(icon),
-                    contentDescription = null,
-                    tint =
-                        if (index ==
-                            0
-                        ) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
-            }
-        }
+        KrateSwitch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }

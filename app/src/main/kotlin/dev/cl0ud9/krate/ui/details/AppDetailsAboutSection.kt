@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.InstallationMode
+import dev.cl0ud9.krate.domain.model.SetupKind
+import dev.cl0ud9.krate.domain.model.SetupStep
 import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.theme.ShapeCache
@@ -111,8 +113,26 @@ internal fun AppInfoSection(
                     }
                 }
             }
+            val steps =
+                app.guide
+                    ?.setup
+                    ?.filter { it.kind != SetupKind.IN_APP }
+                    .orEmpty()
+            if (steps.isNotEmpty()) {
+                Divider()
+                InfoRow(icon = painterResource(R.drawable.ic_security_rounded), title = "What it asks for") {
+                    AsksFor(steps)
+                }
+            }
         }
     }
+}
+
+// the permissions it needs, said before installing, so nothing it asks for afterwards comes as a surprise
+@Composable
+private fun AsksFor(steps: List<SetupStep>) {
+    WhatItDoes(highlights = steps.map { if (it.optional) "${it.title} (optional)" else it.title })
+    BodyText("Once it's installed, Krate takes you to each one in a tap.")
 }
 
 // the source repo as a tappable link, or a word on Krate's own builds; either way each download is checked on arrival

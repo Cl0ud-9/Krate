@@ -5,6 +5,7 @@ import dev.cl0ud9.krate.data.activity.DataStoreActivityLogRepository
 import dev.cl0ud9.krate.data.announcements.DataStoreAnnouncementDismissalStore
 import dev.cl0ud9.krate.data.auth.EncryptedGitHubCredentialStore
 import dev.cl0ud9.krate.data.auth.GitHubCredentialStore
+import dev.cl0ud9.krate.data.autoupdate.DataStoreAutoUpdateStore
 import dev.cl0ud9.krate.data.baseline.DataStoreKrateBaselineStore
 import dev.cl0ud9.krate.data.catalog.AssetCatalogRepository
 import dev.cl0ud9.krate.data.catalog.PrivateCatalogSource
@@ -19,6 +20,7 @@ import dev.cl0ud9.krate.domain.installer.CleanInstallOrchestrator
 import dev.cl0ud9.krate.domain.installer.InstallationEngine
 import dev.cl0ud9.krate.domain.repository.ActivityLogRepository
 import dev.cl0ud9.krate.domain.repository.AnnouncementDismissalStore
+import dev.cl0ud9.krate.domain.repository.AutoUpdateStore
 import dev.cl0ud9.krate.domain.repository.CatalogRepository
 import dev.cl0ud9.krate.domain.repository.KrateBaselineStore
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
@@ -75,6 +77,7 @@ class AppContainer(
     val whatsNewTracker = WhatsNewTracker(context.applicationContext)
     val activityLogRepository: ActivityLogRepository = DataStoreActivityLogRepository(context.applicationContext)
     val krateBaselineStore: KrateBaselineStore = DataStoreKrateBaselineStore(context.applicationContext)
+    val autoUpdateStore: AutoUpdateStore = DataStoreAutoUpdateStore(context.applicationContext)
     val announcementDismissalStore: AnnouncementDismissalStore =
         DataStoreAnnouncementDismissalStore(context.applicationContext)
 }

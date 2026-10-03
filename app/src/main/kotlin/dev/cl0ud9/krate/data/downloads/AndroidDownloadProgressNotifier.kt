@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import dev.cl0ud9.krate.EXTRA_APP_ID
+import dev.cl0ud9.krate.EXTRA_INSTALL_APP_ID
 import dev.cl0ud9.krate.EXTRA_NOTIFICATION_ID
 import dev.cl0ud9.krate.EXTRA_TARGET_ROUTE
 import dev.cl0ud9.krate.KrateActivity
@@ -109,7 +110,7 @@ class AndroidDownloadProgressNotifier(
                 app,
                 KrateVoice.line(Moment.DOWNLOADED),
                 "${app.displayName} is downloaded and checked. Tap to install.",
-            ).addAction(R.drawable.ic_stat_krate, "Install", openAppIntent(app.id))
+            ).addAction(R.drawable.ic_stat_krate, "Install", openAppIntent(app.id, install = true))
                 .build()
         finish(app.id, result)
     }
@@ -234,16 +235,22 @@ class AndroidDownloadProgressNotifier(
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setCategory(NotificationCompat.CATEGORY_EVENT)
 
-    private fun openAppIntent(appId: String): PendingIntent =
+    // install = the Install button: the page opens and installs the download straight away; its own request code, so
+    // the plain "open the page" intent of the same notification isn't overwritten by it
+    private fun openAppIntent(
+        appId: String,
+        install: Boolean = false,
+    ): PendingIntent =
         PendingIntent.getActivity(
             context,
-            appId.hashCode(),
+            appId.hashCode() + if (install) 1 else 0,
             Intent(context, KrateActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(EXTRA_TARGET_ROUTE, "apps/$appId")
                 putExtra(EXTRA_APP_ID, appId)
                 // a finished download's result is dismissed when it opens Krate; a running one's progress can't be
                 putExtra(EXTRA_NOTIFICATION_ID, resultIdFor(appId))
+                if (install) putExtra(EXTRA_INSTALL_APP_ID, appId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

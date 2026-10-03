@@ -26,10 +26,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.kyant.backdrop.backdrops.LayerBackdrop
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.ui.navigation.GlassEdge
+import dev.cl0ud9.krate.ui.navigation.liquidGlass
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import kotlinx.coroutines.flow.Flow
 
@@ -51,6 +55,7 @@ fun BoxScope.RefreshFailureSnackbar(
     refreshFailed: Flow<Unit>,
     message: () -> KrateMessage,
     onRetry: () -> Unit,
+    glass: LayerBackdrop? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val latestMessage = rememberUpdatedState(message)
@@ -64,6 +69,7 @@ fun BoxScope.RefreshFailureSnackbar(
     KrateSnackbarHost(
         state = snackbarHostState,
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalNavBarClearance.current),
+        glass = glass,
     )
 }
 
@@ -71,22 +77,28 @@ fun BoxScope.RefreshFailureSnackbar(
 fun KrateSnackbarHost(
     state: SnackbarHostState,
     modifier: Modifier = Modifier,
+    // the page under it, when the snackbar is liquid glass
+    glass: LayerBackdrop? = null,
 ) {
     SnackbarHost(hostState = state, modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp)) { data ->
-        KrateSnackbar(data)
+        KrateSnackbar(data, glass)
     }
 }
 
 @Composable
-private fun KrateSnackbar(data: SnackbarData) {
+private fun KrateSnackbar(
+    data: SnackbarData,
+    glass: LayerBackdrop?,
+) {
     val visuals = data.visuals
     val krate = visuals as? KrateMessage
+    val color = MaterialTheme.colorScheme.surfaceContainerHighest
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().liquidGlass(glass, ShapeCache.rounded24, GlassEdge.ALL, color = color),
         shape = ShapeCache.rounded24,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        color = if (glass != null) Color.Transparent else color,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shadowElevation = 6.dp,
+        shadowElevation = if (glass != null) 0.dp else 6.dp,
     ) {
         Row(
             modifier = Modifier.padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),

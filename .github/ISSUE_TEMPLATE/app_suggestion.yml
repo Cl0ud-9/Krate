@@ -1,0 +1,39 @@
+name: App suggestion
+description: An app that belongs in Krate's catalog.
+title: "App suggestion: "
+labels: ["app suggestion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Krate is a small, hand-picked shelf of apps you won't find on the Play Store, mostly open source and released
+        on GitHub. You can also suggest an app straight from Krate: **Apps > Suggest an app**, or share a GitHub link
+        to Krate from your browser.
+  - type: input
+    id: name
+    attributes:
+      label: App name
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Where it's published
+      description: The GitHub repository, or the page the app is downloaded from.
+      placeholder: https://github.com/owner/app
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What it does, and why it belongs in Krate
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: About the app
+      options:
+        - label: It publishes ready-to-install APK files with its releases.
+        - label: It's still maintained (a release within the last year or so).
+        - label: I've used it myself.

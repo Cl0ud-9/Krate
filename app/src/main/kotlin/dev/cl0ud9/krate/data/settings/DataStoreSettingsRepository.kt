@@ -56,6 +56,22 @@ class DataStoreSettingsRepository(
         context.settingsDataStore.edit { prefs -> prefs[DOWNLOAD_ON_MOBILE_DATA] = enabled }
     }
 
+    override fun observeAutoInstallUpdates(): Flow<Boolean> =
+        context.settingsDataStore.data.map { prefs -> prefs[AUTO_INSTALL_UPDATES] ?: false }
+
+    override suspend fun setAutoInstallUpdates(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[AUTO_INSTALL_UPDATES] = enabled }
+    }
+
+    override fun observeAutoInstallChosen(): Flow<Boolean> =
+        context.settingsDataStore.data.map { prefs -> AUTO_INSTALL_UPDATES in prefs }
+
+    override suspend fun offerAutoInstallUpdates() {
+        context.settingsDataStore.edit { prefs ->
+            if (AUTO_INSTALL_UPDATES !in prefs) prefs[AUTO_INSTALL_UPDATES] = true
+        }
+    }
+
     override fun observeOnboardingCompleted(): Flow<Boolean> =
         context.settingsDataStore.data.map { prefs -> prefs[ONBOARDING_COMPLETED] ?: false }
 
@@ -93,6 +109,13 @@ class DataStoreSettingsRepository(
         context.settingsDataStore.edit { prefs -> prefs[NAV_BAR_COMPACT_MODE] = enabled }
     }
 
+    override fun observeLiquidGlass(): Flow<Boolean> =
+        context.settingsDataStore.data.map { prefs -> prefs.liquidGlass() }
+
+    override suspend fun setLiquidGlass(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[LIQUID_GLASS] = enabled }
+    }
+
     override fun observeDefaultLaunchTab(): Flow<LaunchTab> =
         context.settingsDataStore.data.map { prefs -> prefs.toLaunchTab() }
 
@@ -105,10 +128,12 @@ class DataStoreSettingsRepository(
             onboardingCompleted = this[ONBOARDING_COMPLETED] ?: false,
             automaticDownloads = automaticDownloads(),
             downloadOnMobileData = downloadOnMobileData(),
+            autoInstallUpdates = this[AUTO_INSTALL_UPDATES] ?: false,
             themeMode = toThemeMode(),
             navBarStyle = toNavBarStyle(),
             navBarCornerRadius = navBarCornerRadius(),
             navBarCompactMode = navBarCompactMode(),
+            liquidGlass = liquidGlass(),
             defaultLaunchTab = toLaunchTab(),
         )
 
@@ -122,6 +147,8 @@ class DataStoreSettingsRepository(
             .coerceIn(MIN_NAV_BAR_CORNER_RADIUS, MAX_NAV_BAR_CORNER_RADIUS)
 
     private fun Preferences.navBarCompactMode() = this[NAV_BAR_COMPACT_MODE] ?: false
+
+    private fun Preferences.liquidGlass() = this[LIQUID_GLASS] ?: false
 
     private fun Preferences.toThemeMode(): ThemeMode =
         this[THEME_MODE]?.let { stored -> runCatching { ThemeMode.valueOf(stored) }.getOrNull() } ?: ThemeMode.SYSTEM
@@ -138,11 +165,13 @@ class DataStoreSettingsRepository(
         // default ON per section 42.4 of the spec
         val AUTOMATIC_DOWNLOADS = booleanPreferencesKey("automatic_downloads")
         val DOWNLOAD_ON_MOBILE_DATA = booleanPreferencesKey("download_on_mobile_data")
+        val AUTO_INSTALL_UPDATES = booleanPreferencesKey("auto_install_updates")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val NAV_BAR_STYLE = stringPreferencesKey("nav_bar_style")
         val NAV_BAR_CORNER_RADIUS = intPreferencesKey("nav_bar_corner_radius")
         val NAV_BAR_COMPACT_MODE = booleanPreferencesKey("nav_bar_compact_mode")
+        val LIQUID_GLASS = booleanPreferencesKey("liquid_glass")
         val DEFAULT_LAUNCH_TAB = stringPreferencesKey("default_launch_tab")
     }
 }

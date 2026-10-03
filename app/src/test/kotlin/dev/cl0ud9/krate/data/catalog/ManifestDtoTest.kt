@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.data.catalog
 
 import dev.cl0ud9.krate.domain.model.DeviceProfile
+import dev.cl0ud9.krate.domain.model.SetupKind
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -66,6 +67,55 @@ class ManifestDtoTest {
         assertEquals(listOf("One", "Two"), app.highlights)
         assertNull(plain.description)
         assertEquals(emptyList<String>(), plain.highlights)
+    }
+
+    // a step kind added by a later catalog is left out by an older Krate, not shown with nothing to open
+    @Test
+    fun `an app's setup guide comes through, skipping step kinds this Krate doesn't know`() {
+        val guided =
+            """{"schemaVersion":2,"apps":[{"id":"guided","displayName":"G","packageName":"p",
+            "supportStatus":"SUPPORTED","installationMode":"UPDATE","guide":{
+              "setup":[
+                {"kind":"ACCESSIBILITY","title":"Turn it on","detail":"Why","service":"p/.Service"},
+                {"kind":"SOMETHING_NEW","title":"Later"},
+                {"kind":"BATTERY","title":"Background","optional":true}],
+              "settingsWhere":"Settings","tips":["One"],"backup":"Export","restore":"Import"}}]}"""
+
+        val guide =
+            parse(guided)
+                .apps
+                .single()
+                .toDomain(android12Arm64)!!
+                .guide!!
+
+        assertEquals(listOf(SetupKind.ACCESSIBILITY, SetupKind.BATTERY), guide.setup.map { it.kind })
+        assertEquals("p/.Service", guide.setup.first().service)
+        assertEquals(true, guide.setup.last().optional)
+        assertEquals("Export", guide.backup)
+        assertNull(
+            parse(manifest)
+                .apps
+                .single()
+                .toDomain(android12Arm64)!!
+                .guide,
+        )
+    }
+
+    // an empty guide is no guide, so App Details doesn't show an empty setup card
+    @Test
+    fun `an empty guide is treated as none`() {
+        val empty =
+            """{"schemaVersion":2,"apps":[{"id":"bare","displayName":"B","packageName":"p",
+            "supportStatus":"SUPPORTED","installationMode":"UPDATE",
+            "guide":{"setup":[{"kind":"FUTURE","title":"x"}]}}]}"""
+
+        assertNull(
+            parse(empty)
+                .apps
+                .single()
+                .toDomain(android12Arm64)!!
+                .guide,
+        )
     }
 
     private fun parse(text: String) = json.decodeFromString<ManifestDto>(text)

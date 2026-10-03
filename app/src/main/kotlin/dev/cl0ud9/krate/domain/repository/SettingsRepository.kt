@@ -22,6 +22,17 @@ interface SettingsRepository {
 
     suspend fun setDownloadOnMobileData(enabled: Boolean)
 
+    // installs downloaded updates of apps Krate installed, in the background; on for new installs (see below)
+    fun observeAutoInstallUpdates(): Flow<Boolean>
+
+    suspend fun setAutoInstallUpdates(enabled: Boolean)
+
+    // false until the user has chosen either way: an upgrade from before the switch existed hasn't
+    fun observeAutoInstallChosen(): Flow<Boolean>
+
+    // turns it on unless the user already chose; first-run setup starts with it on
+    suspend fun offerAutoInstallUpdates()
+
     // whether first-run onboarding (amendment 44.4) has been completed - gates the Apps catalog
     fun observeOnboardingCompleted(): Flow<Boolean>
 
@@ -46,6 +57,11 @@ interface SettingsRepository {
     fun observeNavBarCompactMode(): Flow<Boolean>
 
     suspend fun setNavBarCompactMode(enabled: Boolean)
+
+    // frosted, light-bending glass for the nav bar and page headers (Android 12+); off keeps them solid
+    fun observeLiquidGlass(): Flow<Boolean>
+
+    suspend fun setLiquidGlass(enabled: Boolean)
 
     fun observeDefaultLaunchTab(): Flow<LaunchTab>
 

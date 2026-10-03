@@ -1,20 +1,31 @@
-Krate Proprietary License
+Krate Source-Available License
 
 Copyright (c) 2026 Cloud/9 (https://github.com/Cl0ud-9). All rights reserved.
 
+This license applies to Krate version 0.4.8 and every later version, and to the source code in this repository from
+the commit that introduced it onwards. Versions up to and including 0.4.7 were published under the Apache License,
+Version 2.0, and copies of those versions remain available under that license.
+
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-documentation files (the "Software") to study and review the Software, and to build and use it for personal,
-non-commercial purposes only, subject to the following conditions:
+documentation files (the "Software") to:
+
+  a. read, study and review the Software;
+  b. build and use it for personal, non-commercial purposes; and
+  c. fork and modify it solely to prepare contributions to the official repository at
+     https://github.com/Cl0ud-9/Krate,
+
+subject to the following conditions:
 
 1. The above copyright notice and this permission notice shall be included in all copies or substantial portions
    of the Software.
 
 2. Redistribution of the Software or any derivative work, in source or binary form, including modified, renamed or
-   rebranded builds, is strictly prohibited without prior written permission from the author.
+   rebranded builds, is prohibited without prior written permission from the author. Forking on GitHub, as
+   GitHub's Terms of Service allow, grants no further rights: a fork may be used only as described in (c) above.
 
-3. Commercial use of the Software or any derivative work is strictly prohibited. This includes, but is not limited
-   to, selling it, or publishing it on the Google Play Store, F-Droid, any other app store or download site, or
-   any other commercial platform.
+3. Commercial use of the Software or any derivative work is prohibited. This includes, but is not limited to,
+   selling it, or publishing it on the Google Play Store, F-Droid, any other app store or download site, or any
+   other commercial platform.
 
 4. The Software may not be used, in whole or in part, to train, fine-tune or evaluate any machine learning or
    artificial intelligence model, or be supplied to an AI tool or agent to produce a derivative or competing work,
@@ -25,12 +36,11 @@ non-commercial purposes only, subject to the following conditions:
 6. The right to sell, sublicense and distribute the Software, for profit or otherwise, is reserved exclusively by
    the author, Cloud/9.
 
-7. By submitting a contribution to the Software (for example a pull request), you grant the author a perpetual,
-   worldwide, irrevocable, royalty-free license to use, modify, sublicense and distribute that contribution as part
-   of the Software under any terms the author chooses.
+7. By submitting a contribution to the Software (for example a pull request), you confirm that you have the right
+   to submit it, and you grant the author a perpetual, worldwide, irrevocable, royalty-free license to use, modify,
+   sublicense and distribute that contribution as part of the Software under any terms the author chooses.
 
-This license covers every version of the Software. Third-party material included with the Software stays under its own
-license, listed in NOTICE.
+Third-party material included with the Software stays under its own license, listed in NOTICE.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
 WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR

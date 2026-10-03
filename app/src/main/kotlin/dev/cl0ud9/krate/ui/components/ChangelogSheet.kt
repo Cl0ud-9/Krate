@@ -13,10 +13,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumExtendedFloatingActionButton
@@ -33,15 +32,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kyant.backdrop.backdrops.LayerBackdrop
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.data.downloads.friendlyNetworkError
 import dev.cl0ud9.krate.platform.appContainer
 import dev.cl0ud9.krate.platform.selfupdate.KrateRelease
+import dev.cl0ud9.krate.ui.navigation.GlassEdge
+import dev.cl0ud9.krate.ui.navigation.glassSource
+import dev.cl0ud9.krate.ui.navigation.liquidGlass
+import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import java.io.IOException
 
@@ -53,12 +58,12 @@ private const val RELEASES_URL = "https://github.com/Cl0ud-9/Krate/releases"
 @Composable
 fun HomeChangelogAction() {
     var showChangelog by rememberSaveable { mutableStateOf(false) }
-    FilledIconButton(
+    HeaderIconButton(
         onClick = { showChangelog = true },
         colors =
-            IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+            HeaderButtonColors(
+                MaterialTheme.colorScheme.surfaceContainerHigh,
+                MaterialTheme.colorScheme.onSurface,
             ),
     ) {
         Icon(painterResource(R.drawable.ic_newspaper_rounded), contentDescription = "What's new")
@@ -107,20 +112,17 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         // full height from the start, so the sheet has a half-height peek to open at even while the notes load
+        // the notes scroll under the button, which turns to glass over them
+        val notesGlass = rememberPageGlass()
         Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
             Column(
-                // the notes fade out above the screen's bottom edge and the system bar, even at the half-height peek
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .fadeAboveSystemBar(MaterialTheme.colorScheme.surfaceContainerLow)
-                        .padding(horizontal = 24.dp),
+                modifier = Modifier.fillMaxWidth().glassSource(notesGlass).padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 ChangelogHeader()
                 ReleasesContent(state = state, onRetry = { attempt++ })
             }
-            ViewOnGitHubButton(modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp))
+            ViewOnGitHubButton(glass = notesGlass, modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp))
         }
     }
 }
@@ -152,16 +154,26 @@ private fun ChangelogHeader() {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ViewOnGitHubButton(modifier: Modifier = Modifier) {
+private fun ViewOnGitHubButton(
+    glass: LayerBackdrop?,
+    modifier: Modifier = Modifier,
+) {
     val uriHandler = LocalUriHandler.current
+    val color = MaterialTheme.colorScheme.tertiaryContainer
     MediumExtendedFloatingActionButton(
         onClick = { uriHandler.openUri(RELEASES_URL) },
         shape = ShapeCache.rounded16,
-        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        containerColor = if (glass != null) Color.Transparent else color,
         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        elevation =
+            if (glass != null) {
+                FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp)
+            } else {
+                FloatingActionButtonDefaults.elevation()
+            },
         icon = { Icon(painterResource(R.drawable.ic_github), contentDescription = null) },
         text = { Text("View on GitHub") },
-        modifier = modifier,
+        modifier = modifier.liquidGlass(glass, ShapeCache.rounded16, GlassEdge.ALL, color = color),
     )
 }
 

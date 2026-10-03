@@ -15,6 +15,7 @@ import dev.cl0ud9.krate.domain.repository.CatalogRepository
 import dev.cl0ud9.krate.domain.repository.KrateBaselineStore
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.platform.packageinfo.InstalledPackageReader
+import dev.cl0ud9.krate.platform.rollback.RollbackStore
 import dev.cl0ud9.krate.platform.selfupdate.KrateSelfUpdateInstaller
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateChecker
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateStatus
@@ -52,6 +53,8 @@ class SettingsViewModel(
     private val installedPackageReader: InstalledPackageReader,
     private val activityLogRepository: ActivityLogRepository,
     private val krateBaselineStore: KrateBaselineStore,
+    // copies of old apks kept around a reinstall from scratch, cleared along with the download cache
+    private val rollbackStore: RollbackStore,
     // what the saved token got from the invite-only catalog, shown under GitHub access
     val inviteStatus: StateFlow<InviteStatus>,
 ) : ViewModel() {
@@ -63,6 +66,9 @@ class SettingsViewModel(
 
     val downloadOnMobileData: StateFlow<Boolean> =
         settingsRepository.observeDownloadOnMobileData().stateInPage(saved?.downloadOnMobileData ?: false)
+
+    val autoInstallUpdates: StateFlow<Boolean> =
+        settingsRepository.observeAutoInstallUpdates().stateInPage(saved?.autoInstallUpdates ?: false)
 
     val themeMode: StateFlow<ThemeMode> =
         settingsRepository.observeThemeMode().stateInPage(saved?.themeMode ?: ThemeMode.SYSTEM)
@@ -77,6 +83,11 @@ class SettingsViewModel(
 
     val navBarCompactMode: StateFlow<Boolean> =
         settingsRepository.observeNavBarCompactMode().stateInPage(saved?.navBarCompactMode ?: false)
+
+    val liquidGlass: StateFlow<Boolean> =
+        settingsRepository.observeLiquidGlass().stateInPage(
+            saved?.liquidGlass ?: false,
+        )
 
     val defaultLaunchTab: StateFlow<LaunchTab> =
         settingsRepository.observeDefaultLaunchTab().stateInPage(saved?.defaultLaunchTab ?: LaunchTab.HOME)
@@ -166,6 +177,14 @@ class SettingsViewModel(
         viewModelScope.launch { settingsRepository.setAutomaticDownloads(enabled) }
     }
 
+    fun setAutoInstallUpdates(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setAutoInstallUpdates(enabled) }
+    }
+
+    fun offerAutoInstallUpdates() {
+        viewModelScope.launch { settingsRepository.offerAutoInstallUpdates() }
+    }
+
     fun setDownloadOnMobileData(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setDownloadOnMobileData(enabled) }
     }
@@ -184,6 +203,10 @@ class SettingsViewModel(
 
     fun setNavBarCompactMode(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setNavBarCompactMode(enabled) }
+    }
+
+    fun setLiquidGlass(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setLiquidGlass(enabled) }
     }
 
     fun setDefaultLaunchTab(tab: LaunchTab) {
@@ -227,7 +250,7 @@ class SettingsViewModel(
     // download, or a leftover from a build before that cleanup existed
     fun clearCache() {
         viewModelScope.launch {
-            val bytesFreed = withContext(Dispatchers.IO) { artifactDownloader.clearCache() }
+            val bytesFreed = withContext(Dispatchers.IO) { artifactDownloader.clearCache() + rollbackStore.clearAll() }
             mutableCacheClearedMessage.value =
                 if (bytesFreed > 0) "Freed ${formatMb(bytesFreed)}." else "Cache is already empty."
         }

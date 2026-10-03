@@ -46,6 +46,8 @@ data class AppProfile(
     // what the app is for, in a line, and a few things it does - absent from older catalogs
     val description: String? = null,
     val highlights: List<String> = emptyList(),
+    // setup steps, settings tips and backup steps; absent from older catalogs and for apps that need none
+    val guide: AppGuide? = null,
 )
 
 // a withdrawn build stays listed in version history but is never the one offered as the update

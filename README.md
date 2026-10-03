@@ -35,7 +35,7 @@
 
 ---
 
-## What's in the box
+## What's in the Krate
 
 Some of the best Android apps never make it to the Play Store. They live on GitHub, and keeping them up to date means
 checking release pages, downloading APKs and hoping you grabbed the right file.
@@ -52,14 +52,17 @@ quiet? Turn off **Playful messages** in **Settings > Appearance > Personality**.
 | | |
 |---|---|
 | 📦 **A curated catalog** | A short shelf of apps worth having, each with a plain-language description of what it does and where it comes from. |
-| ⚡ **One-tap installs and updates** | Install, update, or *Update all* in the right order, so an app's dependencies always go in first. |
+| ⚡ **One-tap installs and updates** | One tap downloads and installs. Updates to apps Krate installed go on without Android's prompt, and *Update all* puts dependencies in first. |
+| 🧭 **Set up in a tap** | After installing, each app's permissions are a tap away, ticked off as you turn them on, with the settings worth a look and how to back them up. |
 | 🔐 **Checked before it installs** | The catalog is signed with Ed25519, and every APK's SHA-256 and signing certificate are checked before Android ever sees it. |
-| 🔔 **Updates find you** | A background check every few hours, and a notification when something new lands. Nothing installs without your tap. |
+| 🔔 **Updates find you** | A background check every few hours, and a notification when something new lands. |
+| 🌙 **Updates that install themselves** | Updates to apps from Krate install a day after release, while you're not using them. It never rolls an app back or erases its data, and any app can stay manual or skip a version. On for new installs; anyone upgrading is asked once. |
 | 📶 **Automatic downloads** | Updates can download ahead of time on Wi-Fi (mobile data is opt-in), so installing takes seconds. |
 | 🏃 **Downloads that keep going** | Switch apps mid-download and it carries on, with progress in the notification. A dropped connection picks up where it stopped. |
 | 🕰️ **Version history** | A new build misbehaving? Pick an older one from the list and go back. |
 | 🛟 **Safe clean installs** | When an update can't go on top, Krate keeps a copy of the current version and puts it back if anything fails. |
-| 🎨 **Looks the part** | Material 3 Expressive, Material You colors, light and dark themes, a floating or full-width nav bar, and a proper landscape layout. |
+| 🎨 **Looks the part** | Material 3 Expressive, Material You colors, light and dark themes, a floating or full-width nav bar, and optional liquid glass across the app, tinted by your colours, and a proper landscape layout. |
+| 💡 **Suggest from anywhere** | Share a GitHub link to *Suggest to Krate* from your browser and the suggestion is filled in. |
 | 🙈 **Hide the icon** | Keep Krate off your home screen. It keeps working, and opens from its notifications or App info. |
 | 🧾 **Readable release notes** | GitHub's markup, cleaned up, with "what's new since yours" at a glance. |
 | 🐞 **Feedback built in** | Report a bug from any app, with an optional diagnostic report that never includes your token. |
@@ -180,13 +183,19 @@ Full notices are in [licenses/](licenses).
 
 ## License
 
-Krate is **proprietary** software: Copyright 2026 Cloud/9, all rights reserved. The source is published so you can read
-it and build it for your own personal, non-commercial use. Redistributing it or anything built from it, publishing
-rebranded or modified builds, putting it on any app store, or using it to train AI models is not allowed without
-written permission. See [LICENSE](LICENSE) for the full terms.
+Krate is **source-available**: Copyright 2026 Cloud/9, all rights reserved. You can read the source, build it for your
+own personal, non-commercial use, and fork it to contribute back. Redistributing it or anything built from it,
+publishing rebranded or modified builds, putting it on any app store, or using it to train AI models is not allowed
+without written permission. See [LICENSE](LICENSE) for the full terms. These terms apply from 0.4.8 on; earlier
+versions were released under the Apache License 2.0.
 
 Bundled fonts, icons and libraries keep their own licenses, listed above and in [NOTICE](NOTICE).
 
-Forks are not supported. If you use one, ask whoever made it for help.
+Builds from anywhere but this repository's releases aren't supported. If you use one, ask whoever made it for help.
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), and please read the
+[Code of Conduct](CODE_OF_CONDUCT.md). Security problems go through [SECURITY.md](SECURITY.md), not public issues.
 
 <p align="center"><sub>Made by <a href="https://github.com/Cl0ud-9">Cloud/9</a>, for friends, shaped by what they ask for.</sub></p>

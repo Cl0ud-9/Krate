@@ -8,6 +8,10 @@
     <!-- lets a normal app request an uninstall through PackageInstaller, still shows the system
          confirmation dialog - section 17, 18 of the spec (clean install) -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- updates to apps Krate installed go through without Android's confirmation, where Android allows it -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <!-- Android 14+: apps Krate installs stay updated by Krate unless the user says otherwise -->
+    <uses-permission android:name="android.permission.ENFORCE_UPDATE_OWNERSHIP" />
     <!-- the curated catalog is fetched remotely, so package names to check aren't known at build
          time - a static <queries> allowlist can't cover that; this is the same justification
          F-Droid/Aurora Store use, section 13 of the spec -->
@@ -38,6 +42,22 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.INFO" />
+            </intent-filter>
+        </activity>
+
+        <!-- "Suggest to Krate" in the share sheet: a link shared from a browser opens Suggest an app, filled in -->
+        <activity
+            android:name=".ShareTargetActivity"
+            android:exported="true"
+            android:label="@string/share_to_suggest"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
 

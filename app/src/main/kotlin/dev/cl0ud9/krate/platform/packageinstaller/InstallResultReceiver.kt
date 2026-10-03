@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
 import android.os.Parcelable
+import dev.cl0ud9.krate.platform.autoupdate.AUTO_UPDATE_REQUEST_PREFIX
+import dev.cl0ud9.krate.platform.autoupdate.AutoUpdateResults
 
 // key we bake into the pending intent ourselves for uninstall requests, which have no session id of
 // their own to correlate on - install requests are keyed off the system's own EXTRA_SESSION_ID instead
@@ -19,6 +21,11 @@ class InstallResultReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
+        // a background update never puts a prompt in front of the user; it reports back on its own
+        if (intent.getStringExtra(EXTRA_REQUEST_KEY)?.startsWith(AUTO_UPDATE_REQUEST_PREFIX) == true) {
+            AutoUpdateResults.handle(this, context, intent)
+            return
+        }
         val sessionId = intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
         val requestKey = intent.getStringExtra(EXTRA_REQUEST_KEY) ?: "install:$sessionId"
         val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)

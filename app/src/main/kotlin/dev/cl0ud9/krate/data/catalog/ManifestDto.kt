@@ -2,10 +2,13 @@ package dev.cl0ud9.krate.data.catalog
 
 import dev.cl0ud9.krate.domain.model.Announcement
 import dev.cl0ud9.krate.domain.model.AnnouncementSeverity
+import dev.cl0ud9.krate.domain.model.AppGuide
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.ArtifactInfo
 import dev.cl0ud9.krate.domain.model.DeviceProfile
 import dev.cl0ud9.krate.domain.model.InstallationMode
+import dev.cl0ud9.krate.domain.model.SetupKind
+import dev.cl0ud9.krate.domain.model.SetupStep
 import dev.cl0ud9.krate.domain.model.SupportStatus
 import kotlinx.serialization.Serializable
 import java.time.Instant
@@ -57,7 +60,41 @@ data class ManifestAppDto(
     val iconPng: String? = null,
     val description: String? = null,
     val highlights: List<String> = emptyList(),
+    val guide: ManifestGuideDto? = null,
 )
+
+@Serializable
+data class ManifestGuideDto(
+    val setup: List<ManifestSetupStepDto> = emptyList(),
+    val settingsWhere: String? = null,
+    val tips: List<String> = emptyList(),
+    val backup: String? = null,
+    val restore: String? = null,
+)
+
+@Serializable
+data class ManifestSetupStepDto(
+    val kind: String,
+    val title: String,
+    val detail: String = "",
+    val optional: Boolean = false,
+    val service: String? = null,
+)
+
+// a step of a kind this Krate doesn't know yet is left out rather than shown with nothing to open
+fun ManifestGuideDto.toDomain(): AppGuide =
+    AppGuide(
+        setup =
+            setup.mapNotNull { step ->
+                runCatching { SetupKind.valueOf(step.kind) }.getOrNull()?.let { kind ->
+                    SetupStep(kind, step.title, step.detail, step.optional, step.service)
+                }
+            },
+        settingsWhere = settingsWhere,
+        tips = tips,
+        backup = backup,
+        restore = restore,
+    )
 
 @Serializable
 data class ManifestAnnouncementDto(
@@ -118,6 +155,7 @@ fun ManifestAppDto.toDomain(device: DeviceProfile): AppProfile? {
         iconPng = iconPng,
         description = description,
         highlights = highlights,
+        guide = guide?.toDomain()?.takeUnless { it.isEmpty },
     )
 }
 

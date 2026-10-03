@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
 import dev.cl0ud9.krate.ui.components.systemNavBarClearance
 import dev.cl0ud9.krate.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.krate.ui.util.rememberDebouncedButtonState
@@ -95,26 +96,37 @@ fun DownloadsStoragePage(
     val viewModel = rememberSettingsViewModel()
     val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
     val onMobileData by viewModel.downloadOnMobileData.collectAsStateWithLifecycle()
+    val autoInstall by viewModel.autoInstallUpdates.collectAsStateWithLifecycle()
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     // idempotent in the ViewModel too - the debounce stops a double tap reaching it at all
     val clearCacheState = rememberDebouncedButtonState(onClick = viewModel::clearCache)
+    val rows = if (autoUpdatesSupported) DOWNLOADS_ROWS + 1 else DOWNLOADS_ROWS
     SettingsPage(scrollState, topContentPadding) {
         AutomaticDownloadsRow(
             checked = automaticDownloads,
             onCheckedChange = viewModel::setAutomaticDownloads,
-            shape = settingsGroupShape(0, DOWNLOADS_ROWS),
+            shape = settingsGroupShape(0, rows),
             onMobileData = automaticDownloads && onMobileData,
+            autoInstall = autoUpdatesSupported && automaticDownloads && autoInstall,
         )
         MobileDataDownloadsRow(
             checked = onMobileData,
             available = automaticDownloads,
             onCheckedChange = viewModel::setDownloadOnMobileData,
-            shape = settingsGroupShape(1, DOWNLOADS_ROWS),
+            shape = settingsGroupShape(1, rows),
         )
+        if (autoUpdatesSupported) {
+            AutoInstallRow(
+                checked = autoInstall,
+                available = automaticDownloads,
+                onCheckedChange = viewModel::setAutoInstallUpdates,
+                shape = settingsGroupShape(2, rows),
+            )
+        }
         StorageRow(
             cacheClearedMessage = cacheClearedMessage,
             clearCacheState = clearCacheState,
-            shape = settingsGroupShape(2, DOWNLOADS_ROWS),
+            shape = settingsGroupShape(rows - 1, rows),
         )
     }
 }

@@ -9,8 +9,14 @@ import androidx.work.WorkerParameters
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.DownloadStatus
 import dev.cl0ud9.krate.domain.model.latestArtifact
+import dev.cl0ud9.krate.domain.repository.buildKey
 import dev.cl0ud9.krate.platform.AppContainer
 import dev.cl0ud9.krate.platform.appContainer
+import dev.cl0ud9.krate.platform.autoupdate.AutoUpdateLedger
+import dev.cl0ud9.krate.platform.autoupdate.AutoUpdateWorker
+import dev.cl0ud9.krate.platform.autoupdate.autoUpdatePolicy
+import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesOn
+import dev.cl0ud9.krate.platform.autoupdate.isOverdue
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateStatus
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.last
@@ -35,14 +41,16 @@ class ManifestCheckWorker(
                 val baselines = container.krateBaselineStore.observeBaselines().first()
                 apps to pendingUpdates(apps, container.installedPackageReader, hasToken, baselines)
             }.onSuccess { (apps, pending) ->
-                if (pending.isEmpty()) {
+                val downloaded = pending.isNotEmpty() && downloadInBackground(container, pending, apps.map { it.id })
+                // updates that go on by themselves aren't waiting on the user, so they don't notify
+                val byHand = installOrLeave(apps, pending)
+                if (byHand.isEmpty()) {
                     UpdateNotifier.clearPendingUpdates(applicationContext)
                 } else {
-                    val downloaded = downloadInBackground(container, pending, apps.map { it.id })
                     UpdateNotifier.notifyPendingUpdates(
                         applicationContext,
-                        pending,
-                        pendingUpdatesSignature(pending),
+                        byHand,
+                        pendingUpdatesSignature(byHand),
                         downloaded,
                     )
                 }
@@ -59,6 +67,25 @@ class ManifestCheckWorker(
             }
 
         return if (catalogResult.isSuccess) Result.success() else Result.retry()
+    }
+
+    // queues the background install of what's due; returns the updates left for the user
+    private suspend fun installOrLeave(
+        apps: List<AppProfile>,
+        pending: List<AppProfile>,
+    ): List<AppProfile> {
+        if (pending.isEmpty() || !autoUpdatesOn(applicationContext)) return pending
+        val policy = autoUpdatePolicy(applicationContext, apps)
+        val now = System.currentTimeMillis()
+        val due = pending.filter { policy.isDue(it, now) }
+        if (due.isNotEmpty()) AutoUpdateWorker.enqueue(applicationContext)
+        val ledger = AutoUpdateLedger(applicationContext)
+        val overdue =
+            due.filter { app ->
+                val key = app.latestArtifact?.buildKey
+                key != null && isOverdue(ledger.dueSince(app.id, key, now), now)
+            }
+        return pending.filter { !policy.willUpdate(it) || it in overdue }
     }
 
     // Settings > Automatic downloads: pre-fetch updates on Wi-Fi (or mobile data if allowed), not in Battery Saver;

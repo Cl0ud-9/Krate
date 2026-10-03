@@ -34,8 +34,8 @@ internal val LICENSES =
     listOf(
         LicenseEntry(
             name = "Krate",
-            license = "Proprietary",
-            use = "Krate's own code. Copyright 2026 Cloud/9, all rights reserved. Free for personal use, not to share.",
+            license = "Source available",
+            use = "Krate's own code. Copyright 2026 Cloud/9. Free to read, use and contribute to, not to redistribute.",
             text = LicenseText.File(KRATE_LICENSE_FILE),
         ),
         LicenseEntry(

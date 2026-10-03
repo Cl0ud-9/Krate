@@ -3,7 +3,6 @@ package dev.cl0ud9.krate.platform.packageinstaller
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import dev.cl0ud9.krate.domain.installer.InstallationEngine
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.InstallStatus
@@ -31,8 +30,14 @@ class PackageInstallerEngine(
             val requestKey = "install:${app.packageName}"
             val started = runCatching { createAndCommitSession(app, apkFile, requestKey) }
             if (started.isFailure) {
-                val reason = started.exceptionOrNull()?.message ?: "unknown error"
-                send(InstallStatus.Failed("Couldn't start the install: $reason"))
+                // plain words, never the internal file path an exception message carries
+                val reason =
+                    if (started.exceptionOrNull() is java.io.IOException) {
+                        "Couldn't read the downloaded file. Download it again and try once more."
+                    } else {
+                        "Couldn't start the install. Try again."
+                    }
+                send(InstallStatus.Failed(reason))
                 close()
                 return@callbackFlow
             }
@@ -83,10 +88,7 @@ class PackageInstallerEngine(
         requestKey: String,
     ) {
         val packageInstaller = context.packageManager.packageInstaller
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-        params.setAppPackageName(app.packageName)
-        params.setSize(apkFile.length())
-        val sessionId = packageInstaller.createSession(params)
+        val sessionId = packageInstaller.createSession(krateSessionParams(app.packageName, apkFile))
         packageInstaller.openSession(sessionId).use { session ->
             session.openWrite("apk", 0, apkFile.length()).use { out ->
                 apkFile.inputStream().use { it.copyTo(out) }

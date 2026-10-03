@@ -56,6 +56,8 @@ import dev.cl0ud9.krate.ui.components.LocalIntroPlaying
 import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
 import dev.cl0ud9.krate.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.krate.ui.components.WhatsNewDialog
+import dev.cl0ud9.krate.ui.navigation.glassSource
+import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
 import dev.cl0ud9.krate.ui.util.formatRelativeTime
@@ -111,10 +113,12 @@ fun HomeScreen(
     // manifest shows up here first - refreshFromNetwork() shares its result with every other screen
     // via the catalog repository's cache, so this pull is never wasted even if the user never leaves Home
     Box(modifier = Modifier.fillMaxSize()) {
+        // the list, for the snackbar to turn to glass over
+        val pageGlass = rememberPageGlass()
         KratePullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refreshFromNetwork,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().glassSource(pageGlass),
         ) {
             HomeContent(viewModel, onNavigateToApps, onNavigateToUpdates, onNavigateToApp)
         }
@@ -129,6 +133,7 @@ fun HomeScreen(
                 )
             },
             onRetry = viewModel::refreshFromNetwork,
+            glass = pageGlass,
         )
     }
 }
@@ -160,6 +165,8 @@ private fun HomeContent(
         announcements.forEach { item ->
             AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = viewModel::dismissAnnouncement)
         }
+        // once, for anyone who had Krate before it could update apps by itself
+        AutoUpdateOffer()
 
         HomeAppear(order = 0) {
             StatusHeroCard(

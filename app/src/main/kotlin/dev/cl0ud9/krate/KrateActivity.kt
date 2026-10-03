@@ -33,10 +33,13 @@ import androidx.lifecycle.lifecycleScope
 import dev.cl0ud9.krate.domain.model.ThemeMode
 import dev.cl0ud9.krate.platform.appContainer
 import dev.cl0ud9.krate.platform.workers.KRATE_UPDATED_NOTIFICATION_ID
+import dev.cl0ud9.krate.ui.apps.SharedSuggestions
+import dev.cl0ud9.krate.ui.apps.parseSharedSuggestion
 import dev.cl0ud9.krate.ui.components.KrateIntro
 import dev.cl0ud9.krate.ui.components.KrateIntroProgress
 import dev.cl0ud9.krate.ui.components.LocalIntroHeaderSlot
 import dev.cl0ud9.krate.ui.components.LocalIntroPlaying
+import dev.cl0ud9.krate.ui.details.InstallRequests
 import dev.cl0ud9.krate.ui.navigation.ArrivalFromOutside
 import dev.cl0ud9.krate.ui.navigation.KrateNavHost
 import dev.cl0ud9.krate.ui.navigation.LiveNavigation
@@ -51,6 +54,12 @@ import kotlinx.coroutines.launch
 const val EXTRA_TARGET_ROUTE = "target_route"
 const val EXTRA_APP_ID = "appId"
 const val EXTRA_NOTIFICATION_ID = "notification_id"
+
+// text shared to "Suggest to Krate" from another app
+const val EXTRA_SHARED_TEXT = "shared_text"
+
+// a download notification's Install button: open that app's page and install the ready download straight away
+const val EXTRA_INSTALL_APP_ID = "install_app_id"
 
 class KrateActivity : ComponentActivity() {
     private val pendingRoute = MutableStateFlow<String?>(null)
@@ -119,6 +128,14 @@ class KrateActivity : ComponentActivity() {
         if (intent?.hasExtra(EXTRA_NOTIFICATION_ID) == true) {
             NotificationManagerCompat.from(this).cancel(intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0))
             intent.removeExtra(EXTRA_NOTIFICATION_ID)
+        }
+        intent?.getStringExtra(EXTRA_INSTALL_APP_ID)?.let { appId ->
+            InstallRequests.request(appId)
+            intent.removeExtra(EXTRA_INSTALL_APP_ID)
+        }
+        intent?.getStringExtra(EXTRA_SHARED_TEXT)?.let { text ->
+            parseSharedSuggestion(text)?.let(SharedSuggestions::offer)
+            intent.removeExtra(EXTRA_SHARED_TEXT)
         }
         // Krate is open now, which is all "Krate updated, tap to open" was asking for
         NotificationManagerCompat.from(this).cancel(KRATE_UPDATED_NOTIFICATION_ID)

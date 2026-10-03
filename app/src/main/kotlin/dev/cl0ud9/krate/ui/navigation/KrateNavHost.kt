@@ -21,7 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -40,21 +39,20 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.kyant.backdrop.backdrops.LayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import dev.cl0ud9.krate.data.settings.DEFAULT_NAV_BAR_CORNER_RADIUS
 import dev.cl0ud9.krate.domain.model.LaunchTab
 import dev.cl0ud9.krate.domain.model.NavBarStyle
 import dev.cl0ud9.krate.platform.appContainer
 import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
-import dev.cl0ud9.krate.ui.components.NavBarFade
-import dev.cl0ud9.krate.ui.theme.ShapeCache
-import dev.cl0ud9.krate.ui.theme.rememberHeroGradient
 import dev.cl0ud9.krate.ui.util.LocalScrollClaim
 import dev.cl0ud9.krate.ui.util.ScrollClaim
 import dev.cl0ud9.krate.ui.util.isShortScreen
@@ -127,6 +125,7 @@ fun KrateNavHost(
     onRouteHandled: () -> Unit = {},
 ) {
     ApplyPendingRoute(navController, pendingRoute, onRouteHandled)
+    SharedSuggestionSheet(navController)
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -150,6 +149,9 @@ fun KrateNavHost(
     val navBarCompactMode by settingsRepository.observeNavBarCompactMode().collectAsStateWithLifecycle(
         initialValue = saved?.navBarCompactMode ?: false,
     )
+    // the screens are recorded into a layer the glass bar reads from; no glass, no recording
+    val glassBackdrop = rememberLayerBackdrop()
+    val glass = rememberLiquidGlass(settingsRepository, saved?.liquidGlass ?: false)
     // NavHost always starts at Home immediately (see KrateNavGraph below) rather than waiting on
     // this DataStore read - gating NavHost's own existence on it meant every cold start (including
     // reopening from Recents after Android killed the process mid-download) hit a real frame-or-more
@@ -179,7 +181,7 @@ fun KrateNavHost(
     val barCompact = isShortScreen() || (navBarCompactMode && navBarStyle == NavBarStyle.FLOATING_PILL)
     val navBarClearance = navBarFootprint(barCompact, floating = navBarStyle == NavBarStyle.FLOATING_PILL)
 
-    CompositionLocalProvider(LocalNavBarClearance provides navBarClearance) {
+    CompositionLocalProvider(LocalNavBarClearance provides navBarClearance, LocalLiquidGlass provides glass) {
         // contentWindowInsets defaults to WindowInsets.systemBars, which would reserve the status
         // bar's top inset here AND again inside every TabScreen/DetailScreen's own TopAppBar (that's
         // the default inset every M3 TopAppBar carries) - zeroing it out here leaves exactly one
@@ -193,7 +195,7 @@ fun KrateNavHost(
                     KrateBottomBar(
                         navController,
                         currentRoute,
-                        NavBarAppearance(navBarStyle, navBarCornerRadius, barCompact),
+                        NavBarAppearance(navBarStyle, navBarCornerRadius, barCompact, glassBackdrop.takeIf { glass }),
                         navBarVisibility,
                         barHeightPx,
                     )
@@ -204,7 +206,10 @@ fun KrateNavHost(
             KrateNavGraph(
                 navController = navController,
                 startDestination = KrateDestination.HOME.route,
-                modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
+                modifier =
+                    Modifier
+                        .padding(top = innerPadding.calculateTopPadding())
+                        .then(if (glass) Modifier.layerBackdrop(glassBackdrop) else Modifier),
             )
         }
     }
@@ -265,7 +270,7 @@ internal object LiveNavigation {
 // a notification's target: a tab is switched to the way the bottom bar does it, never stacked over another tab (which
 // left the tabs' saved history tangled), and any other screen opens on top unless it's already the one showing;
 // compared with its arguments, so a notification for one app opens it even over another app's details
-private fun NavHostController.navigateFromOutside(route: String) {
+internal fun NavHostController.navigateFromOutside(route: String) {
     when {
         KrateBottomNavDestinations.any { it.route == route } -> navigateToTab(route)
         currentBackStackEntry?.let(::currentRouteOf) != route -> navigate(route)
@@ -295,6 +300,8 @@ internal data class NavBarAppearance(
     val style: NavBarStyle,
     val cornerRadius: Int,
     val compactMode: Boolean,
+    // the screens behind it, when the bar is liquid glass
+    val glass: LayerBackdrop? = null,
 )
 
 private const val NAV_BAR_VISIBILITY_EPSILON = 0.001f
@@ -341,10 +348,6 @@ private fun KrateNavGraph(
 // a tab destination's own top bar + opaque content, now composed as one subtree INSIDE NavHost so
 // it rides the exact same enter/exit transition (and the same live predictive-back progress) as the
 // content below it, instead of being hoisted out where no transition could ever reach it.
-// transparent instead of a tonal-elevated bar - no boxed top chrome at all, just text/icons
-// floating directly on the background, which reads as lighter than a filled app bar
-private val TabContentPanelRadius = 28.dp
-
 // titleIcon and subtitle are Home's Krate mark and launch greeting - the other tabs are title-only
 @Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -363,31 +366,10 @@ internal fun AnimatedContentScope.TabScreen(
     // just the panel, so a receding tab shrinks/blurs/rounds as one unified card, instead of
     // leaving the header a sharp, unaffected rectangle above it
     Box(modifier = Modifier.fillMaxSize().then(depth.contentModifier)) {
-        // the tint wash only ever shows through the header strip - everything below sits on an
-        // opaque, rounded-top panel starting right under it (ignoring the bottom inset, so the
-        // panel's own color still shows through the gaps around the floating nav bar) - a
-        // top-tinted, bottom-solid split instead of one wash bleeding all the way down
-        Scaffold(
-            modifier = Modifier.background(rememberHeroGradient()),
-            topBar = {
-                // content keeps clear of the side insets (landscape camera cutout); backgrounds run edge to edge
-                Box(modifier = Modifier.windowInsetsPadding(SideInsets)) {
-                    TabHeader(title = title, icon = titleIcon, subtitle = subtitle, actions = actions)
-                }
-            },
-            containerColor = Color.Transparent,
-        ) { innerPadding ->
-            Surface(
-                modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding()),
-                color = MaterialTheme.colorScheme.surface,
-                shape = ShapeCache.contentPanel(TabContentPanelRadius),
-            ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(SideInsets)) { content() }
-                    NavBarFade()
-                }
-            }
+        val header: @Composable () -> Unit = {
+            TabHeader(title = title, icon = titleIcon, subtitle = subtitle, actions = actions)
         }
+        TabFrame(glass = LocalLiquidGlass.current, header = header, content = content)
         // skipped entirely at rest (isDimVisible == false) rather than always drawn transparent -
         // one less full-screen layer on every tab, every frame, while nothing is actually covering
         // it. alpha itself is read as depth.dimAlpha.value inside the layer lambda, not passed in
@@ -419,6 +401,8 @@ internal fun AnimatedContentScope.DetailScreen(
     val scrollState = rememberScrollState()
     val headerState = rememberCollapsingHeaderState(scrollState)
     val scrollClaim = remember { ScrollClaim() }
+    // the page under its header, for the header to turn to glass over once it collapses
+    val pageGlass = rememberPageGlass()
     Box(
         modifier =
             Modifier
@@ -434,11 +418,11 @@ internal fun AnimatedContentScope.DetailScreen(
         CompositionLocalProvider(
             LocalScrollClaim provides scrollClaim,
         ) {
-            Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(SideInsets)) {
+            Box(modifier = Modifier.fillMaxSize().glassSource(pageGlass).windowInsetsPadding(SideInsets)) {
                 content(scrollState, headerState.headerHeight)
             }
         }
-        CollapsingDetailHeader(title = title, state = headerState, onBack = onBack)
+        CollapsingDetailHeader(title = title, state = headerState, onBack = onBack, glass = pageGlass)
         if (depth.isDimVisible) {
             Box(
                 modifier =

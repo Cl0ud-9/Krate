@@ -62,21 +62,7 @@ fun AppDetailsScreen(
     scrollState: ScrollState,
     topContentPadding: Dp,
 ) {
-    val viewModel =
-        krateViewModel { container ->
-            AppDetailsViewModel(
-                container.catalogRepository,
-                container.artifactDownloader,
-                container.installationEngine,
-                container.cleanInstallOrchestrator,
-                container.installedPackageReader,
-                container.activityLogRepository,
-                container.krateBaselineStore,
-                container.downloadProgressNotifier,
-                container.announcementDismissalStore,
-                appId,
-            )
-        }
+    val viewModel = rememberAppDetailsViewModel(appId)
     RefreshOnResume(viewModel::refresh)
     val app by viewModel.app.collectAsStateWithLifecycle()
     val installedVersion by viewModel.installedVersion.collectAsStateWithLifecycle()
@@ -110,6 +96,8 @@ fun AppDetailsScreen(
                         installStatus = installStatus,
                         selectedArtifact = selectedArtifact,
                         announcements = announcements,
+                        justInstalled = viewModel.justInstalled.collectAsStateWithLifecycle().value,
+                        restorePending = viewModel.restorePending.collectAsStateWithLifecycle().value,
                     ),
                 onDismissAnnouncement = viewModel::dismissAnnouncement,
                 onDownload = rememberDebouncedOnClick(onClick = viewModel::startDownload),
@@ -126,6 +114,24 @@ fun AppDetailsScreen(
     }
 }
 
+@Composable
+private fun rememberAppDetailsViewModel(appId: String): AppDetailsViewModel =
+    krateViewModel { container ->
+        AppDetailsViewModel(
+            container.catalogRepository,
+            container.artifactDownloader,
+            container.installationEngine,
+            container.cleanInstallOrchestrator,
+            container.installedPackageReader,
+            container.activityLogRepository,
+            container.krateBaselineStore,
+            container.downloadProgressNotifier,
+            container.announcementDismissalStore,
+            container.autoUpdateStore,
+            appId,
+        )
+    }
+
 // bundles the screen's state so the composables below stay under the parameter-count limit
 internal data class AppDetailsUiState(
     val app: AppProfile,
@@ -139,9 +145,17 @@ internal data class AppDetailsUiState(
     val installStatus: InstallStatus,
     val selectedArtifact: ArtifactInfo?,
     val announcements: List<AnnouncementItem> = emptyList(),
+    // an install just finished on this screen; its message shows where "Up to date." would
+    val justInstalled: Boolean = false,
+    // that install erased the app's data, so the setup card offers to bring the settings back
+    val restorePending: Boolean = false,
 ) {
     val installedVersionName: String?
         get() = installed?.versionName
+
+    // one tap downloads and installs; otherwise the button only downloads and installing is its own step
+    val installsInPlace: Boolean
+        get() = canInstallInPlace(app, installed, selectedArtifact)
 
     // the recorded baseline if Krate has one, otherwise its best guess - see
     // KrateBaselineStore.effectiveBaseline for the full reasoning
@@ -158,6 +172,13 @@ internal data class AppDetailsUiState(
             effectiveBaseline?.takeIf { installed != null && it.buildId != null }?.let { baseline ->
                 app.artifacts.firstOrNull { it.isBuildOf(baseline) }
             }
+
+    // the newer build of the installed theme waiting to go on, if there is one
+    val pendingUpdate: ArtifactInfo?
+        get() {
+            val baseline = effectiveBaseline?.takeIf { installed != null } ?: return null
+            return trackApp.latestArtifact?.takeIf { it.isNewerThan(baseline, trackApp.artifacts) }
+        }
 
     // a build of another theme than the installed one - a change of look, not an update or a rollback
     val isSwitch: Boolean
@@ -223,16 +244,6 @@ internal data class AppDetailsUiState(
             val baseline = effectiveBaseline ?: return false
             return installed != baseline.versionName
         }
-}
-
-// Android refuses an in-place install of a lower versionCode, so a build older than the installed
-// one can only go on after uninstalling it (which erases the app's data)
-internal fun requiresUninstall(
-    installed: InstalledVersion?,
-    artifact: ArtifactInfo?,
-): Boolean {
-    val versionCode = artifact?.versionCode ?: return false
-    return installed != null && versionCode < installed.versionCode
 }
 
 // a baseline recorded before builds had ids only knows its version, which is enough for apps that
@@ -307,13 +318,21 @@ private fun AppDetailsContent(
         // the primary action moves right under the header instead of sitting below Release notes,
         // which could push it off-screen for apps with long release notes - a detail page exists
         // to get the user to this action, so it should not be the thing they have to scroll to find
+        val guarded = rememberBackupGuard(state, onInstall, onRetryAsCleanInstall)
         DownloadSection(
             state = state,
             onDownload = onDownload,
-            onInstall = onInstall,
-            onRetryAsCleanInstall = onRetryAsCleanInstall,
+            onInstall = guarded.install,
+            onRetryAsCleanInstall = guarded.retryFromScratch,
             onCancelDownload = onCancelDownload,
         )
+
+        // what it needs switched on, and its settings, right under the action once it's installed
+        val guide = app.guide
+        if (guide != null && state.installed != null && !uninstalling) {
+            SetupCard(app = app, guide = guide, restorePending = state.restorePending)
+        }
+        if (state.installed != null && !uninstalling) AutoUpdateCard(state)
 
         // what the app is sits right under the action, before the finer controls further down
         AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)

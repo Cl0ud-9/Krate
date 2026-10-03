@@ -23,5 +23,12 @@ class FileRollbackStore(
             it.exists()
         }
 
+    override fun discard(packageName: String) {
+        File(rollbackDir, fileNameFor(packageName)).delete()
+    }
+
+    override fun clearAll(): Long =
+        rollbackDir.listFiles().orEmpty().sumOf { file -> file.length().also { file.delete() } }
+
     private fun fileNameFor(packageName: String): String = "$packageName.apk"
 }

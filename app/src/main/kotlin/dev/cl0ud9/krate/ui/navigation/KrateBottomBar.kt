@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
@@ -42,6 +43,7 @@ internal fun KrateBottomBar(
     val geometry = rememberNavBarGeometry(appearance)
     val compact = appearance.compactMode
     val full = appearance.style == NavBarStyle.FULL_WIDTH
+    val shape = navBarShape(geometry.topRadius, geometry.bottomRadius)
     Surface(
         modifier =
             Modifier
@@ -52,11 +54,18 @@ internal fun KrateBottomBar(
                 .padding(bottom = geometry.bottomMargin)
                 .height(geometry.height)
                 .then(if (full) Modifier else Modifier.windowInsetsPadding(SideInsets))
-                .padding(horizontal = geometry.sideMargin),
-        shape = navBarShape(geometry.topRadius, geometry.bottomRadius),
-        // Material's own navigation bar color: a tone above the surface panel behind it, plus the shadow
-        color = NavigationBarDefaults.containerColor,
-        shadowElevation = 3.dp,
+                .padding(horizontal = geometry.sideMargin)
+                .liquidGlass(
+                    appearance.glass,
+                    shape,
+                    edge = if (full) GlassEdge.TOP else GlassEdge.ALL,
+                    cornerRadius = geometry.topRadius,
+                ),
+        shape = shape,
+        // Material's own navigation bar color: a tone above the surface panel behind it, plus the shadow; glass draws
+        // its own surface and shadow instead
+        color = if (appearance.glass != null) Color.Transparent else NavigationBarDefaults.containerColor,
+        shadowElevation = if (appearance.glass != null) 0.dp else 3.dp,
     ) {
         Row(
             modifier =

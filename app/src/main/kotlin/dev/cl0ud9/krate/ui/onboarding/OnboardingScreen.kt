@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.core.content.ContextCompat
 import dev.cl0ud9.krate.domain.model.ThemeMode
+import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
 import dev.cl0ud9.krate.ui.navigation.SideInsets
 import dev.cl0ud9.krate.ui.settings.CornerRadiusEditor
 import dev.cl0ud9.krate.ui.settings.SettingsViewModel
@@ -79,6 +80,8 @@ fun OnboardingScreen(
     var markBounds by remember { mutableStateOf<Rect?>(null) }
     val handoff = remember(markHidden) { MarkHandoff(hidden = markHidden, onPlaced = { markBounds = it }) }
     LaunchedEffect(Unit) { onboarding.applyDarkOnce { settings.setThemeMode(ThemeMode.DARK) } }
+    // a new install starts with automatic updates on; the Updates step shows it, to switch off there and then
+    LaunchedEffect(Unit) { if (autoUpdatesSupported) settings.offerAutoInstallUpdates() }
     val permissions = rememberPermissionState(context)
     val step = steps[stepIndex]
     val canContinue = step != OnboardingStep.INSTALL || permissions.canInstall

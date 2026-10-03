@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
@@ -52,6 +54,8 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
 import dev.cl0ud9.krate.ui.components.BusyButtonContent
 import dev.cl0ud9.krate.ui.components.StatTile
+import dev.cl0ud9.krate.ui.navigation.LocalLiquidGlass
+import dev.cl0ud9.krate.ui.navigation.heroGlow
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.pressScale
 import dev.cl0ud9.krate.ui.util.rememberDebouncedOnClick
@@ -77,6 +81,30 @@ internal fun Modifier.homeTappable(
 }
 
 // "am I up to date, and what should I do about it" - the whole card is the action: open Updates, or look again
+// the status card's container, text and icon colours: filled with its state's colour, or with glass on the tab
+// header's glowing panel, keeping that colour in the icon and button
+@Composable
+private fun heroColors(upToDate: Boolean): Triple<Color, Color, Color> {
+    val colors = MaterialTheme.colorScheme
+    return when {
+        LocalLiquidGlass.current ->
+            Triple(colors.surfaceContainer, colors.onSurface, if (upToDate) colors.primary else colors.tertiary)
+        upToDate -> Triple(colors.primaryContainer, colors.onPrimaryContainer, colors.onPrimaryContainer)
+        else -> Triple(colors.tertiaryContainer, colors.onTertiaryContainer, colors.onTertiaryContainer)
+    }
+}
+
+@Composable
+private fun heroButtonColors(upToDate: Boolean): ButtonColors {
+    val colors = MaterialTheme.colorScheme
+    return when {
+        LocalLiquidGlass.current && upToDate -> ButtonDefaults.buttonColors(colors.primary, colors.onPrimary)
+        LocalLiquidGlass.current -> ButtonDefaults.buttonColors(colors.tertiary, colors.onTertiary)
+        upToDate -> ButtonDefaults.buttonColors(colors.onPrimaryContainer, colors.primaryContainer)
+        else -> ButtonDefaults.buttonColors(colors.onTertiaryContainer, colors.tertiaryContainer)
+    }
+}
+
 @Composable
 internal fun StatusHeroCard(
     pendingUpdateCount: Int,
@@ -85,22 +113,24 @@ internal fun StatusHeroCard(
     onCheckAgain: () -> Unit,
 ) {
     val upToDate = pendingUpdateCount == 0
-    val colors = MaterialTheme.colorScheme
-    val container = if (upToDate) colors.primaryContainer else colors.tertiaryContainer
-    val content = if (upToDate) colors.onPrimaryContainer else colors.onTertiaryContainer
+    val (container, content, icon) = heroColors(upToDate)
     val action = if (upToDate) onCheckAgain else onViewUpdates
     Card(
         modifier = Modifier.fillMaxWidth().homeTappable(ShapeCache.rounded28, action),
         shape = ShapeCache.rounded28,
         colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
     ) {
-        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().heroGlow().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             Icon(
                 painter =
                     painterResource(
                         if (upToDate) R.drawable.ic_check_circle_rounded else R.drawable.ic_system_update_alt_rounded,
                     ),
                 contentDescription = null,
+                tint = icon,
                 modifier = Modifier.size(36.dp),
             )
             Text(
@@ -120,7 +150,7 @@ internal fun StatusHeroCard(
             // stays enabled while checking (a second tap is ignored) so the button never flashes to a dimmed colour
             Button(
                 onClick = { if (!checking) action() },
-                colors = ButtonDefaults.buttonColors(containerColor = content, contentColor = container),
+                colors = heroButtonColors(upToDate),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
             ) {
                 BusyButtonContent(

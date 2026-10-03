@@ -42,6 +42,11 @@ internal fun actionLabelFor(state: AppDetailsUiState): String =
         else -> "Update"
     }
 
+// the download button: the whole action when one tap installs too, otherwise just the download (the rest is its own
+// step, with its own warning)
+internal fun downloadLabelFor(state: AppDetailsUiState): String =
+    if (state.installsInPlace) actionLabelFor(state) else "Download"
+
 internal const val UNINSTALL_FIRST_WARNING =
     "This is older than the installed version, so Android needs the app uninstalled first. " +
         "Its data on this device will be erased."

@@ -78,13 +78,13 @@ class PendingUpdatesTest {
         assertEquals(1, count)
     }
 
-    // an explicitly recorded baseline always wins over the fallback guess - this is what a real
-    // Krate-driven install writes, and it must keep working correctly even while the live device
-    // has since diverged to something the catalog doesn't recognize
+    // an explicitly recorded baseline wins over the fallback guess - this is what a real Krate-driven install
+    // writes, and it keeps working while the device has since moved to a build the catalog doesn't recognize, as
+    // long as that build isn't older (an older one is behind, see the next test)
     @Test
     fun `a recorded baseline is used over the live installed version`() {
         val app = profile("recorded", latestVersionName = "1.0.2")
-        val reader = FakeInstalledPackageReader(mapOf(app.packageName to InstalledVersion("1.0.0-custom", 1)))
+        val reader = FakeInstalledPackageReader(mapOf(app.packageName to InstalledVersion("1.0.2-custom", 1)))
 
         val notPending =
             pendingUpdateCount(
@@ -102,6 +102,23 @@ class PendingUpdatesTest {
             )
 
         assertEquals(0, notPending)
+        assertEquals(1, pending)
+    }
+
+    // Krate recorded 1.0.2, then an older build went on outside it: that's an update waiting, not up to date
+    @Test
+    fun `an older build installed outside Krate is pending even with a newer record`() {
+        val app = profile("downgraded", latestVersionName = "1.0.2")
+        val reader = FakeInstalledPackageReader(mapOf(app.packageName to InstalledVersion("1.0.0-custom", 1)))
+
+        val pending =
+            pendingUpdateCount(
+                listOf(app),
+                reader,
+                hasGitHubToken = false,
+                baselines = mapOf(app.packageName to Baseline("1.0.2")),
+            )
+
         assertEquals(1, pending)
     }
 

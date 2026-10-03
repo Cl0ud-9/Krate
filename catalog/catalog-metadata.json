@@ -21,6 +21,30 @@
         "includePrerelease": false,
         "retainVersions": 3,
         "expectedCertificateSha256": "7a40d5ce5dc4fb80addc9399c1fadbd77cf89b71a45812d12b9ff9e911299549"
+      },
+      "guide": {
+        "setup": [
+          {
+            "kind": "ALL_FILES_ACCESS",
+            "title": "Allow access to all files",
+            "detail": "It needs this to find and clear junk files across your storage. Without it, it can't see them."
+          },
+          {
+            "kind": "NOTIFICATIONS",
+            "title": "Allow notifications",
+            "detail": "Lets scheduled cleans tell you what they cleared.",
+            "optional": true
+          }
+        ],
+        "settingsWhere": "its Settings (the gear on the main screen)",
+        "tips": [
+          "Turn on Auto Whitelist, so folders other apps rely on are protected automatically",
+          "Look through Whitelist before your first clean, and add anything you want kept",
+          "Clean on boot or Hourly Clean keep things tidy without opening the app",
+          "Leave Delete .apk files off if you keep app installers around"
+        ],
+        "backup": "open Settings and tap Export Data",
+        "restore": "open Settings, tap Import Data and pick the file you saved"
       }
     },
     {
@@ -43,6 +67,27 @@
         "includePrerelease": false,
         "retainVersions": 3,
         "expectedCertificateSha256": "28fa393354f1d13d70c2f1f5298cdd455ffdbc2c17939cbc8f053ddc5e152da8"
+      },
+      "guide": {
+        "setup": [
+          {
+            "kind": "ACCESSIBILITY",
+            "title": "Turn on its accessibility service",
+            "detail": "Android only lets system apps clear other apps' caches in one go, so it uses this to tap Clear cache in each app's settings for you. It's open source, so what it does with it can be checked.",
+            "service": "com.github.bmx666.appcachecleaner/.service.AppCacheCleanerService"
+          },
+          {
+            "kind": "USAGE_ACCESS",
+            "title": "Allow usage access",
+            "detail": "It needs this to see your apps and how much cache each one holds before it can clean them."
+          }
+        ],
+        "settingsWhere": "the app itself",
+        "tips": [
+          "Start with User Apps rather than All Apps, and untick anything you'd rather leave alone",
+          "Tap the floating button during a clean to stop it early",
+          "If you'd rather it isn't left on, tap Stop Accessibility service in the app when you're done"
+        ]
       }
     },
     {
@@ -65,6 +110,33 @@
         "includePrerelease": false,
         "retainVersions": 3,
         "expectedCertificateSha256": "0b6c9515afb195fac59601696ba0a7907a0b217ccf720b43148427ccf64343e7"
+      },
+      "guide": {
+        "setup": [
+          {
+            "kind": "BATTERY",
+            "title": "Let it run in the background",
+            "detail": "Apps that sign in or get notifications through it stop working properly if Android puts it to sleep.",
+            "optional": true
+          },
+          {
+            "kind": "NOTIFICATIONS",
+            "title": "Allow notifications",
+            "detail": "So it can ask when an app wants to use your account.",
+            "optional": true
+          },
+          {
+            "kind": "IN_APP",
+            "title": "Add your Google account",
+            "detail": "Only if you want to sign in to apps that use it. Open microG Settings and go to Accounts.",
+            "optional": true
+          }
+        ],
+        "settingsWhere": "microG Settings (its own icon in your app drawer)",
+        "tips": [
+          "Self-Check shows at a glance whether everything is set up",
+          "Keep Cloud Messaging on for notifications from apps that rely on it"
+        ]
       }
     },
     {
@@ -87,6 +159,40 @@
         "includePrerelease": false,
         "retainVersions": 3,
         "expectedCertificateSha256": "9add655a78e96c4ec7a53ef89dccb557cb5d767489fac5e785d671a5a75d4da2"
+      },
+      "guide": {
+        "setup": [
+          {
+            "kind": "IN_APP",
+            "title": "Choose a storage location",
+            "detail": "On first launch Mihon asks for a folder. Downloads and backups are saved there."
+          },
+          {
+            "kind": "INSTALL_APPS",
+            "title": "Allow it to install apps",
+            "detail": "Sources come as extensions, and Mihon installs them itself. Without this, there's nothing to read from."
+          },
+          {
+            "kind": "NOTIFICATIONS",
+            "title": "Allow notifications",
+            "detail": "For library updates and finished downloads.",
+            "optional": true
+          },
+          {
+            "kind": "BATTERY",
+            "title": "Let it run in the background",
+            "detail": "Keeps long library updates, downloads and backup restores from being cut off.",
+            "optional": true
+          }
+        ],
+        "settingsWhere": "More > Settings",
+        "tips": [
+          "Data and storage: set Automatic backup frequency so a backup is always there",
+          "Browse > Extensions is where you add the sources you read from",
+          "Tracking connects AniList, MyAnimeList and others, so progress follows you"
+        ],
+        "backup": "open More > Settings > Data and storage and tap Create backup",
+        "restore": "open More > Settings > Data and storage, tap Restore backup and pick the file"
       }
     }
   ]

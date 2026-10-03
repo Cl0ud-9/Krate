@@ -36,6 +36,7 @@ import dev.cl0ud9.krate.ui.components.KrateLinearProgress
 import dev.cl0ud9.krate.ui.components.ReopenPromptButton
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.components.StatusRow
+import dev.cl0ud9.krate.ui.navigation.heroGlow
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.voice.Moment
 import dev.cl0ud9.krate.voice.rememberKrateLeadIn
@@ -56,7 +57,10 @@ internal fun DownloadSection(
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().heroGlow().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             SectionHeader(title = "Get this app", icon = rememberVectorPainter(Icons.Filled.Download))
             // crossfades between states (Idle -> Downloading -> Verifying -> ...) instead of the
             // content just swapping instantly - contentKey groups by the status's own class, not
@@ -162,7 +166,7 @@ private fun DownloadStatusContent(
     }
 }
 
-// three real states, not two: up to date (Open + Redownload, unchanged), installed-but-behind
+// three real states, not two: up to date (Open + Reinstall), installed-but-behind
 // (Open stays available - there's a real working app right there - alongside the actual Update
 // action, matching how any app store pairs Open with a pending update instead of hiding one behind
 // the other), and genuinely not installed (plain Install button, nothing to open). A prominent
@@ -186,15 +190,26 @@ private fun IdleContent(
             RollbackContent(state = state, uninstalling = uninstalling, onDownload = onDownload)
 
         state.isUpToDate -> {
+            val colorScheme = MaterialTheme.colorScheme
             StatusRow(
                 icon = painterResource(R.drawable.ic_check_circle_rounded),
-                tint = MaterialTheme.colorScheme.tertiary,
-                text = "Up to date.",
+                // the same colour as the install's own success step, so settling into this doesn't change it
+                tint = if (state.justInstalled) colorScheme.primary else colorScheme.tertiary,
+                text =
+                    if (state.justInstalled) {
+                        rememberKrateLeadIn(Moment.INSTALLED, "${state.app.displayName} is installed.")
+                    } else {
+                        "Up to date."
+                    },
             )
             if (uninstalling) {
                 UninstallingStatus(installStatus = state.installStatus)
             } else {
-                UpToDateActions(packageName = state.app.packageName, onDownload = onDownload)
+                UpToDateActions(
+                    packageName = state.app.packageName,
+                    label = downloadLabelFor(state),
+                    onDownload = onDownload,
+                )
             }
         }
 
@@ -213,7 +228,7 @@ private fun IdleContent(
 
         else -> {
             Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
-                Text("Install")
+                Text(downloadLabelFor(state))
             }
             if (selected == null) {
                 HelperText("Not yet available for download.")
@@ -269,7 +284,7 @@ private fun IdleFootnotes(
 }
 
 // Open stacked above the real Update/Roll back action - same pairing UpToDateActions uses for
-// Open+Redownload, just with the actual CTA instead of a redownload of the same thing
+// Open+Reinstall, just with the actual CTA instead of a reinstall of the same thing
 @Composable
 private fun InstalledNotUpToDateActions(
     state: AppDetailsUiState,
@@ -279,17 +294,18 @@ private fun InstalledNotUpToDateActions(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         OpenAppButton(packageName = state.app.packageName, secondary = true)
         Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
-            Text(actionLabelFor(state))
+            Text(downloadLabelFor(state))
         }
     }
 }
 
-// Open (primary) stacked above a secondary-toned Redownload, both full width - if the installed
-// package can actually be launched. Falls back to a lone full-width Redownload for the rare case
+// Open (primary) stacked above a secondary-toned Reinstall, both full width - if the installed
+// package can actually be launched. Falls back to a lone full-width Reinstall for the rare case
 // of an installed package with no launcher activity (a pure library/dependency app, e.g. microG RE)
 @Composable
 private fun UpToDateActions(
     packageName: String,
+    label: String,
     onDownload: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -307,12 +323,12 @@ private fun UpToDateActions(
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     ),
             ) {
-                Text("Redownload")
+                Text(label)
             }
         }
     } else {
         Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-            Text("Redownload")
+            Text(label)
         }
     }
 }

@@ -32,6 +32,8 @@ import dev.cl0ud9.krate.ui.components.KrateMessage
 import dev.cl0ud9.krate.ui.components.KratePullToRefreshBox
 import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
 import dev.cl0ud9.krate.ui.components.RefreshFailureSnackbar
+import dev.cl0ud9.krate.ui.navigation.glassSource
+import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
 import dev.cl0ud9.krate.ui.util.StaggeredAppear
 import dev.cl0ud9.krate.ui.util.krateViewModel
@@ -99,10 +101,12 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
         // pending updates are the most time-sensitive data in the app - a stale manifest here
         // directly means a missed update, so this is the highest-value place for pull-to-refresh
+        // the list, for the snackbar to turn to glass over
+        val pageGlass = rememberPageGlass()
         KratePullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refreshFromNetwork,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().glassSource(pageGlass),
         ) {
             UpdatesContent(
                 uiState = uiState,
@@ -122,6 +126,7 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
                 )
             },
             onRetry = viewModel::refreshFromNetwork,
+            glass = pageGlass,
         )
     }
 }

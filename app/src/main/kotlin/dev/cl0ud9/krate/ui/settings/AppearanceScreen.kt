@@ -1,5 +1,6 @@
 package dev.cl0ud9.krate.ui.settings
 
+import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -10,6 +11,8 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -21,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
@@ -66,6 +70,7 @@ fun AppearanceRoute(
         NavigationRows(viewModel = viewModel, navBarStyle = navBarStyle, onOpenSheet = {
             openSheet = it
         }, onOpenCornerRadius = onOpenCornerRadius)
+        EffectsRows(viewModel = viewModel)
         SettingsSectionLabel("Personality")
         val context = LocalContext.current
         SettingSwitchRow(
@@ -83,6 +88,25 @@ fun AppearanceRoute(
         LauncherIconRow()
     }
     AppearanceSheets(openSheet = openSheet, viewModel = viewModel, onDismiss = { openSheet = null })
+}
+
+// liquid glass needs Android 12's blur (and 13's shaders for the light-bending edge), so older phones don't see it
+@Composable
+private fun EffectsRows(viewModel: SettingsViewModel) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    val glass by viewModel.liquidGlass.collectAsStateWithLifecycle()
+    SettingsSectionLabel("Effects")
+    SettingSwitchRow(
+        item =
+            SettingItem(
+                rememberVectorPainter(Icons.Filled.BubbleChart),
+                "Liquid glass",
+                "Frosted, see-through materials across the app, tinted by your colours.",
+            ),
+        checked = glass,
+        shape = settingsGroupShape(0, 1),
+        onCheckedChange = viewModel::setLiquidGlass,
+    )
 }
 
 @Composable

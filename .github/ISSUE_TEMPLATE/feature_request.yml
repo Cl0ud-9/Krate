@@ -1,0 +1,35 @@
+name: Feature idea
+description: Something that would make Krate better.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome. Please describe the problem first: a clear problem often leads to a better answer than the
+        first solution that comes to mind.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: What are you trying to do, and what gets in the way today?
+      placeholder: When I set up a new phone I have to find every app in Krate again one by one.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to happen?
+      description: How you imagine it working. Sketches and screenshots of other apps are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you've tried instead?
+      description: Workarounds you use now, or other ways it could work.
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Helping out
+      options:
+        - label: I'd like to work on this myself (please wait for a reply before starting).

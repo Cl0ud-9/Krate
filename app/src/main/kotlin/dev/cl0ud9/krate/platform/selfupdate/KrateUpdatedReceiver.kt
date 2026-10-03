@@ -18,6 +18,8 @@ class KrateUpdatedReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+        // the downloaded update has been installed, so it's only taking up space now
+        selfUpdateApk(context).delete()
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(KEY_PENDING, false)) return
         prefs.edit().remove(KEY_PENDING).apply()
