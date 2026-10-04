@@ -39,9 +39,14 @@ private fun statusOutcome(
                     WaitingForUserStep.INSTALL_CONFIRM -> "Installation cancelled."
                 },
                 userCancelled = true,
+                // an app lock in front of the uninstall dialog can end it the same way
+                mayBeAppLock = waitingForUserStep == WaitingForUserStep.UNINSTALL_CONFIRM,
             )
 
-        else -> InstallStatus.Failed(friendlyFailure(message))
+        else -> {
+            val known = knownFailure(message)
+            InstallStatus.Failed(known ?: message ?: "Installation failed.", mayBeAppLock = known == null)
+        }
     }
 
 private fun isBlockedByVerifier(
@@ -51,15 +56,17 @@ private fun isBlockedByVerifier(
     status == PackageInstaller.STATUS_FAILURE_BLOCKED ||
         message?.contains("INSTALL_FAILED_VERIFICATION_FAILURE") == true
 
-// the two failures a user can actually act on get plain wording - both are fixed by the clean install
-// App Details offers next to them. Anything else keeps Android's own message
-private fun friendlyFailure(message: String?): String =
+// the failures a user can act on get plain wording, the first two fixed by the clean install App Details offers
+// next to them. Anything else keeps Android's own message
+private fun knownFailure(message: String?): String? =
     when {
-        message == null -> "Installation failed."
+        message == null -> null
         "INSTALL_FAILED_UPDATE_INCOMPATIBLE" in message ->
             "The installed app is signed with a different key, so it can't be updated in place. " +
                 "A clean install replaces it."
         "INSTALL_FAILED_VERSION_DOWNGRADE" in message ->
             "The installed version is newer, so Android won't install this one over it. A clean install replaces it."
-        else -> message
+        "INSTALL_FAILED_INSUFFICIENT_STORAGE" in message ->
+            "There isn't enough free space on this phone. Free some up and try again."
+        else -> null
     }

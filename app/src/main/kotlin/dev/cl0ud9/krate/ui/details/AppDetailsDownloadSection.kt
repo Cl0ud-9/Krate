@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -21,7 +20,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
@@ -40,7 +43,9 @@ import dev.cl0ud9.krate.ui.navigation.heroGlow
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.voice.Moment
 import dev.cl0ud9.krate.voice.rememberKrateLeadIn
+import kotlinx.coroutines.delay
 
+@Suppress("LongParameterList")
 @Composable
 internal fun DownloadSection(
     state: AppDetailsUiState,
@@ -48,6 +53,7 @@ internal fun DownloadSection(
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
     onCancelDownload: () -> Unit,
+    onBackToLatest: () -> Unit,
 ) {
     val status = state.downloadStatus
     val actionLabel = actionLabelFor(state)
@@ -85,6 +91,7 @@ internal fun DownloadSection(
                         onInstall = onInstall,
                         onRetryAsCleanInstall = onRetryAsCleanInstall,
                         onCancelDownload = onCancelDownload,
+                        onBackToLatest = onBackToLatest,
                     )
                 }
             }
@@ -104,9 +111,10 @@ private fun DownloadStatusContent(
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
     onCancelDownload: () -> Unit,
+    onBackToLatest: () -> Unit,
 ) {
     when (status) {
-        is DownloadStatus.Idle -> IdleContent(state = state, onDownload = onDownload)
+        is DownloadStatus.Idle -> IdleContent(state = state, onDownload = onDownload, onBackToLatest = onBackToLatest)
 
         is DownloadStatus.Downloading -> {
             val total = status.totalBytes
@@ -177,6 +185,7 @@ private fun DownloadStatusContent(
 private fun IdleContent(
     state: AppDetailsUiState,
     onDownload: () -> Unit,
+    onBackToLatest: () -> Unit,
 ) {
     val selected = state.selectedArtifact
     val installed = state.installedVersionName != null
@@ -187,7 +196,7 @@ private fun IdleContent(
 
     when {
         state.isRollback || state.isSwitch ->
-            RollbackContent(state = state, uninstalling = uninstalling, onDownload = onDownload)
+            RollbackContent(state, uninstalling, onDownload, onBackToLatest)
 
         state.isUpToDate -> {
             val colorScheme = MaterialTheme.colorScheme
@@ -195,12 +204,7 @@ private fun IdleContent(
                 icon = painterResource(R.drawable.ic_check_circle_rounded),
                 // the same colour as the install's own success step, so settling into this doesn't change it
                 tint = if (state.justInstalled) colorScheme.primary else colorScheme.tertiary,
-                text =
-                    if (state.justInstalled) {
-                        rememberKrateLeadIn(Moment.INSTALLED, "${state.app.displayName} is installed.")
-                    } else {
-                        "Up to date."
-                    },
+                text = installedStatusText(state),
             )
             if (uninstalling) {
                 UninstallingStatus(installStatus = state.installStatus)
@@ -238,31 +242,13 @@ private fun IdleContent(
     IdleFootnotes(state = state, uninstalling = uninstalling)
 }
 
-// an older build, or another build of the same version, picked in version history - Open stays available
 @Composable
-private fun RollbackContent(
-    state: AppDetailsUiState,
-    uninstalling: Boolean,
-    onDownload: () -> Unit,
-) {
-    StatusRow(
-        icon = rememberVectorPainter(Icons.Filled.History),
-        tint = MaterialTheme.colorScheme.primary,
-        text =
-            if (state.isSwitch) {
-                "Other build selected: ${state.selectedArtifact?.buildDescription()}."
-            } else {
-                "Older version selected: ${state.selectedArtifact?.buildDescription()}."
-            },
-    )
-    // no uninstall warning here: picking a version must not change this section's height and shove the list below;
-    // the version list says it once, and the install step says it again right before it happens
-    if (uninstalling) {
-        UninstallingStatus(installStatus = state.installStatus)
-    } else {
-        InstalledNotUpToDateActions(state = state, onDownload = onDownload)
+private fun installedStatusText(state: AppDetailsUiState): String =
+    when {
+        state.justInstalled -> rememberKrateLeadIn(Moment.INSTALLED, "${state.app.displayName} is installed.")
+        state.signedDifferently -> "Installed from somewhere else."
+        else -> "Up to date."
     }
-}
 
 // independent of which branch rendered - a real pending update and a diverged install aren't
 // mutually exclusive, so this can appear alongside either "Up to date" or "Update available"
@@ -277,9 +263,12 @@ private fun IdleFootnotes(
                 "${state.installedVersionName} outside Krate.",
         )
     }
+    // said before the download, not only once it fails
+    if (state.signedDifferently && !uninstalling) HelperText(SIGNED_DIFFERENTLY_WARNING)
     val failure = state.installStatus as? InstallStatus.Failed
     if (!uninstalling && failure != null) {
         FailureStatusRow(failure = failure)
+        if (state.installed != null && failure.mayBeAppLock) HelperText(APP_LOCK_HINT)
     }
 }
 
@@ -371,7 +360,7 @@ internal fun OpenAppButton(
 // installedVersionName to null, which removes this whole control and reveals the Download button -
 // the same feedback any uninstall (from here or from system Settings) gives
 @Composable
-private fun UninstallingStatus(installStatus: InstallStatus) {
+internal fun UninstallingStatus(installStatus: InstallStatus) {
     KrateLinearProgress(progress = null)
     HelperText(
         if (installStatus is InstallStatus.Uninstalling) {
@@ -380,5 +369,20 @@ private fun UninstallingStatus(installStatus: InstallStatus) {
             "Confirm the uninstall in the system dialog."
         },
     )
-    if (installStatus is InstallStatus.WaitingForUser) ReopenPromptButton()
+    if (installStatus is InstallStatus.WaitingForUser) {
+        ReopenPromptButton()
+        // a phone's app lock can hold the dialog back without a word, so after a while it gets a mention
+        var stillWaiting by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            delay(APP_LOCK_HINT_DELAY_MS)
+            stillWaiting = true
+        }
+        if (stillWaiting) {
+            HelperText(
+                "No dialog? If this app is locked with your phone's app lock, unlock it, then show the prompt again.",
+            )
+        }
+    }
 }
+
+private const val APP_LOCK_HINT_DELAY_MS = 6_000L

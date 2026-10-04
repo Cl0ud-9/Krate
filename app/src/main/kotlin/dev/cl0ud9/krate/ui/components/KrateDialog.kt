@@ -57,12 +57,7 @@ fun KrateDialog(
                         )
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    content = footer,
-                )
+                ButtonRow(spacing = 10, content = footer)
             }
         }
     }

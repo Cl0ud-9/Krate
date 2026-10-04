@@ -85,17 +85,11 @@ private fun SelfUpdateStartButton(
     onInstallUpdate: (String) -> Unit,
 ) {
     val downloadUrl = status.downloadUrl
-    // the Play Protect steps come first; a retry after a failed download has already been through them
-    var guide by rememberSaveable { mutableStateOf(false) }
-    if (downloadUrl != null && guide && !retrying) {
-        PlayProtectUpdateGuide(blocked = false, onUpdate = { onInstallUpdate(downloadUrl) })
-    } else if (downloadUrl != null) {
-        Button(
-            onClick = { if (retrying) onInstallUpdate(downloadUrl) else guide = true },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+    if (downloadUrl != null) {
+        Button(onClick = { onInstallUpdate(downloadUrl) }, modifier = Modifier.fillMaxWidth()) {
             Text(if (retrying) "Try again" else "Update now")
         }
+        if (!retrying) HelperText(PLAY_PROTECT_HEADS_UP)
     } else {
         val uriHandler = LocalUriHandler.current
         Button(onClick = { uriHandler.openUri(status.releaseUrl) }, modifier = Modifier.fillMaxWidth()) {
@@ -132,7 +126,7 @@ private fun SelfUpdateInstallingContent(
 
         is InstallStatus.Failed -> {
             if (installStatus.blockedByPlayProtect && retry != null) {
-                PlayProtectUpdateGuide(blocked = true, onUpdate = retry)
+                PlayProtectBlocked(retry)
             } else {
                 KrateUpdateStatusRow(
                     icon = painterResource(R.drawable.ic_error_rounded),
@@ -157,3 +151,17 @@ private fun SelfUpdateInstallingContent(
 }
 
 private const val PERCENT = 100
+
+// the steps open by themselves the first time, and stay a tap away after that
+@Composable
+private fun PlayProtectBlocked(retry: () -> Unit) {
+    var sheet by rememberSaveable { mutableStateOf(true) }
+    KrateUpdateStatusRow(
+        icon = painterResource(R.drawable.ic_shield_rounded),
+        badgeColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        text = "Play Protect stopped the update.",
+    )
+    Button(onClick = { sheet = true }, modifier = Modifier.fillMaxWidth()) { Text("Show me how") }
+    if (sheet) PlayProtectSheet(onUpdate = retry, onDismiss = { sheet = false })
+}

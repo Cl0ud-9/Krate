@@ -38,6 +38,7 @@ internal fun actionLabelFor(state: AppDetailsUiState): String =
         state.installed == null -> "Install"
         state.isRollback -> "Roll back"
         state.isSwitch -> "Switch to this build"
+        state.signedDifferently -> "Replace"
         state.isUpToDate -> "Reinstall"
         else -> "Update"
     }
@@ -46,6 +47,12 @@ internal fun actionLabelFor(state: AppDetailsUiState): String =
 // step, with its own warning)
 internal fun downloadLabelFor(state: AppDetailsUiState): String =
     if (state.installsInPlace) actionLabelFor(state) else "Download"
+
+internal const val APP_LOCK_HINT = "If this app is locked with your phone's app lock, unlock it and try again."
+
+internal const val SIGNED_DIFFERENTLY_WARNING =
+    "The copy on this phone is signed with a different key, so Android needs it uninstalled before this one " +
+        "can go on. Its data on this device will be erased."
 
 internal const val UNINSTALL_FIRST_WARNING =
     "This is older than the installed version, so Android needs the app uninstalled first. " +
@@ -168,6 +175,7 @@ private fun FailedInstallSection(
             rememberKrateLeadIn(Moment.INSTALL_FAILED, reasonText, key = failure.reason)
         }
     FailureStatusRow(failure = failure, text = text)
+    if (installed && failure.mayBeAppLock) HelperText(APP_LOCK_HINT)
 
     // only for a real failure of an in-place update: not after the user said no, not for a first install
     val offerReinstall = installed && !failure.userCancelled && !fromScratch
@@ -232,6 +240,6 @@ private fun ReadyToInstallContent(
         HelperText("Install required dependencies first: $names.")
     }
     if (state.requiresUninstall) {
-        HelperText(UNINSTALL_FIRST_WARNING)
+        HelperText(if (state.signedDifferently) SIGNED_DIFFERENTLY_WARNING else UNINSTALL_FIRST_WARNING)
     }
 }

@@ -64,8 +64,16 @@ internal fun StatusRow(
 }
 
 @Composable
-internal fun HelperText(text: String) {
-    Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+internal fun HelperText(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 // shown while Android's install/uninstall prompt is waiting - brings it back if it got hidden

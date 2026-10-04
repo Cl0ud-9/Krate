@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -31,6 +34,7 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateStatus
 import dev.cl0ud9.krate.ui.apps.SuggestAppSheet
 import dev.cl0ud9.krate.ui.components.KrateSwitch
+import dev.cl0ud9.krate.ui.details.rememberAutoBackupOn
 import dev.cl0ud9.krate.ui.util.DebouncedButtonState
 import dev.cl0ud9.krate.ui.util.KOFI_URL
 import dev.cl0ud9.krate.ui.util.rememberLastNonNull
@@ -70,14 +74,25 @@ fun SettingsScreen(
             }
             SettingsSectionLabel("General", first = true)
         }
-        AppearanceRow(shape = settingsGroupShape(0, 2), onClick = { onNavigate(SettingsPageRoute.APPEARANCE) })
+        AppearanceRow(
+            shape = settingsGroupShape(0, GENERAL_ROWS),
+            onClick = { onNavigate(SettingsPageRoute.APPEARANCE) },
+        )
         SettingsNavRow(
             icon = painterResource(R.drawable.ic_update_rounded),
             title = "Downloads & storage",
             subtitle = "Automatic downloads, mobile data, download cache",
             colors = SettingsTint.GREEN.colors(),
-            shape = settingsGroupShape(1, 2),
+            shape = settingsGroupShape(1, GENERAL_ROWS),
             onClick = { onNavigate(SettingsPageRoute.DOWNLOADS) },
+        )
+        SettingsNavRow(
+            icon = rememberVectorPainter(Icons.Filled.SettingsBackupRestore),
+            title = "Backups",
+            subtitle = if (rememberAutoBackupOn()) "Automatic backups are on" else "Keep settings across a reinstall",
+            colors = SettingsTint.TEAL.colors(),
+            shape = settingsGroupShape(2, GENERAL_ROWS),
+            onClick = { onNavigate(SettingsPageRoute.BACKUPS) },
         )
         SettingsSectionLabel("Account")
         SettingsNavRow(
@@ -93,6 +108,7 @@ fun SettingsScreen(
 }
 
 private const val GROUP_ROWS = 2
+private const val GENERAL_ROWS = 3
 
 // banner to "General": the same 22dp it had when the label carried the space itself
 private val BANNER_GAP = 18.dp
@@ -144,6 +160,7 @@ private fun SupportSection(
 object SettingsPageRoute {
     const val APPEARANCE = "settings/appearance"
     const val DOWNLOADS = "settings/downloads"
+    const val BACKUPS = "settings/backups"
     const val GITHUB = "settings/github"
     const val FEEDBACK = "settings/feedback"
     const val ABOUT = "settings/about"

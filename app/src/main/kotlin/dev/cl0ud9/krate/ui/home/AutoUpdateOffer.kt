@@ -2,7 +2,6 @@ package dev.cl0ud9.krate.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
@@ -13,7 +12,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -23,6 +21,7 @@ import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
+import dev.cl0ud9.krate.ui.components.ButtonRow
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.krateViewModel
@@ -76,10 +75,7 @@ internal fun AutoUpdateOffer() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            ) {
+            ButtonRow {
                 TextButton(onClick = { viewModel.answer(turnOn = false) }) { Text("No thanks") }
                 FilledTonalButton(onClick = { viewModel.answer(turnOn = true) }) { Text("Turn on") }
             }

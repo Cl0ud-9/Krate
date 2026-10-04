@@ -26,14 +26,14 @@ private typealias Builder = AnnotatedString.Builder
 // those as clickable too, and plenty of release notes rely on that instead of bracket syntax),
 // +/-/* bullet lists, #/##/### ATX headers, > quotes and GitHub's [!NOTE]-style alerts, so raw
 // "**"/"`"/"[...](...)"/"+ "/"### "/"> " syntax doesn't leak into the UI.
-private val QUOTE_LINE = Regex("""^\s*>\s?(.*)$""")
-private val ALERT_LINE = Regex("""^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)]\s*$""", RegexOption.IGNORE_CASE)
+internal val QUOTE_LINE = Regex("""^\s*>\s?(.*)$""")
+internal val ALERT_LINE = Regex("""^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)]\s*$""", RegexOption.IGNORE_CASE)
 private val HEADER_MARKS = Regex("""^#{1,6}\s+""")
-private val HEADER_LINE = Regex("^(#{1,6})\\s+(.*)$")
+internal val HEADER_LINE = Regex("^(#{1,6})\\s+(.*)$")
 
 // a line that is nothing but bold text, which many release notes use as a section title instead of "###"
-private val BOLD_TITLE_LINE = Regex("^\\s*\\*\\*([^*]+)\\*\\*:?\\s*$")
-private val BULLET_LINE = Regex("^(\\s*)[+*-]\\s(.*)$")
+internal val BOLD_TITLE_LINE = Regex("^\\s*\\*\\*([^*]+)\\*\\*:?\\s*$")
+internal val BULLET_LINE = Regex("^(\\s*)[+*-]\\s(.*)$")
 private val HEADER_FONT_SIZE = 15.sp
 
 // bundles the theme colors inline spans need into one, purely to keep appendWithInlineSpans
@@ -253,7 +253,7 @@ private fun Builder.appendWithInlineSpans(
                 val end = remaining.indexOf("**", boldStart + 2)
                 append(remaining.substring(0, boldStart))
                 withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = colors.body)) {
-                    append(remaining.substring(boldStart + 2, end))
+                    appendWithInlineSpans(remaining.substring(boldStart + 2, end), colors)
                 }
                 remaining = remaining.substring(end + 2)
             }
@@ -280,46 +280,3 @@ private fun shortLinkText(url: String): String =
         ?: GITHUB_NUMBERED_URL.matchEntire(url)?.let { "#${it.groupValues[1]}" }
         ?: GITHUB_COMPARE_URL.matchEntire(url)?.let { "changes from ${it.groupValues[1]} to ${it.groupValues[2]}" }
         ?: url
-
-private val HTML_COMMENT = Regex("""<!--[\s\S]*?-->""")
-private val HTML_TAG =
-    Regex(
-        """</?(details|summary|br|p|div|img|picture|source|sub|sup|kbd|b|i|em|strong|span|a|hr|h[1-6])\b[^>]*>""",
-        RegexOption.IGNORE_CASE,
-    )
-
-// release notes as written for GitHub, minus what only makes sense there: HTML comments and tags, and alert blocks
-// telling readers which APK file to pick (Krate picks the right build itself)
-internal fun cleanReleaseNotes(text: String): String {
-    val withoutHtml =
-        text
-            .replace("<!-->", "")
-            .replace(HTML_COMMENT, "")
-            .replace(HTML_TAG, "")
-    val lines = withoutHtml.lines()
-    val kept = mutableListOf<String>()
-    var i = 0
-    while (i < lines.size) {
-        if (QUOTE_LINE.matches(lines[i])) {
-            var end = i
-            while (end < lines.size && QUOTE_LINE.matches(lines[end])) end++
-            val block = lines.subList(i, end)
-            val isAlert = block.any { ALERT_LINE.matches(QUOTE_LINE.matchEntire(it)!!.groupValues[1].trim()) }
-            if (!(isAlert && block.any { it.contains(".apk", ignoreCase = true) })) kept += block
-            i = end
-        } else {
-            kept += lines[i]
-            i++
-        }
-    }
-    return kept.joinToString("\n").trim()
-}
-
-// what a collapsed preview shows: the changes themselves, from the first heading or bullet, past a leading intro
-// such as a donation note; notes without either preview from the top. The flag says whether an intro was skipped
-internal fun releaseNotesPreview(text: String): Pair<String, Boolean> {
-    val lines = cleanReleaseNotes(text).lines()
-    val first =
-        lines.indexOfFirst { HEADER_LINE.matches(it) || BOLD_TITLE_LINE.matches(it) || BULLET_LINE.matches(it) }
-    return if (first > 0) lines.drop(first).joinToString("\n") to true else lines.joinToString("\n") to false
-}

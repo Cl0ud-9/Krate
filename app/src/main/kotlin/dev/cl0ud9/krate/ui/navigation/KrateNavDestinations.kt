@@ -18,6 +18,7 @@ import dev.cl0ud9.krate.ui.details.AppDetailsScreen
 import dev.cl0ud9.krate.ui.home.HomeScreen
 import dev.cl0ud9.krate.ui.settings.AboutPage
 import dev.cl0ud9.krate.ui.settings.AppearanceRoute
+import dev.cl0ud9.krate.ui.settings.BackupsPage
 import dev.cl0ud9.krate.ui.settings.CornerRadiusEditor
 import dev.cl0ud9.krate.ui.settings.DownloadsStoragePage
 import dev.cl0ud9.krate.ui.settings.FeedbackPage
@@ -129,6 +130,9 @@ internal fun NavGraphBuilder.appearanceDestination(navController: NavHostControl
 internal fun NavGraphBuilder.settingsPageDestinations(navController: NavHostController) {
     settingsPageDestination(navController, SettingsPageRoute.DOWNLOADS, "Downloads & storage") { scroll, top ->
         DownloadsStoragePage(scrollState = scroll, topContentPadding = top)
+    }
+    settingsPageDestination(navController, SettingsPageRoute.BACKUPS, "Backups") { scroll, top ->
+        BackupsPage(scrollState = scroll, topContentPadding = top)
     }
     settingsPageDestination(navController, SettingsPageRoute.GITHUB, "GitHub access") { scroll, top ->
         GitHubAccessPage(scrollState = scroll, topContentPadding = top)

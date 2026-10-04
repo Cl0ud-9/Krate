@@ -10,10 +10,28 @@ data class AppGuide(
     // how to save the app's settings and data, and how to bring them back after a reinstall from scratch
     val backup: String? = null,
     val restore: String? = null,
+    // for apps whose backup is text in a box of their own, the way there, so Krate can save and restore it itself
+    val autoBackup: AutoBackup? = null,
 ) {
     val isEmpty: Boolean
         get() = setup.isEmpty() && tips.isEmpty() && backup == null
 }
+
+// the taps from an app's first screen to the box holding its settings as text, and the buttons that close that box
+// and apply text pasted into it
+data class AutoBackup(
+    val path: List<UiTarget>,
+    val close: String,
+    val apply: String,
+)
+
+// something on screen to tap, by its visible text or, for an icon, the label read out for it
+data class UiTarget(
+    val text: String? = null,
+    val description: String? = null,
+    // only on some versions of the app's screens: tapped when it's there, skipped when it isn't
+    val optional: Boolean = false,
+)
 
 data class SetupStep(
     val kind: SetupKind,

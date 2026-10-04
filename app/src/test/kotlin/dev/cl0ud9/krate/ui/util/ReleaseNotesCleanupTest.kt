@@ -66,4 +66,38 @@ class ReleaseNotesCleanupTest {
         val notes = "- Added comparison operators (`>`, `>=`, `<`, `<=`)"
         assertEquals(notes, cleanReleaseNotes(notes))
     }
+
+    // shaped like LastWave's notes: changes, a rule, then a table and a warning about which file to download
+    private val packages =
+        """
+        ### What's New in v4.2.3
+        • Discord RPC: rich presence with live track status.
+
+        ---
+
+        ### 📦 Download Packages & Compatibility
+
+        | Package | Recommended OS | Description |
+        | :--- | :--- | :--- |
+        | **`LastWave-v4.2.3-universal.apk`** (~22 MB) | **Android 10+** | **Standard Recommended Release.** |
+        | **`LastWave-v4.2.3-android7.apk`** (~17 MB) | **Android 7.0 – 9.0** | **Legacy variant.** |
+
+        > [!WARNING]
+        > - For Android 10 or newer, install **`LastWave-v4.2.3-universal.apk`**.
+        """.trimIndent()
+
+    @Test
+    fun `a table of apk files goes, with the heading it leaves empty and the rule`() {
+        val cleaned = cleanReleaseNotes(packages)
+        assertFalse(cleaned.contains("|"))
+        assertFalse(cleaned.contains("Download Packages"))
+        assertFalse(cleaned.contains("---"))
+        assertTrue(cleaned.contains("Discord RPC"))
+    }
+
+    @Test
+    fun `other tables become bullets`() {
+        val notes = "| Setting | What it does |\n|---|---|\n| Crossfade | Blends tracks |\n| Gapless | No pause |"
+        assertEquals("- Crossfade: Blends tracks\n- Gapless: No pause", cleanReleaseNotes(notes))
+    }
 }

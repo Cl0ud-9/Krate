@@ -58,7 +58,27 @@ class InstallResultMappingTest {
                 "DELETE_FAILED_ABORTED: User rejected permission",
                 WaitingForUserStep.UNINSTALL_CONFIRM,
             )
-        assertEquals(InstallStatus.Failed("Uninstall cancelled.", userCancelled = true), status)
+        assertEquals(InstallStatus.Failed("Uninstall cancelled.", userCancelled = true, mayBeAppLock = true), status)
+    }
+
+    // a phone's own app lock gives no code of its own, so only failures without a clear cause point to it
+    @Test
+    fun `only failures without a clear cause mention an app lock`() {
+        fun failed(
+            status: Int,
+            message: String?,
+        ) = interpretInstallResult(status, message, WaitingForUserStep.INSTALL_CONFIRM) as InstallStatus.Failed
+
+        assertTrue(failed(PackageInstaller.STATUS_FAILURE, "INSTALL_FAILED_INTERNAL_ERROR").mayBeAppLock)
+        assertTrue(failed(PackageInstaller.STATUS_FAILURE, message = null).mayBeAppLock)
+        assertTrue(!failed(PackageInstaller.STATUS_FAILURE_ABORTED, message = null).mayBeAppLock)
+        assertTrue(!failed(PackageInstaller.STATUS_FAILURE_STORAGE, "INSTALL_FAILED_INSUFFICIENT_STORAGE").mayBeAppLock)
+        assertTrue(
+            !failed(
+                PackageInstaller.STATUS_FAILURE_CONFLICT,
+                "INSTALL_FAILED_UPDATE_INCOMPATIBLE: mismatch",
+            ).mayBeAppLock,
+        )
     }
 
     @Test

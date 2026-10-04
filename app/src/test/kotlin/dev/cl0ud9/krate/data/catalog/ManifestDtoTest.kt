@@ -118,6 +118,33 @@ class ManifestDtoTest {
         )
     }
 
+    // the way to an app's backup box comes through whole, and an incomplete one is dropped rather than half followed
+    @Test
+    fun `an automatic backup path comes through only when it's complete`() {
+        fun guideWith(autoBackup: String) =
+            parse(
+                """{"schemaVersion":2,"apps":[{"id":"a","displayName":"A","packageName":"p",
+                "supportStatus":"SUPPORTED","installationMode":"UPDATE",
+                "guide":{"backup":"Export","autoBackup":$autoBackup}}]}""",
+            ).apps
+                .single()
+                .toDomain(android12Arm64)!!
+                .guide!!
+
+        val complete =
+            guideWith(
+                """{"path":[{"description":"Profile"},{"text":"Backup","optional":true}],""" +
+                    """"close":"Cancel","apply":"Import"}""",
+            ).autoBackup!!
+        assertEquals(listOf(null, "Backup"), complete.path.map { it.text })
+        assertEquals("Profile", complete.path.first().description)
+        assertEquals("Import", complete.apply)
+        assertEquals(listOf(false, true), complete.path.map { it.optional })
+
+        assertNull(guideWith("""{"path":[{"text":"Backup"}],"close":"Cancel"}""").autoBackup)
+        assertNull(guideWith("""{"path":[{}],"close":"Cancel","apply":"Import"}""").autoBackup)
+    }
+
     private fun parse(text: String) = json.decodeFromString<ManifestDto>(text)
 
     private val manifest =

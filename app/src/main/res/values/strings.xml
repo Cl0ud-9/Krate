@@ -6,4 +6,7 @@
     <string name="nav_apps">Apps</string>
     <string name="nav_updates">Updates</string>
     <string name="nav_settings">Settings</string>
+    <string name="backup_service_label">Krate automatic backups</string>
+    <string name="backup_service_summary">Saves and restores an app’s settings for you</string>
+    <string name="backup_service_description">When you ask Krate to back up or restore an app’s settings, or right before and after Krate reinstalls that app, this opens the app and goes through its own backup screen for you, the same taps you would make. It does nothing at any other time, and only looks at the app being backed up. Backups stay in Krate on this phone.</string>
 </resources>

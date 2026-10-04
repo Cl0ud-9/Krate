@@ -252,12 +252,23 @@ class AppDetailsViewModel(
     // stale ReadyToInstall install the wrong (no longer selected) version, so this also resets
     // downloadStatus back to Idle for the newly selected artifact
     fun selectVersion(artifact: ArtifactInfo) {
-        val status = mutableDownloadStatus.value
-        if (isBusy() || status is DownloadStatus.Downloading || status is DownloadStatus.Verifying) return
+        if (!canChangeVersion()) return
         mutableJustInstalled.value = false
         mutableRestorePending.value = false
         mutableExplicitArtifact.value = artifact
         mutableDownloadStatus.value = DownloadStatus.Idle
+    }
+
+    // drops a version picked in version history, back to the newest build
+    fun backToLatest() {
+        if (mutableExplicitArtifact.value == null || !canChangeVersion()) return
+        mutableExplicitArtifact.value = null
+        mutableDownloadStatus.value = DownloadStatus.Idle
+    }
+
+    private fun canChangeVersion(): Boolean {
+        val status = mutableDownloadStatus.value
+        return !isBusy() && status !is DownloadStatus.Downloading && status !is DownloadStatus.Verifying
     }
 
     fun startDownload() {

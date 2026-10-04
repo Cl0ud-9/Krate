@@ -32,8 +32,9 @@ class CleanInstallOrchestrator(
                 }
             }
             val uninstallError = uninstallFailure
+            // passed on whole, so a cancel still reads as one and an app lock still gets its hint
             if (uninstallError != null) {
-                emit(InstallStatus.Failed(uninstallError.reason))
+                emit(uninstallError)
                 return@flow
             }
 

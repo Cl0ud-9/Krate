@@ -43,7 +43,7 @@ internal fun ReleaseItem(release: KrateRelease) {
                 )
             }
         }
-        ReleaseNotesCard(notes = releaseNoteItems(release.notes))
+        ReleaseNotesCard(notes = releaseNoteItems(release.notes), intro = releaseNoteIntro(release.notes))
     }
 }
 
@@ -61,7 +61,10 @@ private fun VersionBadge(version: String) {
 }
 
 @Composable
-private fun ReleaseNotesCard(notes: List<String>) {
+private fun ReleaseNotesCard(
+    notes: List<String>,
+    intro: String?,
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -73,6 +76,14 @@ private fun ReleaseNotesCard(notes: List<String>) {
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
+            intro?.let {
+                Text(
+                    text = it.formatMarkdownLite(),
+                    modifier = Modifier.padding(top = 12.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             notes.ifEmpty { listOf("No notes for this version.") }.forEachIndexed { index, note ->
                 if (index > 0) {
                     HorizontalDivider(
@@ -111,9 +122,27 @@ private fun NoteRow(
 }
 
 // a release body's "- " bullets become one row each; any loose paragraph is a row of its own
+// the lines before the first bullet, such as "Here's what's new:", read as a lead-in rather than a change
+internal fun releaseNoteIntro(notes: String): String? =
+    notes
+        .lines()
+        .map { it.trim() }
+        .takeWhile { !it.startsWith("- ") && !it.startsWith("* ") }
+        .filter { it.isNotEmpty() && !it.startsWith("#") }
+        .joinToString(" ")
+        .takeIf { it.isNotEmpty() && notes.lines().any { line -> line.trim().startsWith("- ") } }
+
 internal fun releaseNoteItems(notes: String): List<String> {
     val items = mutableListOf<String>()
-    notes.lines().map { it.trim() }.forEach { line ->
+    val body =
+        if (releaseNoteIntro(notes) !=
+            null
+        ) {
+            notes.lines().dropWhile { !it.trim().startsWith("- ") }
+        } else {
+            notes.lines()
+        }
+    body.map { it.trim() }.forEach { line ->
         when {
             line.isEmpty() -> Unit
             line.startsWith("- ") || line.startsWith("* ") -> items += line.drop(2).trim()

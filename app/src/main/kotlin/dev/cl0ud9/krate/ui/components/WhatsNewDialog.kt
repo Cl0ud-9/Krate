@@ -30,7 +30,13 @@ fun WhatsNewDialog(
                 body = "Krate is on version ${release.version} now. Here's what changed.",
             ),
         onDismissRequest = onDismiss,
-        detail = { ReleaseNotesHint(title = "What's new", notes = releaseNoteItems(release.notes)) },
+        detail = {
+            ReleaseNotesHint(
+                title = "What's new",
+                notes = releaseNoteItems(release.notes),
+                intro = releaseNoteIntro(release.notes),
+            )
+        },
         footer = {
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = onDismiss, shape = ShapeCache.rounded16) {

@@ -13,6 +13,8 @@ data class InstalledVersion(
     val versionName: String?,
     val versionCode: Long,
     val lastUpdateTimeMillis: Long = 0L,
+    // the certificate it's signed with, as the catalog lists it; null when Android didn't say
+    val signerSha256: String? = null,
 )
 
 interface InstalledPackageReader {

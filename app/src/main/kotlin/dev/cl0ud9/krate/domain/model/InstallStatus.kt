@@ -37,5 +37,7 @@ sealed interface InstallStatus {
         val userCancelled: Boolean = false,
         // Google Play Protect stopped it; pausing Play Protect and trying again is the way through
         val blockedByPlayProtect: Boolean = false,
+        // no clear cause, so a phone's own app lock on the app could be what stopped it
+        val mayBeAppLock: Boolean = false,
     ) : InstallStatus
 }

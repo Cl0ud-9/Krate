@@ -104,6 +104,7 @@ fun AppDetailsScreen(
                 onInstall = rememberDebouncedOnClick(onClick = viewModel::startInstall),
                 onRetryAsCleanInstall = rememberDebouncedOnClick(onClick = viewModel::retryAsCleanInstall),
                 onCancelDownload = viewModel::cancelDownload,
+                onBackToLatest = viewModel::backToLatest,
                 onUninstall = rememberDebouncedOnClick(onClick = viewModel::startUninstall),
                 onSelectVersion = viewModel::selectVersion,
                 onNavigateToApp = onNavigateToApp,
@@ -219,6 +220,10 @@ internal data class AppDetailsUiState(
     val requiresUninstall: Boolean
         get() = requiresUninstall(installed, selectedArtifact)
 
+    // the installed copy came from somewhere else, signed with its own key
+    val signedDifferently: Boolean
+        get() = isSignedDifferently(installed, selectedArtifact)
+
     // read by both the Idle and Failed branches of the download section - whether the installed
     // app already matches what's selected is independent of whatever the current download
     // attempt's own status is, so a failed redownload shouldn't hide that the app is fine.
@@ -267,6 +272,7 @@ private fun AppDetailsContent(
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
     onCancelDownload: () -> Unit,
+    onBackToLatest: () -> Unit,
     onUninstall: () -> Unit,
     onSelectVersion: (ArtifactInfo) -> Unit,
     onNavigateToApp: (String) -> Unit,
@@ -325,6 +331,7 @@ private fun AppDetailsContent(
             onInstall = guarded.install,
             onRetryAsCleanInstall = guarded.retryFromScratch,
             onCancelDownload = onCancelDownload,
+            onBackToLatest = onBackToLatest,
         )
 
         // what it needs switched on, and its settings, right under the action once it's installed
@@ -355,7 +362,7 @@ private fun NotesAndHistory(
         // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
         installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
         selectedArtifact = state.selectedArtifact,
-        olderThanInstalledListed = state.app.artifacts.any { requiresUninstall(state.installed, it) },
+        olderThanInstalledListed = state.app.artifacts.any { isOlderThanInstalled(state.installed, it) },
         onSelectVersion = { artifact ->
             anchor.hold()
             onSelectVersion(artifact)

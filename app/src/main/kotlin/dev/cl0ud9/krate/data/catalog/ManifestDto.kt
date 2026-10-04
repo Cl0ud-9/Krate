@@ -5,11 +5,13 @@ import dev.cl0ud9.krate.domain.model.AnnouncementSeverity
 import dev.cl0ud9.krate.domain.model.AppGuide
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.ArtifactInfo
+import dev.cl0ud9.krate.domain.model.AutoBackup
 import dev.cl0ud9.krate.domain.model.DeviceProfile
 import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.SetupKind
 import dev.cl0ud9.krate.domain.model.SetupStep
 import dev.cl0ud9.krate.domain.model.SupportStatus
+import dev.cl0ud9.krate.domain.model.UiTarget
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
@@ -70,6 +72,21 @@ data class ManifestGuideDto(
     val tips: List<String> = emptyList(),
     val backup: String? = null,
     val restore: String? = null,
+    val autoBackup: ManifestAutoBackupDto? = null,
+)
+
+@Serializable
+data class ManifestAutoBackupDto(
+    val path: List<ManifestUiTargetDto> = emptyList(),
+    val close: String = "",
+    val apply: String = "",
+)
+
+@Serializable
+data class ManifestUiTargetDto(
+    val text: String? = null,
+    val description: String? = null,
+    val optional: Boolean = false,
 )
 
 @Serializable
@@ -94,7 +111,19 @@ fun ManifestGuideDto.toDomain(): AppGuide =
         tips = tips,
         backup = backup,
         restore = restore,
+        autoBackup = autoBackup?.toDomain(),
     )
+
+// left out unless it's complete: every step names something, and both buttons are there
+private fun ManifestAutoBackupDto.toDomain(): AutoBackup? =
+    takeIf { spec ->
+        spec.path.isNotEmpty() &&
+            spec.path.all { it.text != null || it.description != null } &&
+            spec.close.isNotBlank() &&
+            spec.apply.isNotBlank()
+    }?.let { spec ->
+        AutoBackup(spec.path.map { UiTarget(it.text, it.description, it.optional) }, spec.close, spec.apply)
+    }
 
 @Serializable
 data class ManifestAnnouncementDto(
