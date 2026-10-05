@@ -44,13 +44,13 @@ class BaselineTest {
         assertFalse(older.isNewerThan(Baseline("20.40.45", "b2"), app.artifacts))
     }
 
-    // records from 0.1.5 have no build id: a privately built app is rebuilt whenever its patches
-    // change, so the record can't be trusted to be the current build; a public app has one build
+    // records from 0.1.5 have no build id: a privately built app is rebuilt on the same
+    // version, so the record can't be trusted to be the current build; a public app has one build
     // per version, so the record simply is that build
-    // the version history is patches releases: a newer patches release is the update even when it
+    // the version history is builds: a newer build is the update even when it
     // had to target an older app version
     @Test
-    fun `a newer patches release is an update even on an older app version`() {
+    fun `a newer build is an update even on an older app version`() {
         val app = app(build("20.37.48", "p3"), build("20.40.45", "p2"))
 
         assertTrue(isUpdateAvailable(installed, app, Baseline("20.40.45", "p2")))

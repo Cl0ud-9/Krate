@@ -83,7 +83,7 @@ internal fun formatDiagnosticReport(
         }
     }
 
-// the version as the app reports it, plus the build when that says more than the version (a patched rebuild)
+// the version as the app reports it, plus the build when that says more than the version (a rebuild)
 internal fun reportedVersion(
     versionName: String,
     buildId: String?,

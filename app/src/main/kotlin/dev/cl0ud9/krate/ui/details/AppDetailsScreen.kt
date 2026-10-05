@@ -256,11 +256,11 @@ internal data class AppDetailsUiState(
 internal fun ArtifactInfo.isBuildOf(baseline: Baseline): Boolean =
     if (baseline.buildId != null) buildId == baseline.buildId else versionName == baseline.versionName
 
-// "patches v6.2.1 on 20.40.45, Material You" for a patched app, where the patches release is what
-// tells builds apart; just the version otherwise
+// "20.40.45, build v6.2.1, Material You" for an app Krate builds itself, where the build number is what tells
+// builds apart; just the version otherwise
 internal fun ArtifactInfo.buildDescription(): String {
     val patches = patchesVersionName ?: return listOfNotNull(versionName, label).joinToString(", ")
-    return listOfNotNull("patches $patches on $versionName", label).joinToString(", ")
+    return listOfNotNull(versionName, "build $patches", label).joinToString(", ")
 }
 
 @Suppress("LongParameterList")
@@ -427,13 +427,12 @@ private fun AppDetailsHeader(
                         )
                     }
 
-                    // only set for an artifact built by an intermediate tool (a patches bundle) - "Latest"
-                    // above is always the app's own version, so this is shown alongside it rather than
-                    // instead of it, giving a complete picture of what was patched and what patched it
+                    // only set for an app Krate builds itself: "Latest" above is the app's own version, and this
+                    // build number sits beside it
                     app.latestArtifact?.patchesVersionName?.let { patchesVersion ->
                         val label = app.latestArtifact?.label
                         Text(
-                            text = listOfNotNull(label, "Patches $patchesVersion").joinToString(", "),
+                            text = listOfNotNull(label, "Build $patchesVersion").joinToString(", "),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

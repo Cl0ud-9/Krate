@@ -84,8 +84,8 @@ private fun Baseline.notNewerThan(
         this
     }
 
-// the installed version is one the catalog knows, but several builds can share a version (patched
-// rebuilds with newer patches) - the one it is, is the newest of them already published when it was
+// the installed version is one the catalog knows, but several builds can share a version (rebuilds
+// on the same version) - the one it is, is the newest of them already published when it was
 // installed. Without publish dates there's no telling, so the build stays unknown
 private fun matchingBuild(
     app: AppProfile,
@@ -116,9 +116,8 @@ private fun guessFromCatalog(
 }
 
 // true when this artifact is something newer than the baseline. With build ids on both sides the
-// catalog's own order decides - it lists builds newest release first, and for patched apps a
-// release is a patches release, so a new patches release is newer even on the same (or, if the
-// patches dropped support for it, an older) app version. A baseline build missing from the list
+// catalog's own order decides - it lists builds newest release first, and for apps Krate builds
+// itself a newer build is newer even on the same (or an older) app version. A baseline build missing from the list
 // was pruned long ago, so it is older. Without build ids it falls back to the version number
 fun ArtifactInfo.isNewerThan(
     baseline: Baseline,
@@ -129,8 +128,8 @@ fun ArtifactInfo.isNewerThan(
         buildId != null && baselineBuildId != null -> isListedBefore(baselineBuildId, baseline, artifacts)
         isNewerVersion(versionName, baseline.versionName) -> true
         versionName != baseline.versionName -> false
-        // a pre-build-id record of a privately built app (patched ones, rebuilt whenever patches
-        // change) can't be matched to a build, so it is treated as older. Public apps publish one
+        // a pre-build-id record of a privately built app (rebuilt on the same version) can't be matched
+        // to a build, so it is treated as older. Public apps publish one
         // build per version, so their same-version record is simply that build
         else -> baselineBuildId == null && buildId != null && requiresAuth
     }

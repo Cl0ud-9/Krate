@@ -139,7 +139,7 @@ class OkHttpArtifactDownloader(
 
     // the build (or, for manifests without build ids, the version) is part of the file name, not
     // just app.id - otherwise a stale .part/.apk from a different version, or from an older build of
-    // the same version (a patched rebuild keeps the app's own version), could look resumable/ready here
+    // the same version (a rebuild keeps the app's own version), could look resumable/ready here
     private fun fileIdFor(
         app: AppProfile,
         artifact: ArtifactInfo,

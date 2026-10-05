@@ -31,8 +31,8 @@ import java.text.DateFormat
 import java.util.Date
 
 // every retained build, so a misbehaving newest one can be swapped for an earlier one (a withdrawn build is
-// listed but can't be picked); with only one build it says so rather than vanishing. For a patched app each row
-// is a patches release
+// listed but can't be picked); with only one build it says so rather than vanishing. For an app Krate builds itself
+// each row is one of its builds
 @Suppress("LongParameterList")
 @Composable
 internal fun VersionHistorySection(
@@ -111,7 +111,7 @@ private fun VersionRow(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             val patches = artifact.patchesVersionName
             Text(
-                text = if (patches != null) "Patches $patches" else artifact.versionName,
+                text = if (patches != null) "Build $patches" else artifact.versionName,
                 style = MaterialTheme.typography.bodyMedium,
             )
             val details =

@@ -42,7 +42,7 @@ import dev.cl0ud9.krate.ui.theme.ShapeCache
 private const val DIVIDER_ALPHA = 0.4f
 private val GITHUB_RELEASE_URL = Regex("""^https://github\.com/([^/]+)/([^/]+)/releases/""")
 
-// where an app's builds come from, read off its download link: a public GitHub repo, or Krate's own patched builds
+// where an app's builds come from, read off its download link: a public GitHub repo, or Krate's own builds
 internal sealed interface PackedFrom {
     data class Repo(
         val slug: String,
@@ -51,7 +51,7 @@ internal sealed interface PackedFrom {
     data object KrateBuilds : PackedFrom
 }
 
-// builds behind a token are the patched ones Krate builds and signs itself; otherwise the repo in the link
+// builds behind a token are the ones Krate builds and signs itself; otherwise the repo in the link
 internal fun packedFrom(
     downloadUrl: String?,
     requiresAuth: Boolean,
@@ -152,7 +152,7 @@ private fun PackedFromRow(source: PackedFrom) {
                     ) { append(source.slug) }
                     append(" on GitHub, with no middlemen. ")
                 }
-                PackedFrom.KrateBuilds -> append("Patched and signed by Krate itself. ")
+                PackedFrom.KrateBuilds -> append("Built and signed by Krate itself. ")
             }
             append("Every download's fingerprint is checked before it's installed.")
         }
