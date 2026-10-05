@@ -27,8 +27,9 @@ cd Krate
 ./gradlew assembleDebug
 ```
 
-The debug build installs alongside nothing else and needs no signing keys. Release signing and the catalog signing key
-are only needed by the maintainer; see [SETUP.md](SETUP.md).
+The debug build needs no signing keys. It uses the same app ID as Krate's releases, so it can't install over a Krate
+from the Releases page: uninstall that first, or use an emulator. Release signing and the catalog signing key are only
+needed by the maintainer; see [SETUP.md](SETUP.md).
 
 ## Making a change
 
@@ -54,8 +55,25 @@ are only needed by the maintainer; see [SETUP.md](SETUP.md).
 - ktlint and detekt enforce formatting and size limits (60-line functions, 120-character lines); don't suppress a
   rule to get past it without explaining why in the pull request.
 - Comments explain *why*, not *what*, and stay short. No commented-out code.
-- User-facing text is plain and friendly: short sentences, no jargon, no exclamation marks in errors.
+- User-facing text follows the writing guide below.
 - No new dependency without discussing it first in an issue: every library ends up in the APK people install.
+
+## Writing
+
+The same rules apply to text in the app, the docs and release notes.
+
+- **Talk to the reader.** Use "you", short sentences, and say what something does for them before how it works.
+  Explain a technical term once, or leave it out.
+- **Be plain and honest.** Say what Krate can't do and what it asks for. No hype ("powerful", "seamless"), no filler
+  ("genuinely", "actually"), no exclamation marks.
+- **A little character, in the right places.** The odd crate-and-shelf joke is welcome in headlines and empty states,
+  at most once a section. Never in instructions, errors, security or licence text.
+- **Punctuation and spelling.** No em dashes, and no spaced hyphen in their place: use a full stop, comma, colon or
+  brackets. British spelling (colour, behaviour).
+- **Formatting.** Sentence-case headings. Menu paths in bold with `>`, like **Settings > Downloads & storage**; button
+  labels in italics, like *Install*. Versions as 0.4.9 in text and v0.4.9 for tags. Markdown wrapped at 120 characters.
+- **Release notes.** A one-line intro, then bullets that each start with a bold phrase, most important first, with
+  **Fixes.** last. Only what changed for the person using Krate: no file names, internals or refactors.
 
 ## What gets merged
 

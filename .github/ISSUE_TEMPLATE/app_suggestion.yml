@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Krate is a small, hand-picked shelf of apps you won't find on the Play Store, mostly open source and released
-        on GitHub. You can also suggest an app straight from Krate: **Apps > Suggest an app**, or share a GitHub link
+        on GitHub. You can also suggest an app straight from Krate: **Settings > Suggest an app**, or share a GitHub link
         to Krate from your browser.
   - type: input
     id: name

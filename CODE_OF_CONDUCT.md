@@ -21,5 +21,5 @@ else the project lives) is expected to help keep it a friendly place to be.
 ## Enforcement
 
 The maintainer may edit or remove comments, close issues and pull requests, and block anyone who doesn't follow this
-code, temporarily or permanently. To report a problem privately, use the contact details in [SECURITY.md](SECURITY.md).
+code, temporarily or permanently. To report a problem privately, email the maintainer at tonpe.parag1@gmail.com.
 Reports are kept confidential.

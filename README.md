@@ -52,17 +52,15 @@ quiet? Turn off **Playful messages** in **Settings > Appearance > Personality**.
 | | |
 |---|---|
 | 📦 **A curated catalog** | A short shelf of apps worth having, each with a plain-language description of what it does and where it comes from. |
-| ⚡ **One-tap installs and updates** | One tap downloads and installs. Updates to apps Krate installed go on without Android's prompt, and *Update all* puts dependencies in first. |
+| ⚡ **One-tap installs and updates** | One tap downloads and installs, and *Update all* puts dependencies in first. On Android 12 and newer, updates to apps Krate installed skip Android's prompt. |
 | 🧭 **Set up in a tap** | After installing, each app's permissions are a tap away, ticked off as you turn them on, with the settings worth a look and how to back them up. |
 | 🔐 **Checked before it installs** | The catalog is signed with Ed25519, and every APK's SHA-256 and signing certificate are checked before Android ever sees it. |
-| 🔔 **Updates find you** | A background check every few hours, and a notification when something new lands. |
-| 🌙 **Updates that install themselves** | Updates to apps from Krate install a day after release, while you're not using them. It never rolls an app back or erases its data, and any app can stay manual or skip a version. On for new installs; anyone upgrading is asked once. |
-| 📶 **Automatic downloads** | Updates can download ahead of time on Wi-Fi (mobile data is opt-in), so installing takes seconds. |
+| 🔔 **Updates find you** | A background check every few hours and a notification when something new lands. Updates can download ahead of time on Wi-Fi, and install themselves a day after release while you're not using the app. Any app can stay manual or skip a version. |
 | 🏃 **Downloads that keep going** | Switch apps mid-download and it carries on, with progress in the notification. A dropped connection picks up where it stopped. |
 | 🕰️ **Version history** | A new build misbehaving? Pick an older one from the list and go back. |
-| 💾 **Automatic backups** | Optional. For apps that export their settings as text, Krate can back them up before a reinstall from scratch and put them back after, by going through the app's own backup screen with Android's accessibility access. It only acts while a backup runs. |
+| 💾 **Automatic backups** | If you turn them on, Krate saves an app's settings before a reinstall from scratch and puts them back after. |
 | 🛟 **Safe clean installs** | When an update can't go on top, Krate keeps a copy of the current version and puts it back if anything fails. |
-| 🎨 **Looks the part** | Material 3 Expressive, Material You colors, light and dark themes, a floating or full-width nav bar, and optional liquid glass across the app, tinted by your colours, and a proper landscape layout. |
+| 🎨 **Looks the part** | Material 3 Expressive with Material You colours, light and dark themes, a floating or full-width nav bar, optional liquid glass and a proper landscape layout. |
 | 💡 **Suggest from anywhere** | Share a GitHub link to *Suggest to Krate* from your browser and the suggestion is filled in. |
 | 🙈 **Hide the icon** | Keep Krate off your home screen. It keeps working, and opens from its notifications or App info. |
 | 🧾 **Readable release notes** | GitHub's markup, cleaned up, with "what's new since yours" at a glance. |
@@ -131,7 +129,8 @@ GitHub releases ──► catalog (built every 2 hours, signed) ──► Krate 
 - Krate only talks to GitHub: the catalog, releases and its own updates.
 - If you add a GitHub token, it's stored encrypted on your device and only ever sent to GitHub.
 - Diagnostic reports are only created when you ask for one, and you choose where to send them.
-- Automatic backups are off until you turn them on. They stay in Krate on your phone, and the accessibility access they use only looks at the app being backed up, only while it runs.
+- Automatic backups are off until you turn them on. They use Android's accessibility access only while a backup runs,
+  only inside the app being backed up, and the backups stay on your phone.
 
 ## FAQ
 

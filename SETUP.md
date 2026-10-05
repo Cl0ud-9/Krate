@@ -1,59 +1,53 @@
 # Setup
 
-These steps involve your own accounts and secrets, so each is written as a command to run yourself. None of it is needed to build and run the app locally - only for signing, push notifications, and CI publishing.
+None of this is needed to build and run Krate yourself. It covers what the maintainer needs to sign releases and
+publish the catalog. Each step is a command to run yourself, because it involves your own keys and accounts.
 
-## 1. Release signing keystore (needed from Phase 4 onward)
+## 1. Release signing key
 
-Generate it locally, keep it outside the repo (`.gitignore` already excludes `*.jks`/`*.keystore`):
-
-```
-keytool -genkeypair -v -keystore release.jks -alias krate-release -keyalg RSA -keysize 4096 -validity 10000
-```
-
-Pick your own store/key passwords when prompted - don't reuse them elsewhere. Back the file up somewhere offline; losing it means you can never publish an update under the same signing identity again.
-
-Base64-encode it for CI:
+Krate's releases are signed on the maintainer's machine, not in CI. Make the key once:
 
 ```
-base64 -w0 release.jks > release.jks.b64
+keytool -genkeypair -v -keystore manager-release.keystore -alias manager-release -keyalg RSA -keysize 2048 -validity 10000 -storetype PKCS12
 ```
 
-Add as GitHub Actions secrets (repo Settings -> Secrets and variables -> Actions), or via `gh`:
+Then create `keystore.properties` next to `build.gradle.kts`:
 
 ```
-gh secret set RELEASE_KEYSTORE_BASE64 < release.jks.b64
-gh secret set RELEASE_KEYSTORE_PASSWORD
-gh secret set RELEASE_KEY_ALIAS
-gh secret set RELEASE_KEY_PASSWORD
+storeFile=manager-release.keystore
+storePassword=<the password you chose>
+keyAlias=manager-release
+keyPassword=<the same password>
 ```
 
-Delete `release.jks.b64` locally once uploaded.
+Both files are ignored by git. `./gradlew assembleRelease` signs with them, and a release build without them comes out
+unsigned rather than signed with the wrong key.
 
-## 2. Firebase project (needed from Phase 9, FCM)
+Back both up somewhere safe and offline. Every Krate release has to be signed with this same key: if it's lost, nobody
+can update in place and everyone has to reinstall Krate.
 
-1. Create a project at https://console.firebase.google.com (free Spark plan - FCM has no usage cap on it).
-2. Add an Android app with package name `dev.cl0ud9.krate`.
-3. Download `google-services.json`, place it at `app/google-services.json`. It's gitignored - each environment (your machine, CI) needs its own copy or a secret-backed copy.
-4. For CI, base64-encode it the same way as the keystore and store as `GOOGLE_SERVICES_JSON_BASE64`; the workflow decodes it before build.
+## 2. Catalog signing key
 
-## 3. Manifest signing key (needed from Phase 2, per amendment 44.3)
+The public catalog is signed with an Ed25519 key. Its public half is built into Krate, and the private half is a
+GitHub Actions secret:
 
 ```
 openssl genpkey -algorithm ed25519 -out manifest-signing.key
 openssl pkey -in manifest-signing.key -pubout -out manifest-signing.pub
+gh secret set MANIFEST_SIGNING_KEY < manifest-signing.key
 ```
 
-Keep `manifest-signing.key` as a CI secret (`MANIFEST_SIGNING_KEY`), never commit it. The public key (`manifest-signing.pub`) gets baked into the app as a resource - that one's fine to commit once Phase 2 wires it in.
+Never commit the private key. Changing it means shipping a Krate update with the new public key first.
 
-Optionally, `RELEASE_NOTES_BLOCKLIST` (a comma-separated list of words) keeps any upstream release notes that
-mention one of them out of the catalog; the app links to that release on GitHub instead:
+Optionally, `RELEASE_NOTES_BLOCKLIST` (a comma-separated list of words) keeps upstream release notes that mention any
+of them out of the catalog. Krate links to that release on GitHub instead:
 
 ```
 gh secret set RELEASE_NOTES_BLOCKLIST
 ```
 
-## 4. Invite-only catalog entries (optional)
+## 3. Invite-only apps
 
-Some catalog entries are published privately, in a separate signed catalog that Krate fetches only while a GitHub token
-is saved in **Settings > GitHub access**. Building and publishing them, and granting access, is covered in that
-private repo's own docs, not here.
+Some apps are published privately, in a separate signed catalog that Krate fetches only while a GitHub token is saved
+in **Settings > GitHub access**. Building them, signing that catalog and giving people access are covered in the
+private repo's own docs.
