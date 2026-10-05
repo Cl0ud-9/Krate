@@ -12,8 +12,10 @@ license: you have the right to submit the change, and it becomes part of Krate u
 - **Found a bug?** Search the [issues](https://github.com/Cl0ud-9/Krate/issues) first, then open one with the
   **Bug report** form. The fastest way to fill it in is from inside the app: **Settings > Feedback & bug reports**
   attaches a diagnostic report (app version, device, Android version) with no personal data.
+- **Have a question?** Ask in [Discussions](https://github.com/Cl0ud-9/Krate/discussions).
 - **Have an idea?** Open a **Feature idea** issue before writing code, so we can agree on the approach first.
   Pull requests for large changes that weren't discussed may be closed.
+- **Looking for something to work on?** Issues labelled **good first issue** or **help wanted** are a good start.
 - **Know an app that belongs in Krate?** Use **Suggest an app** in the app, or the **App suggestion** form here.
 - **Found a security problem?** Don't open a public issue. Follow [SECURITY.md](SECURITY.md).
 
@@ -86,6 +88,8 @@ The maintainer reviews every pull request and decides what goes in. A pull reque
 
 It's fine for a pull request to be closed, even a good one: sometimes a change just isn't the right fit. You'll always
 get a reason.
+
+Everyone whose pull request is merged is credited in the README and in the next release's notes.
 
 ## Code of Conduct
 

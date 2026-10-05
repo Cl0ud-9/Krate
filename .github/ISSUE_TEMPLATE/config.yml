@@ -1,6 +1,9 @@
 # blank issues stay on: Krate's own "Feedback & bug reports" and "Suggest an app" open a pre-filled blank issue
 blank_issues_enabled: true
 contact_links:
+  - name: Ask a question
+    url: https://github.com/Cl0ud-9/Krate/discussions
+    about: Questions about using or building Krate are best asked in Discussions.
   - name: Report a security problem
     url: https://github.com/Cl0ud-9/Krate/security/advisories/new
     about: Please report security problems privately, not as a public issue.

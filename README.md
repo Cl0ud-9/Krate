@@ -213,6 +213,8 @@ Builds from anywhere but this repository's releases aren't supported. If you use
 ## Contributing
 
 Bug reports, ideas and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), and please read the
-[Code of Conduct](CODE_OF_CONDUCT.md). Security problems go through [SECURITY.md](SECURITY.md), not public issues.
+[Code of Conduct](CODE_OF_CONDUCT.md). Questions go to [Discussions](https://github.com/Cl0ud-9/Krate/discussions), and
+security problems through [SECURITY.md](SECURITY.md), not public issues. Everyone whose pull request is merged is
+credited here.
 
 <p align="center"><sub>Made by <a href="https://github.com/Cl0ud-9">Cloud/9</a>, for friends, shaped by what they ask for.</sub></p>
