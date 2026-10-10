@@ -34,6 +34,8 @@ WORK_DIR = Path("manifest-work")
 # change without it getting a new id, so a hit here is as good as re-downloading and re-checking
 # (the workflow keeps this file between runs with actions/cache)
 CACHE_PATH = WORK_DIR / "asset-cache.json"
+# apps whose newest release has APKs but none the catalog's pattern matches; the workflow fails on it after publishing
+DRIFT_PATH = WORK_DIR / "asset-drift.txt"
 
 GITHUB_API = "https://api.github.com"
 # the repo and release tag the catalog is published to, read back as the fallback for an app whose
@@ -226,9 +228,28 @@ def release_notes(release):
     return body[:RELEASE_NOTES_LIMIT] or None
 
 
+def note_asset_drift(app, source, releases):
+    """A project that renames its release files would otherwise leave its app quietly stuck on the last match."""
+    for release in releases:
+        if release.get("draft") or (release.get("prerelease") and not source["includePrerelease"]):
+            continue
+        apks = [a["name"] for a in release.get("assets", []) if a["name"].endswith(".apk")]
+        if apks and pick_asset(release, source["assetPattern"]) is None:
+            line = (
+                f"{app['id']}: release {release['tag_name']} of {source['repo']} has APKs {apks}, "
+                f"but none match {source['assetPattern']!r}"
+            )
+            print(f"::warning title=Release files renamed::{line}")
+            WORK_DIR.mkdir(exist_ok=True)
+            with DRIFT_PATH.open("a", encoding="utf-8") as drift:
+                drift.write(line + "\n")
+        return
+
+
 def artifacts_from_public_source(app, source, cache):
     releases = gh_get(f"/repos/{source['repo']}/releases?per_page=30")
     retain = source.get("retainVersions", DEFAULT_RETAIN_VERSIONS)
+    note_asset_drift(app, source, releases)
     artifacts = []
     for release in releases:
         if release.get("draft") or (release.get("prerelease") and not source["includePrerelease"]):

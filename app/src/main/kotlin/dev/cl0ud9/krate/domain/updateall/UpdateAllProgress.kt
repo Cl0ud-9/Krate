@@ -9,6 +9,8 @@ data class UpdateAllOutcome(
     val reason: String? = null,
     // failed while downloading rather than installing, so a later successful download can clear it
     val failedDownloading: Boolean = false,
+    // Play Protect stopped the install
+    val blockedByPlayProtect: Boolean = false,
 )
 
 sealed interface UpdateAllProgress {

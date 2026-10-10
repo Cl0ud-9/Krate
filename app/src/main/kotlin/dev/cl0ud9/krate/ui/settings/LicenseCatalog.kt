@@ -35,13 +35,17 @@ internal val LICENSES =
         LicenseEntry(
             name = "Krate",
             license = "Source available",
-            use = "Krate's own code. Copyright 2026 Cloud/9. Free to read, use and contribute to, not to redistribute.",
+            use =
+                "Krate's own code. Copyright 2026 Cloud/9. Free to read, use and contribute to, but not to " +
+                    "redistribute.",
             text = LicenseText.File(KRATE_LICENSE_FILE),
         ),
         LicenseEntry(
-            name = "Open source libraries",
+            name = "Open-source libraries",
             license = "Apache License 2.0",
-            use = "Android Jetpack and Compose, Kotlin, OkHttp and Okio, Google Tink, Guava and Gson.",
+            use =
+                "Android Jetpack and Compose, Kotlin, OkHttp and Okio, Google Tink, Guava, Gson, " +
+                    "and Kyant's Backdrop for liquid glass.",
             text = LicenseText.ApacheTerms,
         ),
         LicenseEntry(

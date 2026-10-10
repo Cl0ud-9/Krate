@@ -5,7 +5,6 @@ import android.app.AppOpsManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -50,6 +49,20 @@ fun stepState(
     }
 
 // the secure setting lists turned-on services as package/class separated by ':'
+// false when a step names a service the installed version doesn't have (a feature it dropped): Android can't switch
+// on what isn't there, so the step would only open a page that closes again
+fun stepAvailable(
+    context: Context,
+    packageName: String,
+    step: SetupStep,
+): Boolean {
+    val component = step.service?.let(ComponentName::unflattenFromString)
+    return component == null ||
+        component.packageName != packageName ||
+        runCatching { context.packageManager.getServiceInfo(component, PackageManager.MATCH_DISABLED_COMPONENTS) }
+            .isSuccess
+}
+
 private fun serviceState(
     context: Context,
     setting: String,
@@ -122,9 +135,12 @@ private fun notificationAccessIntent(service: String?): Intent {
     }
 }
 
-// the app's App info page (the same one as Settings > Apps), where the ⋮ menu has "Allow restricted settings"
+// the app's App info page (the same one as Settings > Apps), where the ⋮ menu has "Allow restricted settings". Always
+// a fresh page: Android only adds that menu entry after a switch was blocked, and an App info page left open from
+// before shows its old menu without it
 fun appInfoIntent(packageName: String): Intent =
     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
 
 // a screen to fall back to when the exact one isn't there on this phone
 fun fallbackIntent(
@@ -138,16 +154,6 @@ fun fallbackIntent(
         SetupKind.NOTIFICATION_ACCESS -> Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
         else -> appInfoIntent(packageName)
     }
-
-// Android 13+ adds "Allow restricted settings" for apps from outside an app store; Krate installs as a store now,
-// so only apps it installed before (or another app did) are held back
-fun restrictedSettingsApply(
-    context: Context,
-    packageName: String,
-): Boolean =
-    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-        runCatching { context.packageManager.getInstallSourceInfo(packageName).packageSource }
-            .getOrNull() != PackageInstaller.PACKAGE_SOURCE_STORE
 
 // steps Krate can't check are ticked by hand; a tick counts for the install it was made on, so a reinstall from
 // scratch (which resets the app's permissions) shows them as to do again

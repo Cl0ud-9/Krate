@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.platform.autoupdate
 
 import android.content.Context
+import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.platform.workers.KrateNotification
 import dev.cl0ud9.krate.platform.workers.UpdateNotifier
 import dev.cl0ud9.krate.voice.KrateVoice
@@ -8,6 +9,7 @@ import dev.cl0ud9.krate.voice.Moment
 
 private const val AUTO_UPDATED_NOTIFICATION_ID = 1005
 private const val AUTO_UPDATE_NEEDS_YOU_NOTIFICATION_ID = 1006
+private const val PLAY_PROTECT_STOPPED_NOTIFICATION_ID = 1009
 private const val NOTICE_PREFS = "auto_update_notices"
 private const val NAME_SEPARATOR = '\u001f'
 
@@ -46,6 +48,26 @@ internal object AutoUpdateNotices {
                 category = "Updates",
                 targetRoute = "updates",
                 actionLabel = "Review",
+            ),
+        )
+    }
+
+    // Play Protect stopped an update in the background; the tap opens the app's page, where the way past it is
+    fun stoppedByPlayProtect(
+        context: Context,
+        app: AppProfile,
+    ) {
+        UpdateNotifier.notify(
+            context,
+            PLAY_PROTECT_STOPPED_NOTIFICATION_ID,
+            KrateNotification(
+                headline = "Play Protect stopped an update",
+                fact =
+                    "Play Protect stopped ${app.displayName}'s update. Krate will try again later, or tap to see how " +
+                        "to install it now.",
+                category = "Updates",
+                targetRoute = "apps/${app.id}",
+                actionLabel = "Show me how",
             ),
         )
     }

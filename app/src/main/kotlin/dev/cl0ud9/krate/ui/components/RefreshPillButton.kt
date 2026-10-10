@@ -6,7 +6,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
@@ -57,7 +57,8 @@ fun RefreshPillButton(
     FilledTonalButton(
         // a tap mid-refresh is ignored rather than disabling the pill, which would flash it grey
         onClick = { if (!isRefreshing) onClick() },
-        modifier = modifier.height(BUTTON_HEIGHT),
+        // at least this tall, taller with a big font, so the label is never cut
+        modifier = modifier.heightIn(min = BUTTON_HEIGHT),
         shape = ShapeCache.pill,
         colors =
             ButtonDefaults.filledTonalButtonColors(
@@ -73,6 +74,12 @@ fun RefreshPillButton(
             modifier = Modifier.size(ICON_SIZE).graphicsLayer { rotationZ = spin.value },
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text = "Refresh", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+        Text(
+            text = "Refresh",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }

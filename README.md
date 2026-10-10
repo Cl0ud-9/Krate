@@ -44,8 +44,9 @@ checking release pages, downloading APKs and hoping you grabbed the right file.
 downloads the right build for your phone, checks that it's genuine, and hands it to Android to install. You tap
 *Install*, Android asks once, and that's it.
 
-It also has a bit of a personality. Open it in the morning and it might tell you to *rise and Krate*. Prefer it
-quiet? Turn off **Playful messages** in **Settings > Appearance > Personality**.
+It also has a bit of a personality. Open it in the morning and it might tell you to *rise and Krate*, wish you a
+happy Diwali, or look back at your week. Prefer it quiet? Turn off **Playful messages** in
+**Settings > Appearance > Personality**.
 
 ## Features
 
@@ -54,17 +55,20 @@ quiet? Turn off **Playful messages** in **Settings > Appearance > Personality**.
 | 📦 **A curated catalog** | A short shelf of apps worth having, each with a plain-language description of what it does and where it comes from. |
 | ⚡ **One-tap installs and updates** | One tap downloads and installs, and *Update all* puts dependencies in first. On Android 12 and newer, updates to apps Krate installed skip Android's prompt. |
 | 🧭 **Set up in a tap** | After installing, each app's permissions are a tap away, ticked off as you turn them on, with the settings worth a look and how to back them up. |
-| 🔐 **Checked before it installs** | The catalog is signed with Ed25519, and every APK's SHA-256 and signing certificate are checked before Android ever sees it. |
+| 🔐 **Checked before it installs** | The catalog is signed with Ed25519, and every APK's SHA-256 and signing certificate are checked before Android ever sees it. If an update can use something new, like your location, Krate tells you first. |
+| 🧲 **Track any app yourself** | Paste a link to an app on GitHub, Codeberg or GitLab and Krate keeps it up to date like the rest. It only installs builds signed by the same developer as the first one, and test versions are a switch away. |
 | 🔔 **Updates find you** | A background check every few hours and a notification when something new lands. Updates can download ahead of time on Wi-Fi, and install themselves a day after release while you're not using the app. Any app can stay manual or skip a version. |
-| 🏃 **Downloads that keep going** | Switch apps mid-download and it carries on, with progress in the notification. A dropped connection picks up where it stopped. |
+| 🏃 **Downloads that keep going** | Leave the app's page or switch apps mid-download and it carries on, with progress in the Apps list and the notification. A dropped connection picks up where it stopped. |
 | 🕰️ **Version history** | A new build misbehaving? Pick an older one from the list and go back. |
 | 💾 **Automatic backups** | If you turn them on, Krate saves an app's settings before a reinstall from scratch and puts them back after. |
 | 🛟 **Safe clean installs** | When an update can't go on top, Krate keeps a copy of the current version and puts it back if anything fails. |
-| 🎨 **Looks the part** | Material 3 Expressive with Material You colours, light and dark themes, a floating or full-width nav bar, optional liquid glass and a proper landscape layout. |
+| 🎨 **Looks the part** | Material 3 Expressive with Material You colours, light and dark themes, a floating or full-width nav bar, optional liquid glass and a proper landscape layout. It stays readable with large text and display sizes. |
+| 🛡️ **Play Protect, explained** | If Play Protect stops an install, Krate shows you the way past it for that app and reminds you to turn scanning back on. |
+| 🤝 **Share with a friend** | Send an app as a link, with a line about what it does and where to get Krate. |
 | 💡 **Suggest from anywhere** | Share a GitHub link to *Suggest to Krate* from your browser and the suggestion is filled in. |
 | 🙈 **Hide the icon** | Keep Krate off your home screen. It keeps working, and opens from its notifications or App info. |
 | 🧾 **Readable release notes** | GitHub's markup, cleaned up, with "what's new since yours" at a glance. |
-| 🐞 **Feedback built in** | Report a bug from any app, with an optional diagnostic report that never includes your token. |
+| 🐞 **Feedback built in** | Report a bug and send it through any app, like email or WhatsApp, with an optional diagnostic report that never includes your token. |
 | 🚀 **Keeps itself fresh** | Krate updates itself from its own releases, and tells you what changed. |
 
 ## Apps in the Krate
@@ -82,10 +86,14 @@ Know an app that belongs here? Suggest it from **Settings > Suggest an app**, or
 ## Get Krate
 
 1. **Download** the latest APK from [Releases](https://github.com/Cl0ud-9/Krate/releases/latest).
-2. **Pause Play Protect, then open it** and let your browser or files app install it when Android asks. See
-   [Play Protect](#play-protect) below for why and how.
-3. **Follow the setup.** It takes about a minute and asks for what Krate needs: permission to install apps, and on
-   Android 13 or newer, notifications.
+2. **Pause Play Protect.** It blocks Krate for now. [Play Protect](#play-protect) below explains why and shows how.
+3. **Open the APK** and install it. If your browser or files app hasn't installed an app before, Android asks you to
+   allow it first.
+4. **Turn Play Protect back on.** Krate reminds you about this when it updates itself, but it can't for this first
+   install.
+5. **Open Krate and follow the setup.** Android keeps a newly installed app asleep until you open it, so Krate only
+   starts checking for updates after this first launch. Setup takes about a minute and asks for what Krate needs:
+   permission to install apps, and on Android 13 or newer, notifications.
 
 After that, Krate updates itself, so you only ever download it once.
 
@@ -105,7 +113,8 @@ To install or update Krate:
 4. Turn **Scan apps with Play Protect** back on.
 
 Krate walks you through this when it updates itself, opens the Play Protect screen for you, and reminds you to switch
-scanning back on once the update is in. Apps you install through Krate aren't affected.
+scanning back on once the update is in. Play Protect sometimes stops apps you install through Krate too. When it
+does, Krate shows you the same steps for that app, and asks you to turn scanning back on once it's in.
 
 ## How it works
 
@@ -119,14 +128,17 @@ GitHub releases ──► catalog (built every 2 hours, signed) ──► Krate 
 
 - A GitHub Actions workflow reads each app's releases and publishes a signed catalog.
 - Krate refuses any catalog whose signature doesn't match the key built into the app.
-- Downloads come straight from each app's own GitHub releases.
+- Downloads come straight from each app's own releases.
+- Apps you track yourself skip the catalog. Krate reads their releases straight from GitHub, Codeberg or GitLab, and
+  remembers the signing certificate of the first build you add, so a build signed by anyone else is refused.
 - Installing uses Android's own installer. You confirm every new app; updates to apps Krate installed can go on
   by themselves if you leave automatic updates on.
 
 ## Privacy
 
 - No accounts, no ads, no analytics, no tracking.
-- Krate only talks to GitHub: the catalog, releases and its own updates.
+- Krate talks to GitHub for the catalog, releases and its own updates, and to Codeberg or GitLab only for apps you
+  track from there.
 - If you add a GitHub token, it's stored encrypted on your device and only ever sent to GitHub.
 - Diagnostic reports are only created when you ask for one, and you choose where to send them.
 - Automatic backups are off until you turn them on. They use Android's accessibility access only while a backup runs,
@@ -145,8 +157,16 @@ app. You can switch that off in <b>Settings > Downloads & storage</b>, or per ap
 <details>
 <summary><b>Do downloads keep going if I leave Krate?</b></summary>
 
-Yes. A download you start keeps going while you use other apps, with its progress in the notification, and a dropped
-connection resumes where it stopped instead of starting over.
+Yes. A download you start keeps going when you leave the app's page or use other apps, with its progress in the Apps
+list and the notification, and a dropped connection resumes where it stopped instead of starting over.
+</details>
+
+<details>
+<summary><b>Can I add an app that isn't in the Krate?</b></summary>
+
+Yes. Tap <b>Add app</b> on the Apps tab and either suggest it for the Krate, or track it yourself from GitHub, Codeberg
+or GitLab. A tracked app gets updates like any other, but only from builds signed by the same developer as the first
+one you added.
 </details>
 
 <details>
@@ -214,7 +234,7 @@ Builds from anywhere but this repository's releases aren't supported. If you use
 
 Bug reports, ideas and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), and please read the
 [Code of Conduct](CODE_OF_CONDUCT.md). Questions go to [Discussions](https://github.com/Cl0ud-9/Krate/discussions), and
-security problems through [SECURITY.md](SECURITY.md), not public issues. Everyone whose pull request is merged is
+security problems through [SECURITY.md](SECURITY.md), not public issues. Everyone whose pull request is merged will be
 credited here.
 
 <p align="center"><sub>Made by <a href="https://github.com/Cl0ud-9">Cloud/9</a>, for friends, shaped by what they ask for.</sub></p>

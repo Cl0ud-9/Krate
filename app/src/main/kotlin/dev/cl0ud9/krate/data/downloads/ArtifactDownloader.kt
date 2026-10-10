@@ -34,6 +34,17 @@ interface ArtifactDownloader {
         artifact: ArtifactInfo,
     ): String?
 
+    // takes a file already downloaded and checked elsewhere (an app being added to tracking) as this build's ready
+    // download, so installing it doesn't fetch it again
+    fun adoptReadyFile(
+        app: AppProfile,
+        artifact: ArtifactInfo,
+        file: java.io.File,
+    ) = Unit
+
+    // every download of this app's, for an app Krate no longer offers
+    fun forgetDownloads(app: AppProfile) = Unit
+
     // deletes this app's downloads of any other build, so skipped updates don't pile up (the biggest are ~170 MB each)
     fun pruneOtherBuilds(
         app: AppProfile,

@@ -1,5 +1,6 @@
 package dev.cl0ud9.krate.ui.updates
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,8 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
 import dev.cl0ud9.krate.ui.components.KrateLinearProgress
 import dev.cl0ud9.krate.ui.components.SectionHeader
+import dev.cl0ud9.krate.ui.components.fadeThrough
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.navigation.heroGlow
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.voice.Moment
@@ -37,7 +41,7 @@ fun UpdateAllBar(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
@@ -45,10 +49,22 @@ fun UpdateAllBar(
             modifier = Modifier.fillMaxWidth().heroGlow().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            when (state) {
-                is UpdateAllUiState.Idle -> IdleContent(pendingCount = pendingCount, onStart = onStart)
-                is UpdateAllUiState.Running -> RunningContent(state)
-                is UpdateAllUiState.Done -> DoneContent(state, onDismissResult)
+            // fades through start, run and result while the card eases to its new height; a step ticking over
+            // within the run updates in place
+            AnimatedContent(
+                targetState = state,
+                contentKey = { it::class },
+                transitionSpec = fadeThrough(),
+                contentAlignment = Alignment.TopStart,
+                label = "update-all",
+            ) { shown ->
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    when (shown) {
+                        is UpdateAllUiState.Idle -> IdleContent(pendingCount = pendingCount, onStart = onStart)
+                        is UpdateAllUiState.Running -> RunningContent(shown)
+                        is UpdateAllUiState.Done -> DoneContent(shown, onDismissResult)
+                    }
+                }
             }
         }
     }
@@ -67,10 +83,13 @@ private fun IdleContent(
     )
     Text(
         text =
-            if (pendingCount > 1) {
-                "Updates each app in turn, dependencies first. Android asks you to confirm each one."
-            } else {
-                "Downloads and installs the pending update."
+            when {
+                pendingCount <= 1 -> "Downloads and installs the pending update."
+                // Android 12 and newer let apps Krate installed update without a prompt
+                autoUpdatesSupported ->
+                    "Updates each app in turn, dependencies first. Apps Krate installed update without asking; " +
+                        "Android asks you to confirm the rest."
+                else -> "Updates each app in turn, dependencies first. Android asks you to confirm each one."
             },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -89,7 +108,7 @@ private fun RunningContent(state: UpdateAllUiState.Running) {
         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
     )
     Text(
-        text = "${state.currentIndex + 1} of ${state.total} - ${state.currentApp.displayName}",
+        text = "${state.currentIndex + 1} of ${state.total}: ${state.currentApp.displayName}",
         style = MaterialTheme.typography.bodyMedium,
     )
     Text(

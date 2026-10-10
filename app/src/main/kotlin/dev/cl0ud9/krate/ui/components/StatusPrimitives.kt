@@ -12,6 +12,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,11 +37,13 @@ import dev.cl0ud9.krate.platform.packageinstaller.PendingConfirmation
 @Composable
 internal fun KrateLinearProgress(progress: Float?) {
     if (progress != null) {
+        // eased between the downloader's reports, read only while drawing so the glide never recomposes the screen
+        val fill by rememberSmoothedProgress(progress)
         // stock M3 ramps the wave amplitude down to 0 below 10% and above 95% progress (settling
         // down as it starts/finishes) - held constant here instead, since a download nearing
         // completion flattening out read as the progress bar stalling rather than almost done
         LinearWavyProgressIndicator(
-            progress = { progress },
+            progress = { fill },
             modifier = Modifier.fillMaxWidth(),
             amplitude = { 1f },
         )
@@ -72,6 +75,16 @@ internal fun HelperText(
         text = text,
         modifier = modifier,
         style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+// a helper caption with figures that count up (a percentage, megabytes so far), its digits all one width
+@Composable
+internal fun ProgressCaption(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall.withTabularFigures(),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

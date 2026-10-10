@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
 // Krate's dialog: a headline block, an optional detail block, and a footer row of actions
@@ -34,7 +35,7 @@ fun KrateDialog(
 ) {
     BasicAlertDialog(onDismissRequest = onDismissRequest) {
         Surface(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
+            modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp).glassRim(ShapeCache.rounded32),
             shape = ShapeCache.rounded32,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 8.dp,

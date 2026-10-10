@@ -1,5 +1,13 @@
 package dev.cl0ud9.krate.ui.details
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -38,6 +47,7 @@ import dev.cl0ud9.krate.domain.model.DownloadStatus
 import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.WaitingForUserStep
+import dev.cl0ud9.krate.domain.model.isTracked
 import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.domain.repository.Baseline
 import dev.cl0ud9.krate.domain.repository.effectiveBaseline
@@ -46,13 +56,24 @@ import dev.cl0ud9.krate.domain.repository.isNewerThan
 import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
-import dev.cl0ud9.krate.ui.components.SupportStatusBadge
+import dev.cl0ud9.krate.ui.components.rememberAppIcon
 import dev.cl0ud9.krate.ui.components.systemNavBarClearance
+import dev.cl0ud9.krate.ui.home.PlayProtectReminder
 import dev.cl0ud9.krate.ui.navigation.DetailContentTopGap
+import dev.cl0ud9.krate.ui.navigation.IconFrost
+import dev.cl0ud9.krate.ui.navigation.LocalLiquidGlass
+import dev.cl0ud9.krate.ui.navigation.PageIconSize
+import dev.cl0ud9.krate.ui.navigation.glassRim
+import dev.cl0ud9.krate.ui.navigation.sharedDetailsIcon
 import dev.cl0ud9.krate.ui.theme.ShapeCache
+import dev.cl0ud9.krate.ui.theme.rememberIconAccent
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
 import dev.cl0ud9.krate.ui.util.krateViewModel
 import dev.cl0ud9.krate.ui.util.rememberDebouncedOnClick
+
+// how the setup and auto-update cards arrive and leave: unfolding, never a jump
+private val CardIn = fadeIn() + expandVertically()
+private val CardOut = fadeOut() + shrinkVertically()
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -73,13 +94,14 @@ fun AppDetailsScreen(
     val installStatus by viewModel.installStatus.collectAsStateWithLifecycle()
     val selectedArtifact by viewModel.selectedArtifact.collectAsStateWithLifecycle()
     val ready by viewModel.ready.collectAsStateWithLifecycle()
+    val missing by viewModel.missing.collectAsStateWithLifecycle()
     val currentApp = app.takeIf { ready }
     // no pull-to-refresh here - RefreshOnResume above already re-checks this one app whenever the
     // screen comes back into view, so a swipe gesture on top of that was a redundant second trigger
     Box(modifier = Modifier.fillMaxSize()) {
         if (currentApp == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingIndicator()
+                if (missing) GoneApp() else LoadingIndicator()
             }
         } else {
             // each is already idempotent in the ViewModel (isBusy()/status guards a second call
@@ -121,14 +143,11 @@ private fun rememberAppDetailsViewModel(appId: String): AppDetailsViewModel =
         AppDetailsViewModel(
             container.catalogRepository,
             container.artifactDownloader,
-            container.installationEngine,
-            container.cleanInstallOrchestrator,
             container.installedPackageReader,
             container.activityLogRepository,
             container.krateBaselineStore,
-            container.downloadProgressNotifier,
             container.announcementDismissalStore,
-            container.autoUpdateStore,
+            container.appWork,
             appId,
         )
     }
@@ -284,7 +303,7 @@ private fun AppDetailsContent(
         state.installStatus is InstallStatus.WaitingForUser &&
             state.installStatus.step == WaitingForUserStep.UNINSTALL_CONFIRM
     val uninstalling = state.installStatus is InstallStatus.Uninstalling || awaitingUninstallConfirm
-    // picking a version or collapsing long notes resizes what's above the version list; it stays under the finger
+    // picking a version resizes the action above the list and the notes below it; the list stays under the finger
     val anchor = rememberScrollAnchor(scrollState)
 
     Column(
@@ -292,6 +311,7 @@ private fun AppDetailsContent(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
+                .anchoredPage(anchor)
                 .padding(
                     top = topContentPadding + DetailContentTopGap,
                     start = 20.dp,
@@ -300,49 +320,61 @@ private fun AppDetailsContent(
                 ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // name, version and installed status as one compact block
-        AppDetailsHeader(
-            app = app,
-            installedVersionName = state.installedVersionName,
-            uninstalling = uninstalling,
-            onUninstall = onUninstall,
-        )
+        // everything above the version list, in one block the list keeps its place against
+        Column(modifier = Modifier.aboveAnchor(anchor), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // name, version and installed status as one compact block
+            AppDetailsHeader(
+                app = app,
+                installedVersionName = state.installedVersionName,
+                uninstalling = uninstalling,
+                onUninstall = onUninstall,
+                moment = installMomentFor(state),
+            )
 
-        state.announcements.forEach { item ->
-            AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = onDismissAnnouncement)
+            state.announcements.forEach { item ->
+                AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = onDismissAnnouncement)
+            }
+
+            // shown before the user ever reaches the Install button - a required dependency missing
+            // (e.g. a sign-in helper another app relies on) means the app installs but silently fails to open,
+            // so this is surfaced as early and as plainly as possible rather than only as a disabled
+            // button and small helper text further down the page
+            val unmetDependencies = state.dependencies.filter { !it.installed }
+            if (unmetDependencies.isNotEmpty()) {
+                MissingDependencyWarning(unmetDependencies = unmetDependencies, onNavigateToApp = onNavigateToApp)
+            }
+
+            // the primary action moves right under the header instead of sitting below Release notes,
+            // which could push it off-screen for apps with long release notes - a detail page exists
+            // to get the user to this action, so it should not be the thing they have to scroll to find
+            val guarded = rememberBackupGuard(state, onInstall, onRetryAsCleanInstall)
+            DownloadSection(
+                state = state,
+                onDownload = onDownload,
+                onInstall = guarded.install,
+                onRetryAsCleanInstall = guarded.retryFromScratch,
+                onCancelDownload = onCancelDownload,
+                onBackToLatest = onBackToLatest,
+            )
+
+            // what it needs switched on, and its settings, right under the action once it's installed
+            // both fold away as an uninstall starts and unfold after an install, instead of the page jumping
+            val guide = app.guide
+            val onPhone = state.installed != null && !uninstalling
+            AnimatedVisibility(visible = onPhone && guide != null, enter = CardIn, exit = CardOut) {
+                guide?.let { SetupCard(app = app, guide = it, restorePending = state.restorePending) }
+            }
+            AnimatedVisibility(visible = onPhone, enter = CardIn, exit = CardOut) { AutoUpdateCard(state) }
+
+            // Play Protect was paused for this app: once it's in, ask for it back on right here
+            PlayProtectReminder(onlyFor = app.packageName)
+
+            // a find of the person's own, high enough up to be seen: the nudge to suggest it for everyone
+            if (app.isTracked) ShareFindCard(app)
+
+            // what the app is sits right under the action, before the finer controls further down
+            AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
         }
-
-        // shown before the user ever reaches the Install button - a required dependency missing
-        // (e.g. a sign-in helper another app relies on) means the app installs but silently fails to open,
-        // so this is surfaced as early and as plainly as possible rather than only as a disabled
-        // button and small helper text further down the page
-        val unmetDependencies = state.dependencies.filter { !it.installed }
-        if (unmetDependencies.isNotEmpty()) {
-            MissingDependencyWarning(unmetDependencies = unmetDependencies, onNavigateToApp = onNavigateToApp)
-        }
-
-        // the primary action moves right under the header instead of sitting below Release notes,
-        // which could push it off-screen for apps with long release notes - a detail page exists
-        // to get the user to this action, so it should not be the thing they have to scroll to find
-        val guarded = rememberBackupGuard(state, onInstall, onRetryAsCleanInstall)
-        DownloadSection(
-            state = state,
-            onDownload = onDownload,
-            onInstall = guarded.install,
-            onRetryAsCleanInstall = guarded.retryFromScratch,
-            onCancelDownload = onCancelDownload,
-            onBackToLatest = onBackToLatest,
-        )
-
-        // what it needs switched on, and its settings, right under the action once it's installed
-        val guide = app.guide
-        if (guide != null && state.installed != null && !uninstalling) {
-            SetupCard(app = app, guide = guide, restorePending = state.restorePending)
-        }
-        if (state.installed != null && !uninstalling) AutoUpdateCard(state)
-
-        // what the app is sits right under the action, before the finer controls further down
-        AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
 
         NotesAndHistory(state = state, anchor = anchor, onSelectVersion = onSelectVersion)
     }
@@ -367,7 +399,6 @@ private fun NotesAndHistory(
             anchor.hold()
             onSelectVersion(artifact)
         },
-        modifier = Modifier.anchoredBy(anchor),
     )
     ReleaseNotesSection(
         app = state.app,
@@ -383,6 +414,29 @@ private fun NotesAndHistory(
     )
 }
 
+// the app's icon beside its name and package
+@Composable
+private fun AppIdentity(
+    app: AppProfile,
+    moment: InstallMoment,
+    accent: Color?,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        InstallHalo(moment, accent) {
+            AppIconAvatar(app = app, size = PageIconSize, modifier = Modifier.sharedDetailsIcon(app))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = app.displayName, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                // a zero-width space after each dot lets a long name wrap between its parts at a big font
+                text = app.packageName.replace(".", ".\u200B"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 // the trash action sits beside the name/compatibility/version block as a whole, vertically centered
 // against its full height (not pinned to the bottom "Installed" line) - a floating trailing action
 // for the header overall, rather than a control that belongs to any one row within it
@@ -392,67 +446,60 @@ private fun AppDetailsHeader(
     installedVersionName: String?,
     uninstalling: Boolean,
     onUninstall: () -> Unit,
+    moment: InstallMoment,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        AppIconAvatar(app = app, size = 56.dp)
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(text = app.displayName, style = MaterialTheme.typography.headlineSmall)
+        // with glass on, the app's own icon frosted behind its name, so the card reads as glass tinted by the app
+        // with glass on the card is tinted by the app's icon, so its progress and badge take the app's own colour too
+        val accent =
+            if (LocalLiquidGlass.current) {
+                rememberIconAccent(rememberAppIcon(app), MaterialTheme.colorScheme.surfaceContainer)
+            } else {
+                null
+            }
+        Box {
+            IconFrost(rememberAppIcon(app))
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        AppIdentity(app, moment, accent)
+
+                        HeaderBadges(app, accent)
+
+                        // only set for an app Krate builds itself: "Latest" above is the app's own version, and this
+                        // build number sits beside it
+                        app.latestArtifact?.patchesVersionName?.let { patchesVersion ->
+                            val label = app.latestArtifact?.label
                             Text(
-                                text = app.packageName,
+                                text = listOfNotNull(label, "Build $patchesVersion").joinToString(", "),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        SupportStatusBadge(status = app.supportStatus)
-                        Text(
-                            text = app.latestArtifact?.versionName?.let { "Latest $it" } ?: "Latest version unknown",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-
-                    // only set for an app Krate builds itself: "Latest" above is the app's own version, and this
-                    // build number sits beside it
-                    app.latestArtifact?.patchesVersionName?.let { patchesVersion ->
-                        val label = app.latestArtifact?.label
-                        Text(
-                            text = listOfNotNull(label, "Build $patchesVersion").joinToString(", "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    // fades and folds away once the app is gone, rather than leaving a jump in the row
+                    AnimatedVisibility(
+                        visible = installedVersionName != null,
+                        enter = fadeIn() + expandHorizontally(),
+                        exit = fadeOut() + shrinkHorizontally(),
+                    ) { UninstallIconControl(uninstalling = uninstalling, onUninstall = onUninstall) }
                 }
-                if (installedVersionName != null) {
-                    UninstallIconControl(uninstalling = uninstalling, onUninstall = onUninstall)
+
+                // the app's one-line summary, full width under the name block
+                app.description?.let { description ->
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
-            }
 
-            // the app's one-line summary, full width under the name block
-            app.description?.let { description ->
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                InstalledStatusRow(installedVersionName = installedVersionName)
             }
-
-            InstalledStatusRow(installedVersionName = installedVersionName)
         }
     }
 }
@@ -463,23 +510,28 @@ private fun UninstallIconControl(
     uninstalling: Boolean,
     onUninstall: () -> Unit,
 ) {
-    if (uninstalling) {
-        LoadingIndicator(modifier = Modifier.size(20.dp))
-    } else {
-        IconButton(onClick = onUninstall, modifier = Modifier.size(32.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.Delete,
-                contentDescription = "Uninstall app",
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp),
-            )
+    // one fixed slot, so trading the button for the spinner never nudges the name beside it
+    Crossfade(targetState = uninstalling, modifier = Modifier.size(32.dp), label = "uninstall-control") { busy ->
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
+            if (busy) {
+                LoadingIndicator(modifier = Modifier.size(20.dp))
+            } else {
+                IconButton(onClick = onUninstall, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = "Uninstall app",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun InstalledStatusRow(installedVersionName: String?) {
-    val text = installedVersionName?.let { "Installed - version $it" } ?: "Not installed on this device"
+    val text = installedVersionName?.let { "Installed: version $it" } ?: "Not installed on this device"
     val tint =
         if (installedVersionName != null) {
             MaterialTheme.colorScheme.tertiary

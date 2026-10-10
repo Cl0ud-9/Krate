@@ -57,28 +57,7 @@ fun AppIconAvatar(
 ) {
     val displayName = app.displayName
     val seed = app.id
-    val packageName = app.packageName
-    val catalogIconPng = app.iconPng
-    val context = LocalContext.current
-    val cacheKey = packageName + ":" + catalogIconPng.hashCode()
-    // the last icon seen shows at once, so a list scrolled back or a screen returned to never flashes letters first;
-    // it's still reloaded, so an app updated in the meantime shows its new icon
-    val realIcon by
-        produceState(initialValue = AppIconCache.get(cacheKey), packageName, catalogIconPng) {
-            val loaded =
-                withContext(Dispatchers.IO) {
-                    val installed =
-                        runCatching { context.packageManager.getApplicationIcon(packageName) }
-                            .getOrNull()
-                            ?.let(Drawable::toBitmap)
-                            ?.asImageBitmap()
-                    installed ?: catalogIconPng?.let(::decodeCatalogIcon)
-                }
-            if (loaded != null) AppIconCache.put(cacheKey, loaded)
-            value = loaded
-        }
-
-    val icon = realIcon
+    val icon = rememberAppIcon(app)
     if (icon != null) {
         Image(
             bitmap = icon,
@@ -115,6 +94,32 @@ fun AppIconAvatar(
             fontWeight = FontWeight.Bold,
         )
     }
+}
+
+// the app's real launcher icon when it's installed, else the catalog's; null while loading or when there's neither
+@Composable
+internal fun rememberAppIcon(app: AppProfile): ImageBitmap? {
+    val packageName = app.packageName
+    val catalogIconPng = app.iconPng
+    val context = LocalContext.current
+    val cacheKey = packageName + ":" + catalogIconPng.hashCode()
+    // the last icon seen shows at once, so a list scrolled back or a screen returned to never flashes letters first;
+    // it's still reloaded, so an app updated in the meantime shows its new icon
+    val icon by
+        produceState(initialValue = AppIconCache.get(cacheKey), packageName, catalogIconPng) {
+            val loaded =
+                withContext(Dispatchers.IO) {
+                    val installed =
+                        runCatching { context.packageManager.getApplicationIcon(packageName) }
+                            .getOrNull()
+                            ?.let(Drawable::toBitmap)
+                            ?.asImageBitmap()
+                    installed ?: catalogIconPng?.let(::decodeCatalogIcon)
+                }
+            if (loaded != null) AppIconCache.put(cacheKey, loaded)
+            value = loaded
+        }
+    return icon
 }
 
 private const val CONTRAST_LUMINANCE_THRESHOLD = 0.5f

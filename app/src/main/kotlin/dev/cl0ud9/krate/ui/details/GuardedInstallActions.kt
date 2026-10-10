@@ -93,7 +93,7 @@ private fun BackupFirstDialog(
     val context = LocalContext.current
     val body =
         if (onBackUp != null) {
-            "This erases ${app.displayName}'s data on this phone, settings included. Krate can back them up for you " +
+            "This erases ${app.displayName}'s data on this phone, settings included. Krate can back up its settings " +
                 "first and put them back after, or you can save them by hand."
         } else {
             "This erases ${app.displayName}'s data on this phone, settings included. To keep them, save a " +

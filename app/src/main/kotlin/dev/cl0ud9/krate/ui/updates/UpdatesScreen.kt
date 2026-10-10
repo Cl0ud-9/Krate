@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,6 +26,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.platform.selfupdate.notePlayProtect
 import dev.cl0ud9.krate.platform.workers.UpdateNotifier
 import dev.cl0ud9.krate.ui.components.AppListItem
 import dev.cl0ud9.krate.ui.components.EmptyState
@@ -40,14 +42,14 @@ import dev.cl0ud9.krate.ui.util.krateViewModel
 import dev.cl0ud9.krate.ui.util.plusBottom
 import dev.cl0ud9.krate.ui.util.rememberDebouncedOnClick
 import dev.cl0ud9.krate.ui.util.rememberListShownAt
-import dev.cl0ud9.krate.voice.KrateVoice
-import dev.cl0ud9.krate.voice.Moment
-import dev.cl0ud9.krate.voice.rememberKrateLine
+import dev.cl0ud9.krate.voice.refreshFailedLine
+import dev.cl0ud9.krate.voice.rememberCaughtUpLine
 
 // the tab's one ViewModel, shared by its header and its content
 @Composable
-fun rememberUpdatesViewModel(): UpdatesViewModel =
-    krateViewModel { container ->
+fun rememberUpdatesViewModel(): UpdatesViewModel {
+    val context = LocalContext.current.applicationContext
+    return krateViewModel { container ->
         UpdatesViewModel(
             container.catalogRepository,
             container.installedPackageReader,
@@ -56,8 +58,10 @@ fun rememberUpdatesViewModel(): UpdatesViewModel =
             container.githubCredentialStore,
             container.krateBaselineStore,
             container.downloadProgressNotifier,
+            notePlayProtect = { packageName, stopped -> notePlayProtect(context, packageName, stopped) },
         )
     }
+}
 
 // the header line under "Updates"; blank while loading so the header keeps its height
 @Composable
@@ -106,7 +110,7 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
         KratePullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refreshFromNetwork,
-            modifier = Modifier.fillMaxSize().glassSource(pageGlass),
+            modifier = Modifier.fillMaxSize().glassSource(pageGlass, MaterialTheme.colorScheme.background),
         ) {
             UpdatesContent(
                 uiState = uiState,
@@ -115,12 +119,13 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
                 onAppClick = onAppClick,
             )
         }
+        val context = LocalContext.current
         RefreshFailureSnackbar(
             refreshFailed = viewModel.refreshFailed,
             message = {
                 KrateMessage(
-                    headline = KrateVoice.line(Moment.REFRESH_FAILED),
-                    detail = "Couldn't check for updates, showing what Krate saw last.",
+                    headline = refreshFailedLine(context),
+                    detail = "Couldn't check for updates, so this is what Krate saw last.",
                     icon = R.drawable.ic_cloud_off_rounded,
                     actionLabel = "Retry",
                 )
@@ -163,7 +168,7 @@ private fun UpdatesContent(
                 EmptyState(
                     modifier = Modifier.padding(bottom = LocalNavBarClearance.current),
                     icon = painterResource(R.drawable.ic_check_circle_rounded),
-                    title = rememberKrateLine(Moment.ALL_CAUGHT_UP),
+                    title = rememberCaughtUpLine(),
                     subtitle = "Every installed app is on its latest version.",
                 )
             }
@@ -190,6 +195,7 @@ private fun UpdatesContent(
                                 app = app,
                                 installed = true,
                                 onClick = rememberDebouncedOnClick(onClick = { onAppClick(app.id) }),
+                                place = "updates",
                             )
                         }
                     }

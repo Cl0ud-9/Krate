@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import dev.cl0ud9.krate.domain.model.AutoBackup
+import dev.cl0ud9.krate.domain.model.RecommendedSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +15,13 @@ import kotlinx.coroutines.flow.asStateFlow
 private const val FRAGMENT_ARGS_KEY = ":settings:fragment_args_key"
 private const val SHOW_FRAGMENT_ARGS = ":settings:show_fragment_args"
 
-enum class BackupMode { SAVE, RESTORE }
+enum class BackupMode {
+    SAVE,
+    RESTORE,
+
+    // the catalog's recommended settings laid over the app's own, after keeping a copy of the app's own
+    APPLY,
+}
 
 // where a backup or restore Krate runs by itself stands; one at a time, for one app
 sealed interface AutoBackupState {
@@ -30,6 +37,10 @@ sealed interface AutoBackupState {
         val mode: BackupMode,
         // the app's settings were all at their defaults, so there was nothing to keep
         val nothingToSave: Boolean = false,
+        // for recommended settings: how many of them changed something (none: they were already set that way)
+        val changed: Int = 0,
+        // what the app said on applying, when it said anything ("Imported 12 settings")
+        val appSaid: String? = null,
     ) : AutoBackupState
 
     data class Failed(
@@ -44,8 +55,10 @@ internal data class AutoBackupJob(
     val packageName: String,
     val spec: AutoBackup,
     val mode: BackupMode,
-    // the text to put back, for a restore
+    // the text to put back, for a restore; the recommended settings, for applying them
     val text: String? = null,
+    // which set of recommended settings, so it's remembered as applied
+    val revision: String? = null,
 )
 
 // starts a backup or restore through Krate's accessibility helper and reports how it went. The helper only acts
@@ -84,6 +97,27 @@ object AutoBackupRunner {
     ): Boolean {
         val text = AppBackups.read(context, packageName)?.text ?: return false
         return start(AutoBackupJob(packageName, spec, BackupMode.RESTORE, text))
+    }
+
+    // the catalog's picks over the app's own settings; false when the helper isn't running or a job is already going
+    fun applyRecommended(
+        packageName: String,
+        spec: AutoBackup,
+        recommended: RecommendedSettings,
+    ): Boolean = start(AutoBackupJob(packageName, spec, BackupMode.APPLY, recommended.text, recommended.revision))
+
+    private val mutableSwitchedOff = MutableStateFlow(0)
+
+    // counts the times Krate switched its helper off itself, so screens showing the switch re-read it at once
+    val switchedOff: StateFlow<Int> = mutableSwitchedOff.asStateFlow()
+
+    // the helper switches itself off, the same as turning it off in Android's accessibility settings; false when it
+    // isn't running (already off)
+    fun turnOff(): Boolean {
+        val service = KrateBackupService.running ?: return false
+        service.disableSelf()
+        mutableSwitchedOff.value++
+        return true
     }
 
     // the result has been shown, so the next look at this app starts clean

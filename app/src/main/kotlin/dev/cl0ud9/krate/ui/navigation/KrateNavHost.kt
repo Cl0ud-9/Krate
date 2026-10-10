@@ -3,12 +3,14 @@ package dev.cl0ud9.krate.ui.navigation
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -46,13 +48,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kyant.backdrop.backdrops.LayerBackdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import dev.cl0ud9.krate.data.settings.DEFAULT_NAV_BAR_CORNER_RADIUS
 import dev.cl0ud9.krate.domain.model.LaunchTab
 import dev.cl0ud9.krate.domain.model.NavBarStyle
+import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.platform.appContainer
-import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
 import dev.cl0ud9.krate.ui.util.LocalScrollClaim
 import dev.cl0ud9.krate.ui.util.ScrollClaim
 import dev.cl0ud9.krate.ui.util.isShortScreen
@@ -71,9 +72,20 @@ internal const val APPEARANCE_ROUTE = "settings/appearance"
 @Composable
 private fun ApplyDefaultLaunchTabOnce(
     navController: NavHostController,
-    defaultLaunchTab: LaunchTab?,
+    settingsRepository: SettingsRepository,
+    savedLaunchTab: LaunchTab?,
     hasPendingRoute: Boolean,
 ) {
+    // NavHost always starts at Home immediately (see KrateNavGraph below) rather than waiting on
+    // this DataStore read - gating NavHost's own existence on it meant every cold start (including
+    // reopening from Recents after Android killed the process mid-download) hit a real frame-or-more
+    // gap with no NavHost/NavController in the tree at all, before this app ever had "always land on
+    // Home instead of resuming" reported against it. Once this loads, applyDefaultLaunchTab below
+    // redirects ONE time on a genuinely fresh launch, tracked by appliedDefaultLaunchTab so a
+    // restored backstack from a previous session (e.g. still on an App Details page) is never
+    // clobbered by this running again after process death
+    val defaultLaunchTab by
+        settingsRepository.observeDefaultLaunchTab().collectAsStateWithLifecycle(initialValue = savedLaunchTab)
     var applied by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(defaultLaunchTab, hasPendingRoute) {
         if (applied) return@LaunchedEffect
@@ -152,17 +164,7 @@ fun KrateNavHost(
     // the screens are recorded into a layer the glass bar reads from; no glass, no recording
     val glassBackdrop = rememberLayerBackdrop()
     val glass = rememberLiquidGlass(settingsRepository, saved?.liquidGlass ?: false)
-    // NavHost always starts at Home immediately (see KrateNavGraph below) rather than waiting on
-    // this DataStore read - gating NavHost's own existence on it meant every cold start (including
-    // reopening from Recents after Android killed the process mid-download) hit a real frame-or-more
-    // gap with no NavHost/NavController in the tree at all, before this app ever had "always land on
-    // Home instead of resuming" reported against it. Once this loads, applyDefaultLaunchTab below
-    // redirects ONE time on a genuinely fresh launch, tracked by appliedDefaultLaunchTab so a
-    // restored backstack from a previous session (e.g. still on an App Details page) is never
-    // clobbered by this running again after process death
-    val defaultLaunchTab by
-        settingsRepository.observeDefaultLaunchTab().collectAsStateWithLifecycle(initialValue = saved?.defaultLaunchTab)
-    ApplyDefaultLaunchTabOnce(navController, defaultLaunchTab, hasPendingRoute = pendingRoute != null)
+    ApplyDefaultLaunchTabOnce(navController, settingsRepository, saved?.defaultLaunchTab, pendingRoute != null)
 
     // continuous progress rather than a plain boolean - lets the bar slide fully off/on screen
     // instead of popping in and out the instant a route change flips showBottomBar. Tracks the
@@ -180,8 +182,9 @@ fun KrateNavHost(
     // the shorter, icon-only bar when chosen for the pill, and always on a phone on its side
     val barCompact = isShortScreen() || (navBarCompactMode && navBarStyle == NavBarStyle.FLOATING_PILL)
     val navBarClearance = navBarFootprint(barCompact, floating = navBarStyle == NavBarStyle.FLOATING_PILL)
+    val navBar = NavBarAppearance(navBarStyle, navBarCornerRadius, barCompact, glassBackdrop.takeIf { glass })
 
-    CompositionLocalProvider(LocalNavBarClearance provides navBarClearance, LocalLiquidGlass provides glass) {
+    ProvideNavLocals(navBarClearance, glass) {
         // contentWindowInsets defaults to WindowInsets.systemBars, which would reserve the status
         // bar's top inset here AND again inside every TabScreen/DetailScreen's own TopAppBar (that's
         // the default inset every M3 TopAppBar carries) - zeroing it out here leaves exactly one
@@ -195,7 +198,7 @@ fun KrateNavHost(
                     KrateBottomBar(
                         navController,
                         currentRoute,
-                        NavBarAppearance(navBarStyle, navBarCornerRadius, barCompact, glassBackdrop.takeIf { glass }),
+                        navBar,
                         navBarVisibility,
                         barHeightPx,
                     )
@@ -209,7 +212,7 @@ fun KrateNavHost(
                 modifier =
                     Modifier
                         .padding(top = innerPadding.calculateTopPadding())
-                        .then(if (glass) Modifier.layerBackdrop(glassBackdrop) else Modifier),
+                        .glassSource(glassBackdrop.takeIf { glass }, MaterialTheme.colorScheme.background),
             )
         }
     }
@@ -316,32 +319,40 @@ private fun KrateNavGraph(
     startDestination: String,
     modifier: Modifier = Modifier,
 ) {
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
-        modifier = modifier,
-        // tab-to-tab: slide directionally by index. anything else (the App Details push, or the
-        // first frame with no "from" side yet) falls back to a plain fade+grow
-        enterTransition = {
-            if (ArrivalFromOutside.active) {
-                EnterTransition.None
-            } else {
-                tabEnterTransition(initialState.destination.route, targetState.destination.route)
+    // shared so an app's icon can fly from a list into its page
+    SharedTransitionLayout(modifier = modifier) {
+        CompositionLocalProvider(LocalSharedTransition provides this) {
+            // an icon flying home from an app's page, drawn over the pages
+            Box {
+                NavHost(
+                    navController = navController,
+                    startDestination = startDestination,
+                    // tab-to-tab: slide directionally by index. anything else (the App Details push, or the
+                    // first frame with no "from" side yet) falls back to a plain fade+grow
+                    enterTransition = {
+                        if (ArrivalFromOutside.active) {
+                            EnterTransition.None
+                        } else {
+                            tabEnterTransition(initialState.destination.route, targetState.destination.route)
+                        }
+                    },
+                    exitTransition = {
+                        if (ArrivalFromOutside.active) {
+                            ExitTransition.None
+                        } else {
+                            tabExitTransition(initialState.destination.route, targetState.destination.route)
+                        }
+                    },
+                ) {
+                    tabDestinations(navController)
+                    settingsDestination(navController)
+                    appearanceDestination(navController)
+                    settingsPageDestinations(navController)
+                    appDetailsDestination(navController)
+                }
+                BackFlightOverlay()
             }
-        },
-        exitTransition = {
-            if (ArrivalFromOutside.active) {
-                ExitTransition.None
-            } else {
-                tabExitTransition(initialState.destination.route, targetState.destination.route)
-            }
-        },
-    ) {
-        tabDestinations(navController)
-        settingsDestination(navController)
-        appearanceDestination(navController)
-        settingsPageDestinations(navController)
-        appDetailsDestination(navController)
+        }
     }
 }
 
@@ -389,12 +400,14 @@ internal fun AnimatedContentScope.TabScreen(
 // same reasoning as TabScreen for the depth effect, but no tint wash and no static bar - detail
 // screens are plain, and the heading here rides up with the content as the user scrolls instead
 // of sitting fixed, fading its own background in only once collapsed
+@Suppress("LongParameterList")
 @Composable
 internal fun AnimatedContentScope.DetailScreen(
     title: String,
     navController: NavHostController,
     entry: NavBackStackEntry,
     onBack: () -> Unit,
+    action: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable (scrollState: ScrollState, topContentPadding: Dp) -> Unit,
 ) {
     val depth = rememberDepthEffect(navController, entry)
@@ -418,11 +431,25 @@ internal fun AnimatedContentScope.DetailScreen(
         CompositionLocalProvider(
             LocalScrollClaim provides scrollClaim,
         ) {
-            Box(modifier = Modifier.fillMaxSize().glassSource(pageGlass).windowInsetsPadding(SideInsets)) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .glassSource(
+                            pageGlass,
+                            MaterialTheme.colorScheme.surface,
+                        ).windowInsetsPadding(SideInsets),
+            ) {
                 content(scrollState, headerState.headerHeight)
             }
         }
-        CollapsingDetailHeader(title = title, state = headerState, onBack = onBack, glass = pageGlass)
+        CollapsingDetailHeader(
+            title = title,
+            state = headerState,
+            onBack = onBack,
+            glass = pageGlass,
+            action = action,
+        )
         if (depth.isDimVisible) {
             Box(
                 modifier =

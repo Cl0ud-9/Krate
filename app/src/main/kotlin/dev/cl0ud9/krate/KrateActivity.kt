@@ -43,6 +43,7 @@ import dev.cl0ud9.krate.ui.components.LocalIntroHeaderSlot
 import dev.cl0ud9.krate.ui.components.LocalIntroPlaying
 import dev.cl0ud9.krate.ui.details.InstallRequests
 import dev.cl0ud9.krate.ui.navigation.ArrivalFromOutside
+import dev.cl0ud9.krate.ui.navigation.GlassToggleOverlay
 import dev.cl0ud9.krate.ui.navigation.KrateNavHost
 import dev.cl0ud9.krate.ui.navigation.LiveNavigation
 import dev.cl0ud9.krate.ui.onboarding.OnboardingScreen
@@ -228,6 +229,8 @@ private fun AppRoot(
                     }
                 }
         }
+        // the old look fading out after liquid glass is switched on or off
+        GlassToggleOverlay()
         if (intro.started && !intro.finished) {
             KrateIntro(
                 start = intro.markBounds,

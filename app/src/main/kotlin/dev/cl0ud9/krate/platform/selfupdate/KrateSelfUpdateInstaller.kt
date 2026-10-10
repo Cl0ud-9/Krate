@@ -66,7 +66,8 @@ class KrateSelfUpdateInstaller(
 ) {
     fun downloadAndInstall(downloadUrl: String): Flow<SelfUpdateState> =
         flow {
-            emit(SelfUpdateState.Downloading(null))
+            // an empty bar to start with; it only turns to a "size unknown" wave if the server never says how big
+            emit(SelfUpdateState.Downloading(0f))
             val apkFile = selfUpdateApk(context)
             val failure =
                 try {
@@ -93,6 +94,7 @@ class KrateSelfUpdateInstaller(
             }
             val body = response.body ?: throw UserFacingIOException("The update download was empty. Try again.")
             val total = body.contentLength().takeIf { it > 0 }
+            if (total == null) emit(SelfUpdateState.Downloading(null))
             destination.outputStream().use { out ->
                 body.byteStream().use { input -> copyWithProgress(input, out, total) }
             }

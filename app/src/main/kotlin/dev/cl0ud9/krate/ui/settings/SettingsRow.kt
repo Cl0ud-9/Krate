@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.krate.ui.navigation.glassRim
+import dev.cl0ud9.krate.ui.navigation.pressable
 
 private val ROW_MIN_HEIGHT = 88.dp
 private val BADGE_SIZE = 56.dp
@@ -107,15 +109,18 @@ internal fun SettingsRow(
     // simply isn't meant to be tappable at all (Automatic Downloads, Storage, About)
     if (onClick != null) {
         Surface(
-            onClick = onClick,
-            modifier = rowModifier,
+            modifier = rowModifier.glassRim(shape).pressable(shape, onClick),
             shape = shape,
             color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
             content()
         }
     } else {
-        Surface(modifier = rowModifier, shape = shape, color = MaterialTheme.colorScheme.surfaceContainer) {
+        Surface(
+            modifier = rowModifier.glassRim(shape),
+            shape = shape,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+        ) {
             content()
         }
     }

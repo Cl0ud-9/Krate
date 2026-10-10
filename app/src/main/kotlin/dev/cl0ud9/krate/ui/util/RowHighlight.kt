@@ -21,6 +21,8 @@ private val HIGHLIGHT_VERTICAL = 6.dp
 @Composable
 internal fun Modifier.tappableRow(
     enabled: Boolean = true,
+    // off where something else already answers the tap, like a highlight moving to the row
+    pressFeedback: Boolean = true,
     onClick: () -> Unit,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
@@ -28,12 +30,12 @@ internal fun Modifier.tappableRow(
         val extra = (HIGHLIGHT_BLEED * 2).roundToPx()
         val placeable = measurable.measure(constraints.offset(horizontal = extra))
         layout(placeable.width - extra, placeable.height) { placeable.place(-extra / 2, 0) }
-    }.pressScale(interactionSource)
+    }.then(if (pressFeedback) Modifier.pressScale(interactionSource) else Modifier)
         .clip(ShapeCache.rounded12)
         .clickable(
             enabled = enabled,
             interactionSource = interactionSource,
-            indication = LocalIndication.current,
+            indication = if (pressFeedback) LocalIndication.current else null,
             onClick = onClick,
         ).padding(horizontal = HIGHLIGHT_BLEED, vertical = HIGHLIGHT_VERTICAL)
 }

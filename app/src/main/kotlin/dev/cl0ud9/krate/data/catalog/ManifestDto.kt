@@ -8,11 +8,14 @@ import dev.cl0ud9.krate.domain.model.ArtifactInfo
 import dev.cl0ud9.krate.domain.model.AutoBackup
 import dev.cl0ud9.krate.domain.model.DeviceProfile
 import dev.cl0ud9.krate.domain.model.InstallationMode
+import dev.cl0ud9.krate.domain.model.RecommendedSettings
 import dev.cl0ud9.krate.domain.model.SetupKind
 import dev.cl0ud9.krate.domain.model.SetupStep
 import dev.cl0ud9.krate.domain.model.SupportStatus
 import dev.cl0ud9.krate.domain.model.UiTarget
+import dev.cl0ud9.krate.domain.settings.SettingsText
 import kotlinx.serialization.Serializable
+import java.security.MessageDigest
 import java.time.Instant
 
 // mirrors the real output of catalog/scripts/generate_manifest.py, section 9 of the spec. Every
@@ -73,6 +76,14 @@ data class ManifestGuideDto(
     val backup: String? = null,
     val restore: String? = null,
     val autoBackup: ManifestAutoBackupDto? = null,
+    val recommended: ManifestRecommendedDto? = null,
+)
+
+// settings the catalog recommends: the text exactly as the app exports it, and a line for each thing it changes
+@Serializable
+data class ManifestRecommendedDto(
+    val settings: String = "",
+    val summary: List<String> = emptyList(),
 )
 
 @Serializable
@@ -112,7 +123,20 @@ fun ManifestGuideDto.toDomain(): AppGuide =
         backup = backup,
         restore = restore,
         autoBackup = autoBackup?.toDomain(),
+        recommended = recommended?.toDomain(),
     )
+
+// left out unless the settings read as JSON with at least one setting in them, and say what they change
+private fun ManifestRecommendedDto.toDomain(): RecommendedSettings? =
+    SettingsText.parse(settings)?.takeIf { it.isNotEmpty() && summary.isNotEmpty() }?.let { parsed ->
+        // the settings themselves, not their spacing, decide the revision
+        val canonical = SettingsText.write(parsed, braces = true)
+        val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
+        val revision = digest.take(REVISION_BYTES).joinToString("") { "%02x".format(it) }
+        RecommendedSettings(settings.trim(), summary, revision)
+    }
+
+private const val REVISION_BYTES = 8
 
 // left out unless it's complete: every step names something, and both buttons are there
 private fun ManifestAutoBackupDto.toDomain(): AutoBackup? =

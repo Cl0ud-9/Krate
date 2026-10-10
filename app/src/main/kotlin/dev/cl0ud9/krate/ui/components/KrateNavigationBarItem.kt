@@ -66,6 +66,8 @@ fun RowScope.KrateNavigationBarItem(
     label: String,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    // off under liquid glass, where one glass pill slides between the tabs instead
+    pill: Boolean = true,
 ) {
     // the selected tab reads in the primary color, icon and label alike
     val selectedIconColor = MaterialTheme.colorScheme.primary
@@ -104,7 +106,7 @@ fun RowScope.KrateNavigationBarItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        NavItemIcon(selected = selected, icon = icon, iconColor = iconColor, iconScale = iconScale)
+        NavItemIcon(selected = selected && pill, icon = icon, iconColor = iconColor, iconScale = iconScale)
         if (!compact) {
             Spacer(modifier = Modifier.height(4.dp))
             NavItemLabel(label = label, textColor = textColor, selected = selected)

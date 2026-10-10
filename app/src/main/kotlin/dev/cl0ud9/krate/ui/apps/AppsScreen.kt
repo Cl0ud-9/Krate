@@ -23,9 +23,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
@@ -44,8 +48,9 @@ import dev.cl0ud9.krate.ui.util.krateViewModel
 import dev.cl0ud9.krate.ui.util.plusBottom
 import dev.cl0ud9.krate.ui.util.rememberDebouncedOnClick
 import dev.cl0ud9.krate.ui.util.rememberListShownAt
-import dev.cl0ud9.krate.voice.KrateVoice
+import dev.cl0ud9.krate.voice.KrateMemory
 import dev.cl0ud9.krate.voice.Moment
+import dev.cl0ud9.krate.voice.refreshFailedLine
 import dev.cl0ud9.krate.voice.rememberKrateLine
 
 // the tab's one ViewModel, shared by its header and its content
@@ -98,15 +103,16 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
         KratePullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refreshFromNetwork,
-            modifier = Modifier.fillMaxSize().glassSource(pageGlass),
+            modifier = Modifier.fillMaxSize().glassSource(pageGlass, MaterialTheme.colorScheme.background),
         ) {
             AppsContent(uiState = uiState, isRefreshing = isRefreshing, viewModel = viewModel, onAppClick = onAppClick)
         }
+        val context = LocalContext.current
         RefreshFailureSnackbar(
             refreshFailed = viewModel.refreshFailed,
             message = {
                 KrateMessage(
-                    headline = KrateVoice.line(Moment.REFRESH_FAILED),
+                    headline = refreshFailedLine(context),
                     detail = "Couldn't refresh the catalog, so this is what Krate saw last.",
                     icon = R.drawable.ic_cloud_off_rounded,
                     actionLabel = "Retry",
@@ -170,6 +176,7 @@ private fun AppsList(
     onAppClick: (String) -> Unit,
 ) {
     val listShownAt = rememberListShownAt()
+    var adding by rememberSaveable { mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp).plusBottom(LocalNavBarClearance.current),
@@ -183,6 +190,20 @@ private fun AppsList(
             )
         }
 
+        // until the header's "+" has been found: the two ways to get an app that isn't here
+        if (!KrateMemory.addHintDone) {
+            item(key = "add-hint") {
+                AddAppHint(
+                    onOpen = {
+                        adding = true
+                        KrateMemory.addHintDone = true
+                    },
+                    onDismiss = { KrateMemory.addHintDone = true },
+                    modifier = Modifier.animateItem(),
+                )
+            }
+        }
+
         itemsIndexed(state.apps, key = { _, app -> app.id }) { index, app ->
             StaggeredAppear(index = index, listShownAt = listShownAt, modifier = Modifier.animateItem()) {
                 AppListItem(
@@ -192,6 +213,7 @@ private fun AppsList(
                     // before the first navigate() call's recomposition landed, pushing
                     // App Details onto the back stack twice
                     onClick = rememberDebouncedOnClick(onClick = { onAppClick(app.id) }),
+                    place = "apps",
                 )
             }
         }
@@ -201,10 +223,11 @@ private fun AppsList(
                 listShownAt = listShownAt,
                 modifier = Modifier.animateItem(),
             ) {
-                SuggestAppCard()
+                SuggestAppCard(onOpenApp = onAppClick)
             }
         }
     }
+    if (adding) AddAppFlow(onOpenApp = onAppClick, onDone = { adding = false })
 }
 
 // the catalog's count on one side, the refresh pill on the other - always visible, not tucked away
@@ -222,6 +245,7 @@ private fun AppsListHeader(
         Text(
             text = if (appCount == 1) "1 app in the Krate" else "$appCount apps in the Krate",
             style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f).padding(end = 12.dp),
         )
         RefreshPillButton(isRefreshing = isRefreshing, onClick = onRefresh)
     }

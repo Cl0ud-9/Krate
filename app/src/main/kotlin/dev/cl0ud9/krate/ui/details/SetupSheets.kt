@@ -12,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -23,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.domain.model.AppGuide
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.platform.backup.AppBackups
+import dev.cl0ud9.krate.ui.components.KrateSheet
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
 // the settings worth knowing about, where they are, and a way into the app to change them
@@ -61,7 +61,9 @@ internal fun KeepSettingsSheet(
 ) {
     SetupSheet(title = "Keep your settings", onDismiss = onDismiss) {
         Text(
-            text = "Updates keep them on their own. A reinstall from scratch starts the app empty, so save them first.",
+            text =
+                "Updates keep your settings as they are. A reinstall from scratch starts the app empty, so save " +
+                    "them first.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -96,7 +98,7 @@ private fun HandStep(
 }
 
 @Composable
-private fun OpenAppTonal(app: AppProfile) {
+internal fun OpenAppTonal(app: AppProfile) {
     val context = LocalContext.current
     launchIntent(context, app)?.let { intent ->
         FilledTonalButton(onClick = { startSafely(context, intent, null) }) { Text("Open ${app.displayName}") }
@@ -125,12 +127,12 @@ internal fun relativeTime(millis: Long): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SetupSheet(
+internal fun SetupSheet(
     title: String,
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    ModalBottomSheet(
+    KrateSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {

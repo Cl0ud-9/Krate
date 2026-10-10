@@ -8,8 +8,10 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
 import dev.cl0ud9.krate.KrateActivity
 import dev.cl0ud9.krate.domain.model.UiTarget
+import dev.cl0ud9.krate.domain.settings.SettingsText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,12 +26,34 @@ private const val FIND_TIMEOUT_MS = 6_000L
 private const val SCROLL_AFTER_MS = 1_500L
 private const val MAX_SCROLLS = 6
 private const val MAX_BACKS = 8
+
+// looks for an active window before deciding there isn't one
+private const val ACTIVE_LOOKS = 5
 private const val TAP_MS = 60L
 private const val DIALOG_CHECK_MS = 3_000L
 private const val FULL_LOOK_MS = FIND_TIMEOUT_MS + MAX_SCROLLS * SCROLL_AFTER_MS
 
 // notices an app can stack up as it opens, each closed with Back
 private const val MAX_DIALOGS = 3
+
+// how long to wait for the app to say how an import went, in the short message it shows; some take a few seconds
+private const val APP_MESSAGE_MS = 8_000L
+
+// where Android draws an app's short messages
+private const val SYSTEM_UI = "com.android.systemui"
+
+// words in that message that mean the app turned the settings down
+private val REFUSALS = listOf("fail", "error", "invalid", "couldn't", "could not", "unable")
+
+// what a walk through the app's backup box came back with
+private class WalkResult(
+    // the text read out, for a backup
+    val text: String? = null,
+    // how many recommended settings changed something
+    val changed: Int = 0,
+    // what the app said on importing, if anything
+    val appSaid: String? = null,
+)
 
 // a step that couldn't be found, named for the message shown afterwards
 private class StepNotFound(
@@ -38,6 +62,8 @@ private class StepNotFound(
 
 // Krate's accessibility helper: when asked, it opens an app, taps its way to that app's own backup box, and reads
 // the settings out of it or pastes them back in. It does nothing in between, and only looks at the app it's for
+// one walk through an app's backup box, its steps kept together so the whole of what it does reads in one place
+@Suppress("TooManyFunctions")
 class KrateBackupService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -46,7 +72,25 @@ class KrateBackupService : AccessibilityService() {
         listenTo(packageName)
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    // the app's short messages ("Imported 12 settings"), heard only while a job runs in that app
+    private var jobPackage: String? = null
+    private var appMessage: String? = null
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType != AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) return
+        // a notification carries its own data; a short on-screen message carries none. Android draws an app's short
+        // messages in its system interface, which may be reported as their sender
+        val sender = event.packageName?.toString()
+        val fromApp = sender == jobPackage || (sender == SYSTEM_UI && event.className == Toast::class.java.name)
+        if (jobPackage == null || !fromApp || event.parcelableData != null) return
+        // the message first; Android adds the app's name after it
+        event.text
+            .firstOrNull()
+            ?.toString()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { appMessage = it }
+    }
 
     override fun onInterrupt() = Unit
 
@@ -61,19 +105,26 @@ class KrateBackupService : AccessibilityService() {
             val result =
                 try {
                     listenTo(job.packageName)
-                    val text = walk(job)
+                    jobPackage = job.packageName
+                    val walked = walk(job)
+                    val text = walked.text
                     if (!text.isNullOrBlank()) AppBackups.save(this@KrateBackupService, job.packageName, text)
+                    if (job.mode == BackupMode.APPLY) {
+                        job.revision?.let { RecommendedMarks.applied(this@KrateBackupService, job.packageName, it) }
+                    }
                     AutoBackupState.Done(
                         job.packageName,
                         job.mode,
-                        nothingToSave =
-                            job.mode == BackupMode.SAVE && text.isNullOrBlank(),
+                        nothingToSave = job.mode == BackupMode.SAVE && text.isNullOrBlank(),
+                        changed = walked.changed,
+                        appSaid = walked.appSaid,
                     )
                 } catch (missing: StepNotFound) {
                     AutoBackupState.Failed(job.packageName, job.mode, "Couldn't find \"${missing.step}\" in the app.")
                 } catch (failure: IllegalStateException) {
                     AutoBackupState.Failed(job.packageName, job.mode, failure.message ?: "Something got in the way.")
                 }
+            jobPackage = null
             leave(job.packageName)
             listenTo(packageName)
             AutoBackupRunner.finish(result)
@@ -82,7 +133,7 @@ class KrateBackupService : AccessibilityService() {
     }
 
     // from the app's first screen to its backup box; the text read out, for a backup
-    private suspend fun walk(job: AutoBackupJob): String? {
+    private suspend fun walk(job: AutoBackupJob): WalkResult {
         val launch =
             packageManager.getLaunchIntentForPackage(job.packageName)
                 ?: error("The app isn't installed.")
@@ -93,26 +144,66 @@ class KrateBackupService : AccessibilityService() {
             delay(STEP_SETTLE_MS)
         }
         val field = waitFor(job.packageName) { root -> root.find { it.isEditable } } ?: throw StepNotFound("text box")
+        // an empty box can report its hint as its text; an app with nothing changed from its defaults exports nothing,
+        // which isn't a failure
+        val boxText = if (field.isShowingHintText) "" else field.text?.toString().orEmpty()
         return when (job.mode) {
             BackupMode.SAVE -> {
-                // an app with nothing changed from its defaults exports nothing, which isn't a failure
-                val text = field.text?.toString().orEmpty()
                 tap(job.packageName, UiTarget(text = job.spec.close))
-                text
+                WalkResult(text = boxText)
             }
-            BackupMode.RESTORE -> {
-                val arguments =
-                    Bundle().apply {
-                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, job.text)
-                    }
-                if (!field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
-                    error("Couldn't paste into the backup box.")
-                }
-                delay(STEP_SETTLE_MS)
-                tap(job.packageName, UiTarget(text = job.spec.apply))
-                null
-            }
+            BackupMode.RESTORE -> WalkResult(appSaid = paste(job, field, job.text.orEmpty()))
+            BackupMode.APPLY -> applyRecommended(job, field, boxText)
         }
+    }
+
+    // the app's own settings with the recommended ones laid over them; a copy of the app's own is kept first, so
+    // they can be put back. Nothing is pasted when the picks are all set already, or the box can't be read
+    private suspend fun applyRecommended(
+        job: AutoBackupJob,
+        field: AccessibilityNodeInfo,
+        own: String,
+    ): WalkResult {
+        val picks = job.text.orEmpty()
+        val ownSettings = SettingsText.parse(own)
+        val pickedSettings = SettingsText.parse(picks)
+        if (ownSettings == null || pickedSettings == null) {
+            tap(job.packageName, UiTarget(text = job.spec.close))
+            error("Couldn't read the app's current settings, so nothing was changed.")
+        }
+        val changed = SettingsText.changes(ownSettings, pickedSettings)
+        if (changed.isEmpty()) {
+            tap(job.packageName, UiTarget(text = job.spec.close))
+            return WalkResult()
+        }
+        if (own.isNotBlank()) AppBackups.save(this, job.packageName, own)
+        val braces = SettingsText.usesBraces(own, picks)
+        val merged = SettingsText.write(SettingsText.merge(ownSettings, pickedSettings), braces)
+        return WalkResult(changed = changed.size, appSaid = paste(job, field, merged))
+    }
+
+    // puts the text in the box and applies it; what the app said back, failing if it turned the text down
+    private suspend fun paste(
+        job: AutoBackupJob,
+        field: AccessibilityNodeInfo,
+        text: String,
+    ): String? {
+        val arguments =
+            Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }
+        if (!field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
+            error("Couldn't paste into the backup box.")
+        }
+        delay(STEP_SETTLE_MS)
+        appMessage = null
+        tap(job.packageName, UiTarget(text = job.spec.apply))
+        var waited = 0L
+        while (appMessage == null && waited < APP_MESSAGE_MS) {
+            delay(POLL_MS)
+            waited += POLL_MS
+        }
+        val said = appMessage
+        if (said != null && REFUSALS.any { said.contains(it, ignoreCase = true) }) error("The app said: $said")
+        return said
     }
 
     // a dialog the app shows on opening can cover the first step, so that one gets a Back first if it won't show
@@ -148,13 +239,25 @@ class KrateBackupService : AccessibilityService() {
         if (clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) != true) tapAt(found)
     }
 
-    // backs out of the app's screens it opened, so it's left where it started
+    // backs out of the app's screens it opened, all the way, so the app opens on its own first screen next time rather
+    // than on the settings page Krate left it at. A box that's closing can leave no window active for a moment, so
+    // that gets a short wait rather than being taken for the app having gone
     private suspend fun leave(packageName: String) {
+        delay(STEP_SETTLE_MS)
         repeat(MAX_BACKS) {
-            if (appWindows(packageName).isEmpty() || rootInActiveWindow?.packageName?.toString() != packageName) return
+            if (activePackage() != packageName) return
             performGlobalAction(GLOBAL_ACTION_BACK)
             delay(POLL_MS * 2)
         }
+    }
+
+    // the app in the active window, given a moment to settle when none is reported
+    private suspend fun activePackage(): String? {
+        repeat(ACTIVE_LOOKS) {
+            rootInActiveWindow?.packageName?.toString()?.let { return it }
+            delay(POLL_MS)
+        }
+        return null
     }
 
     private fun returnToKrate() {
@@ -167,7 +270,9 @@ class KrateBackupService : AccessibilityService() {
     // events and windows from this one app only: Krate's own while idle, the app being backed up while a job runs
     private fun listenTo(packageName: String) {
         val info = serviceInfo ?: return
-        info.packageNames = arrayOf(packageName, this.packageName)
+        // while a job runs, the system interface too, only for the app's short messages it draws
+        val messages = if (packageName == this.packageName) emptyArray() else arrayOf(SYSTEM_UI)
+        info.packageNames = arrayOf(packageName, this.packageName) + messages
         serviceInfo = info
     }
 

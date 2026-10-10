@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.ui.navigation
 
 import android.os.Build
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -8,6 +9,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -16,14 +18,16 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kyant.backdrop.BackdropEffectScope
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.colorControls
 import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.ui.theme.krateGlow
@@ -35,17 +39,7 @@ val liquidGlassSupported: Boolean
 private val lensSupported: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
-private val GLASS_BLUR = 14.dp
-private val LENS_HEIGHT = 16.dp
-private val LENS_AMOUNT = 28.dp
-
-// tint over the frosted backdrop: enough for the icons and labels to stay readable over any screen behind it
-private const val GLASS_TINT_DARK = 0.55f
-private const val GLASS_TINT_LIGHT = 0.62f
 private const val HALF = 0.5f
-private val TOP_EDGE_WIDTH = 1.dp
-private const val TOP_EDGE_DARK = 0.22f
-private const val TOP_EDGE_LIGHT = 0.7f
 
 // the Appearance switch, honoured only where the phone can draw the glass
 @Composable
@@ -74,42 +68,91 @@ fun Modifier.heroGlow(): Modifier = if (LocalLiquidGlass.current) krateGlow() el
 @Composable
 fun rememberPageGlass(): LayerBackdrop? = if (LocalLiquidGlass.current) rememberLayerBackdrop() else null
 
-// records this content for the glass over it
-fun Modifier.glassSource(backdrop: LayerBackdrop?): Modifier = if (backdrop == null) this else layerBackdrop(backdrop)
+// records this content for the glass over it, on the colour it sits on: without it, whatever sits straight on the
+// page (section titles, dates) records with nothing around it, and stays sharp through the glass
+fun Modifier.glassSource(
+    backdrop: LayerBackdrop?,
+    background: Color,
+): Modifier = if (backdrop == null) this else layerBackdrop(backdrop).background(background)
 
-// what's behind, blurred, saturated a little and bent at the edges, under a light tint of the piece's own colour;
-// nothing at all when glass is off
+// what's behind, blurred, more colourful and bent at the edges, under a light black (or, in light themes, white)
+// shade; nothing at all when glass is off
+@Suppress("LongParameterList")
 @Composable
 fun Modifier.liquidGlass(
     backdrop: LayerBackdrop?,
     shape: Shape,
     edge: GlassEdge,
-    color: Color = MaterialTheme.colorScheme.surfaceContainer,
     cornerRadius: Dp = 0.dp,
+    // extra drawing-layer changes, like the swell of the navigation bar under a touch
+    layerBlock: (GraphicsLayerScope.() -> Unit)? = null,
+    // how much of the glass to draw, read while drawing: a header ramps it in as content slides under
+    strength: () -> Float = { 1f },
+    // how hard it's pressed, read while drawing: a pressed piece blurs and bends a little more
+    press: () -> Float = { 0f },
+    // a tall piece bends no more than the bar does
+    header: Boolean = false,
 ): Modifier {
     if (backdrop == null) return this
     // Krate's own theme, which can differ from the phone's
     val dark = MaterialTheme.colorScheme.surface.luminance() < HALF
-    val tint = color.copy(alpha = if (dark) GLASS_TINT_DARK else GLASS_TINT_LIGHT)
-    val light = Color.White.copy(alpha = if (dark) TOP_EDGE_DARK else TOP_EDGE_LIGHT)
+    val shade = if (dark) Color.Black else Color.White
+    val light = Color.White.copy(alpha = if (dark) GlassTokens.EDGE_DARK else GlassTokens.EDGE_LIGHT)
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
-            vibrancy()
-            blur(GLASS_BLUR.toPx())
-            // the bent edge takes only corner-based shapes; any other just goes without it
-            if (lensSupported && shape is CornerBasedShape) lens(LENS_HEIGHT.toPx(), LENS_AMOUNT.toPx())
+            frost(strength(), press())
+            // only floating glass bends light at its sides: a full-width bar runs into the screen's edges, where
+            // bending would warp what's behind into curves
+            if (lensSupported && edge == GlassEdge.ALL && shape is CornerBasedShape) bend(header, press())
         },
-        highlight = if (edge == GlassEdge.ALL) ({ Highlight.Default }) else null,
-        onDrawSurface = { drawRect(tint) },
+        layerBlock = layerBlock,
+        highlight = if (edge == GlassEdge.ALL) ({ Highlight.Default.copy(alpha = strength()) }) else null,
+        onDrawSurface = { drawRect(shade, alpha = GlassTokens.SHADE * strength()) },
         onDrawFront =
             when (edge) {
                 GlassEdge.ALL -> null
-                GlassEdge.TOP -> ({ drawTopEdge(shape, cornerRadius.toPx(), light) })
-                GlassEdge.BOTTOM -> ({ drawBottomEdge(light) })
+                GlassEdge.TOP -> (
+                    {
+                        drawTopEdge(
+                            shape,
+                            cornerRadius.toPx(),
+                            light.copy(alpha = light.alpha * strength()),
+                        )
+                    }
+                )
+                GlassEdge.BOTTOM -> ({ drawBottomEdge(light.copy(alpha = light.alpha * strength())) })
             },
     )
+}
+
+// Krate's frosting: what's behind, more colourful twice over and a little brighter, then blurred. Every glass piece
+// uses it, so a piece sitting on another reads as the same material. A header ramps it in with its strength, so while
+// open it matches the page exactly instead of a lighter, bluer band
+internal fun BackdropEffectScope.frost(
+    strength: Float = 1f,
+    press: Float = 0f,
+) {
+    val saturation = lerp(1f, GlassTokens.SATURATION, strength)
+    colorControls(saturation = saturation)
+    colorControls(brightness = GlassTokens.BRIGHTNESS * strength, saturation = saturation)
+    blur(GlassTokens.Blur.toPx() + GlassTokens.PressBlur.toPx() * press)
+}
+
+// bends what's behind near the edges: a quarter of the piece's shorter side in, by half of it
+private fun BackdropEffectScope.bend(
+    header: Boolean,
+    press: Float,
+) {
+    val shorter = size.minDimension
+    var height = shorter * GlassTokens.LENS_HEIGHT_SHARE
+    var amount = shorter * GlassTokens.LENS_AMOUNT_SHARE
+    if (header) {
+        height = height.coerceAtMost(GlassTokens.HeaderLensHeight.toPx())
+        amount = amount.coerceAtMost(GlassTokens.HeaderLensAmount.toPx())
+    }
+    lens(height + GlassTokens.PressLens.toPx() * press, amount)
 }
 
 // the shape's outline, drawn only as far down as its top corners reach
@@ -118,7 +161,7 @@ private fun DrawScope.drawTopEdge(
     cornerPx: Float,
     color: Color,
 ) {
-    val width = TOP_EDGE_WIDTH.toPx()
+    val width = GlassTokens.EdgeWidth.toPx()
     val outline = shape.createOutline(size, layoutDirection, this)
     clipRect(bottom = cornerPx + width) {
         drawOutline(outline, color = color, style = Stroke(width = width))
@@ -126,7 +169,7 @@ private fun DrawScope.drawTopEdge(
 }
 
 private fun DrawScope.drawBottomEdge(color: Color) {
-    val width = TOP_EDGE_WIDTH.toPx()
+    val width = GlassTokens.EdgeWidth.toPx()
     val y = size.height - width / 2
     drawLine(color, Offset(0f, y), Offset(size.width, y), strokeWidth = width)
 }

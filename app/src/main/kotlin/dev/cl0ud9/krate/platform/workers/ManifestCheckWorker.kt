@@ -79,6 +79,12 @@ class ManifestCheckWorker(
         val now = System.currentTimeMillis()
         val due = pending.filter { policy.isDue(it, now) }
         if (due.isNotEmpty()) AutoUpdateWorker.enqueue(applicationContext)
+        // the rest are booked for when they fall due, rather than waiting for the next check
+        pending
+            .filterNot { it in due }
+            .mapNotNull { policy.dueAt(it) }
+            .minOrNull()
+            ?.let { AutoUpdateWorker.enqueueAt(applicationContext, it - now) }
         val ledger = AutoUpdateLedger(applicationContext)
         val overdue =
             due.filter { app ->

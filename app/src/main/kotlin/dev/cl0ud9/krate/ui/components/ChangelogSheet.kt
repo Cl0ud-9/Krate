@@ -1,5 +1,6 @@
 package dev.cl0ud9.krate.ui.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumExtendedFloatingActionButton
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -46,6 +46,7 @@ import dev.cl0ud9.krate.platform.selfupdate.KrateRelease
 import dev.cl0ud9.krate.ui.navigation.GlassEdge
 import dev.cl0ud9.krate.ui.navigation.glassSource
 import dev.cl0ud9.krate.ui.navigation.liquidGlass
+import dev.cl0ud9.krate.ui.navigation.rememberGlassPress
 import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import java.io.IOException
@@ -106,7 +107,7 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
             }
     }
     // peeks at half height first, then drags up to full
-    ModalBottomSheet(
+    KrateSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -116,7 +117,13 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
         val notesGlass = rememberPageGlass()
         Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
             Column(
-                modifier = Modifier.fillMaxWidth().glassSource(notesGlass).padding(horizontal = 24.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .glassSource(
+                            notesGlass,
+                            MaterialTheme.colorScheme.surfaceContainerLow,
+                        ).padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 ChangelogHeader()
@@ -160,6 +167,7 @@ private fun ViewOnGitHubButton(
 ) {
     val uriHandler = LocalUriHandler.current
     val color = MaterialTheme.colorScheme.tertiaryContainer
+    val press = rememberGlassPress()
     MediumExtendedFloatingActionButton(
         onClick = { uriHandler.openUri(RELEASES_URL) },
         shape = ShapeCache.rounded16,
@@ -173,13 +181,36 @@ private fun ViewOnGitHubButton(
             },
         icon = { Icon(painterResource(R.drawable.ic_github), contentDescription = null) },
         text = { Text("View on GitHub") },
-        modifier = modifier.liquidGlass(glass, ShapeCache.rounded16, GlassEdge.ALL, color = color),
+        modifier =
+            modifier
+                .liquidGlass(
+                    glass,
+                    ShapeCache.rounded16,
+                    GlassEdge.ALL,
+                    layerBlock = press.glassLayer,
+                    press = { press.progress },
+                ).then(if (glass != null) press.modifier else Modifier),
     )
+}
+
+// fades from the loader to the notes, or to the error, rather than swapping in a frame
+@Composable
+private fun ReleasesContent(
+    state: ReleasesState,
+    onRetry: () -> Unit,
+) {
+    AnimatedContent(
+        targetState = state,
+        contentKey = { it::class },
+        transitionSpec = fadeThrough(),
+        contentAlignment = Alignment.TopCenter,
+        label = "releases",
+    ) { shown -> ReleasesBody(state = shown, onRetry = onRetry) }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ReleasesContent(
+private fun ReleasesBody(
     state: ReleasesState,
     onRetry: () -> Unit,
 ) {

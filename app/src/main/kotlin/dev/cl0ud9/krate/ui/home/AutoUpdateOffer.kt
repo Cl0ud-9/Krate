@@ -23,6 +23,7 @@ import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
 import dev.cl0ud9.krate.ui.components.ButtonRow
 import dev.cl0ud9.krate.ui.components.SectionHeader
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.krateViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -56,7 +57,7 @@ internal fun AutoUpdateOffer() {
     val visible by viewModel.visible.collectAsStateWithLifecycle()
     if (!visible) return
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {

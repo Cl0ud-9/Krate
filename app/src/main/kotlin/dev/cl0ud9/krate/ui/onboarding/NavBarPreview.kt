@@ -61,7 +61,9 @@ internal fun NavBarPreview(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Box {
-            Column(modifier = Modifier.fillMaxSize().glassSource(backdrop)) {
+            Column(
+                modifier = Modifier.fillMaxSize().glassSource(backdrop, MaterialTheme.colorScheme.surfaceContainerHigh),
+            ) {
                 PreviewHeader(glass = glass)
                 Column(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
@@ -134,7 +136,6 @@ private fun BoxScope.PreviewBar(
                     glass,
                     shape,
                     edge = if (pill) GlassEdge.ALL else GlassEdge.TOP,
-                    color = color,
                     cornerRadius = radius.dp,
                 ),
         shape = shape,

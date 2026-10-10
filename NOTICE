@@ -18,8 +18,13 @@ License 2.0 text is in licenses/apache-2.0.txt):
   AndroidX, Jetpack Compose                          Apache License 2.0
   Kotlin, kotlinx.coroutines, kotlinx.serialization  Apache License 2.0
   OkHttp, Okio                                       Apache License 2.0
+  Backdrop (Kyant)                                   Apache License 2.0
   Google Tink, Guava, Gson, Error Prone, JSpecify    Apache License 2.0
   Protocol Buffers (inside Tink)    BSD 3-Clause     licenses/protobuf-BSD-3-Clause.txt
+
+The liquid glass navigation bar's motion (ui/navigation/GlassMotion.kt) is adapted from the
+Backdrop library's catalog app by Kyant (https://github.com/Kyant0/AndroidLiquidGlass), Apache
+License 2.0. Krate also uses the Backdrop library itself, under the same license.
 
 The APK carries the license texts these require (the Apache License 2.0, the Google Sans
 Flex OFL and the Protocol Buffers BSD license) and Krate's own LICENSE, and shows them in

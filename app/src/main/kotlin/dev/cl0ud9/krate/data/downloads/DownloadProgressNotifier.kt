@@ -29,6 +29,9 @@ interface DownloadProgressNotifier {
 
     fun clear(appId: String)
 
+    // the app left the Krate: its progress and any finished result go, so nothing points at it any more
+    fun dismiss(appId: String)
+
     // Update All downloads outside App Details, so it keeps Krate's network up for its whole run
     fun onUpdateAllStarted()
 

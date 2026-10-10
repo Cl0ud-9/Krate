@@ -20,10 +20,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +41,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.ui.components.KrateSheet
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.githubNewIssueUrl
 import dev.cl0ud9.krate.ui.util.ownsScroll
@@ -49,10 +52,15 @@ private const val WHY_MAX_LINES = 5
 
 // the end of the Apps list: what kind of apps belong in Krate, and a way to ask for one
 @Composable
-fun SuggestAppCard(modifier: Modifier = Modifier) {
+fun SuggestAppCard(
+    onOpenApp: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var open by rememberSaveable { mutableStateOf(false) }
+    // the link to track, once asked for; empty for a fresh start
+    var track by rememberSaveable { mutableStateOf<String?>(null) }
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().glassRim(ShapeCache.rounded24),
         shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
@@ -76,22 +84,47 @@ fun SuggestAppCard(modifier: Modifier = Modifier) {
                 text =
                     "Krate is for apps you won't find on the Play Store, " +
                         "mostly open-source apps published on GitHub. " +
-                        "Suggest one and it might land in the Krate.",
+                        "Suggest one and it might land in the Krate, or track it yourself from GitHub, Codeberg " +
+                        "or GitLab.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            FilledTonalButton(onClick = { open = true }) {
-                Icon(
-                    painterResource(R.drawable.ic_arrow_forward_rounded),
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Suggest an app")
-            }
+            SuggestCardActions(onTrack = { track = "" }, onSuggest = { open = true })
         }
     }
-    if (open) SuggestAppSheet(onDismiss = { open = false })
+    if (open) {
+        SuggestAppSheet(
+            onDismiss = { open = false },
+            onTrackInstead = { link ->
+                open = false
+                track = link
+            },
+        )
+    }
+    track?.let { link -> TrackAppSheet(onDismiss = { track = null }, onOpenApp = onOpenApp, initialLink = link) }
+}
+
+// the card's two ways forward, side by side: follow it yourself, or ask for it to join the Krate
+@Composable
+private fun SuggestCardActions(
+    onTrack: () -> Unit,
+    onSuggest: () -> Unit,
+) {
+    // stacked full width like the sheets' own buttons: side by side, with their icons, they don't fit one line
+    FilledTonalButton(onClick = onSuggest, modifier = Modifier.fillMaxWidth()) {
+        Icon(
+            painterResource(R.drawable.ic_arrow_forward_rounded),
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Suggest an app")
+    }
+    OutlinedButton(onClick = onTrack, modifier = Modifier.fillMaxWidth()) {
+        Icon(painterResource(R.drawable.ic_github), contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Track it yourself")
+    }
 }
 
 // name, where to find it, and why - sent from any app, or as a GitHub issue
@@ -101,6 +134,8 @@ fun SuggestAppSheet(
     onDismiss: () -> Unit,
     // filled in from a link shared to Krate
     initial: SharedSuggestion? = null,
+    // following it from GitHub straight away instead, with the link so far
+    onTrackInstead: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // name, then link, then why - the keyboard's Next key walks through them in order
@@ -109,7 +144,7 @@ fun SuggestAppSheet(
     val why = rememberTextFieldState(initial?.why.orEmpty())
     val whyScroll = rememberScrollState()
     val suggestion = Suggestion(name.text.trim().toString(), link.text.trim().toString(), why.text.trim().toString())
-    ModalBottomSheet(
+    KrateSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -154,6 +189,7 @@ fun SuggestAppSheet(
                 suggestion = suggestion,
                 onShare = { context.startActivity(suggestion.shareIntent()) },
                 onGitHub = { suggestion.openIssue(context) },
+                onTrack = onTrackInstead?.let { track -> { track(link.text.trim().toString()) } },
             )
         }
     }
@@ -175,6 +211,7 @@ private fun SuggestActions(
     suggestion: Suggestion,
     onShare: () -> Unit,
     onGitHub: () -> Unit,
+    onTrack: (() -> Unit)?,
 ) {
     Button(onClick = onShare, enabled = suggestion.isComplete, modifier = Modifier.fillMaxWidth()) {
         Text("Send suggestion")
@@ -183,6 +220,11 @@ private fun SuggestActions(
         Icon(painterResource(R.drawable.ic_github), contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(modifier = Modifier.width(8.dp))
         Text("Suggest on GitHub instead")
+    }
+    onTrack?.let { track ->
+        TextButton(onClick = track, modifier = Modifier.fillMaxWidth()) {
+            Text("Or track it yourself, straight from its releases")
+        }
     }
 }
 

@@ -34,9 +34,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -53,9 +55,12 @@ import kotlin.math.roundToInt
 // a detail page's heading lives below the back button and rides up with the content as the user
 // scrolls, instead of sitting fixed in a conventional toolbar - the min/max bounds and the snap
 // halfway through are the same shape as the app's other scrollable sections, just without a subtitle
-// square, but a corner-based shape: the glass's bent edge only accepts those
-private val SquareCorners = RoundedCornerShape(0.dp)
 private val HeaderMinHeight = 64.dp
+
+// how far the header's glass reaches past the screen's sides and top, and its corners, so its bent edges stay off
+// screen except along the bottom
+private val GlassBleed = 40.dp
+private val BleedShape = RoundedCornerShape(32.dp)
 private val HeaderMaxHeight = 128.dp
 
 // breathing room between the header and whatever the screen's first card/row is - without it, the
@@ -72,8 +77,8 @@ private val CollapsedTitleStartPadding = 64.dp
 // near the header's bottom edge, clear of the back button above it; collapsed, it's pinned to the
 // back button's own vertical center (below) so the two align exactly instead of only approximately
 private val TitleContainerHeight = 64.dp
-private val BackButtonTopPadding = 4.dp
-private val BackButtonSize = 40.dp
+internal val BackButtonTopPadding = 4.dp
+internal val BackButtonSize = 40.dp
 private val CollapsedTitleCenterY = BackButtonTopPadding + BackButtonSize / 2
 private val ExpandedTitleCenterY = HeaderMaxHeight - TitleContainerHeight / 2
 private val TitleTransformOrigin = TransformOrigin(0f, 0.5f)
@@ -168,6 +173,7 @@ fun collapsingHeaderNestedScrollConnection(
 // back button pinned top-start the whole time; the title itself slides from a large left-aligned
 // line near the bottom of the expanded header up to a small line beside the button once collapsed,
 // with the bar's own background fading in over the same stretch instead of staying always-opaque
+@Suppress("LongParameterList")
 @Composable
 fun CollapsingDetailHeader(
     title: String,
@@ -175,6 +181,8 @@ fun CollapsingDetailHeader(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     glass: LayerBackdrop? = null,
+    // one button at the top right, level with Back, for what the page offers (Share on an app's page)
+    action: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     val fraction = state.collapseFraction
     val solidAlpha = (fraction * 2f).coerceIn(0f, 1f)
@@ -193,8 +201,9 @@ fun CollapsingDetailHeader(
                 // the header owns its own area: a tap on it never reaches the page scrolled underneath
                 .pointerInput(Unit) {},
     ) {
-        // nothing behind the title while open; collapsing fades in the bar, solid or glass
-        if (solidAlpha > 0f) HeaderSurface(glass = glass, alpha = solidAlpha)
+        // nothing behind the title while open; collapsing fades in the bar, solid or glass. Glass is always there,
+        // frosting only the page's own background until content slides under it, so it never pops in
+        if (solidAlpha > 0f || glass != null) HeaderSurface(glass = glass, alpha = solidAlpha)
         Box(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(SideInsets)) {
             HeaderTitle(
                 title = title,
@@ -217,6 +226,7 @@ fun CollapsingDetailHeader(
             ) {
                 Icon(painterResource(R.drawable.ic_arrow_back_rounded), contentDescription = "Back")
             }
+            action?.invoke(this)
         }
     }
 }
@@ -231,16 +241,36 @@ private fun BoxScope.HeaderSurface(
         modifier =
             Modifier
                 .matchParentSize()
-                .graphicsLayer { this.alpha = alpha }
                 .then(
                     if (glass == null) {
-                        Modifier.background(color)
+                        Modifier.graphicsLayer { this.alpha = alpha }.background(color)
                     } else {
-                        Modifier.liquidGlass(glass, SquareCorners, GlassEdge.BOTTOM, color = color)
+                        // drawn wider and taller than the header so the glass's bent sides fall off screen: only the
+                        // bottom edge, where content slides under, bends light like the navigation bar does
+                        Modifier
+                            .bleed(GlassBleed)
+                            .liquidGlass(
+                                glass,
+                                BleedShape,
+                                GlassEdge.ALL,
+                                strength = { alpha },
+                                header = true,
+                            )
                     },
                 ),
     )
 }
+
+// lays the piece out larger by [amount] on the sides and top, centred on where it was, without moving anything else
+private fun Modifier.bleed(amount: Dp): Modifier =
+    layout { measurable, constraints ->
+        val extra = amount.roundToPx()
+        val placeable =
+            measurable.measure(
+                Constraints.fixed(constraints.maxWidth + extra * 2, constraints.maxHeight + extra),
+            )
+        layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-extra, -extra) }
+    }
 
 // vertically centered on centerY via a fixed-height box + offset, rather than top/bottom alignment,
 // so it lands on an exact pixel target (the back button's own center once collapsed) at any fraction

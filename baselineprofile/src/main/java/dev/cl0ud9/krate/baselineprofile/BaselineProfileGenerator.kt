@@ -44,6 +44,7 @@ class BaselineProfileGenerator {
         ) {
             startBenchmarkActivity()
             runHomeFlow()
+            runWhatsNewFlow()
             runAppsAndDetailsFlow()
             runUpdatesFlow()
             runSettingsFlow()
@@ -60,6 +61,14 @@ class BaselineProfileGenerator {
     private fun MacrobenchmarkScope.runHomeFlow() {
         clickDescription("Home")
         scrollDownAndUp()
+    }
+
+    // the What's new sheet: its glass button over the notes
+    private fun MacrobenchmarkScope.runWhatsNewFlow() {
+        clickDescription("What's new")
+        waitForUi(POST_LAUNCH_DELAY_MS)
+        device.pressBack()
+        waitForUi()
     }
 
     private fun MacrobenchmarkScope.runAppsAndDetailsFlow() {
@@ -82,6 +91,10 @@ class BaselineProfileGenerator {
         clickDescription("Settings")
         waitForUi(POST_LAUNCH_DELAY_MS)
         scrollDownAndUp()
+        clickText("Backups")
+        waitForUi(POST_LAUNCH_DELAY_MS)
+        clickDescription("Back")
+        waitForUi(POST_LAUNCH_DELAY_MS)
         clickText("Appearance")
         waitForUi(POST_LAUNCH_DELAY_MS)
         scrollDownAndUp()

@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.platform.selfupdate.KrateRelease
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.formatMarkdownLite
 import java.text.DateFormat
@@ -66,7 +67,7 @@ private fun ReleaseNotesCard(
     intro: String?,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded24),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = ShapeCache.rounded24,
     ) {
@@ -84,7 +85,7 @@ private fun ReleaseNotesCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            notes.ifEmpty { listOf("No notes for this version.") }.forEachIndexed { index, note ->
+            notes.ifEmpty { listOf("No release notes for this version.") }.forEachIndexed { index, note ->
                 if (index > 0) {
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 10.dp),

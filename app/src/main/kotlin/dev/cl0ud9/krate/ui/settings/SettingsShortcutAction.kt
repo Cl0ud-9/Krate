@@ -18,7 +18,6 @@ fun SettingsShortcutAction(onClick: () -> Unit) {
             HeaderButtonColors(
                 MaterialTheme.colorScheme.primaryContainer,
                 MaterialTheme.colorScheme.onPrimaryContainer,
-                glassContent = MaterialTheme.colorScheme.primary,
             ),
     ) {
         Icon(painterResource(R.drawable.ic_nav_settings_filled), contentDescription = "Settings")

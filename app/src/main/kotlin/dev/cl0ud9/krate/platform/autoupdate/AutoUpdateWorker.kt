@@ -19,8 +19,12 @@ import dev.cl0ud9.krate.platform.appContainer
 import dev.cl0ud9.krate.platform.workers.pendingUpdates
 import kotlinx.coroutines.flow.first
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 private const val AUTO_UPDATE_WORK_NAME = "auto-update"
+
+// the run booked for when the next update falls due, so it doesn't wait for the next background check
+private const val TIMED_AUTO_UPDATE_WORK_NAME = "auto-update-at-due-time"
 
 // room for the session's copy of the apk and the installed result, with some to spare
 private const val SPACE_FACTOR = 3
@@ -93,18 +97,35 @@ class AutoUpdateWorker(
     companion object {
         // waits for a charged-enough battery and free storage; before Android 14 also for the phone to sit idle
         fun enqueue(context: Context) {
-            val constraints =
-                Constraints
-                    .Builder()
-                    .setRequiresBatteryNotLow(true)
-                    .setRequiresStorageNotLow(true)
-                    .apply {
-                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) setRequiresDeviceIdle(true)
-                    }.build()
-            val request = OneTimeWorkRequestBuilder<AutoUpdateWorker>().setConstraints(constraints).build()
+            val request = OneTimeWorkRequestBuilder<AutoUpdateWorker>().setConstraints(constraints()).build()
             WorkManager
                 .getInstance(context)
                 .enqueueUniqueWork(AUTO_UPDATE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
         }
+
+        // books a run for when the next update falls due; a later check replaces it with its own earliest time
+        fun enqueueAt(
+            context: Context,
+            delayMillis: Long,
+        ) {
+            val request =
+                OneTimeWorkRequestBuilder<AutoUpdateWorker>()
+                    .setConstraints(constraints())
+                    .setInitialDelay(delayMillis.coerceAtLeast(0), TimeUnit.MILLISECONDS)
+                    .build()
+            WorkManager
+                .getInstance(context)
+                .enqueueUniqueWork(TIMED_AUTO_UPDATE_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
+        }
+
+        private fun constraints(): Constraints =
+
+            Constraints
+                .Builder()
+                .setRequiresBatteryNotLow(true)
+                .setRequiresStorageNotLow(true)
+                .apply {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) setRequiresDeviceIdle(true)
+                }.build()
     }
 }

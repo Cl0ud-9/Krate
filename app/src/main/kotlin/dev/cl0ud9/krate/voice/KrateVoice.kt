@@ -2,6 +2,7 @@ package dev.cl0ud9.krate.voice
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.BatteryManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import java.time.Instant
 import java.time.ZonedDateTime
+import java.util.Locale
 import kotlin.random.Random
 
 // Krate's voice: every playful line lives here, one pool per moment, plus the plain line for when playful is off.
@@ -88,6 +90,8 @@ enum class Moment(
             "Weekend mode: on.",
             "No work, just apps.",
             "A lazy weekend check-in?",
+            "Weekend? Perfect time to unpack.",
+            "Slow weekend, fresh apps.",
         ),
     ),
     GREETING_MORNING(
@@ -144,6 +148,8 @@ enum class Moment(
             "New year, fresh Krate.",
             "Out with the old versions.",
             "A whole year of updates ahead.",
+            "Fresh year, fresh builds.",
+            "Starting the year up to date?",
         ),
     ),
     CHRISTMAS(
@@ -152,7 +158,9 @@ enum class Moment(
             "Merry Christmas, Krate keeper!",
             "Unwrapping season.",
             "Something new under the tree?",
-            "Ho ho ho, fresh apps.",
+            "Ho ho ho! Fresh apps.",
+            "The Krate's wrapped and ready.",
+            "Season's greetings, Krate keeper.",
         ),
     ),
     KRATE_ANNIVERSARY(
@@ -162,6 +170,8 @@ enum class Moment(
             "Another year in the Krate.",
             "Thanks for sticking around!",
             "A year of fresh apps together.",
+            "One more candle on the Krate.",
+            "Still unpacking together.",
         ),
     ),
     ALL_CAUGHT_UP(
@@ -196,6 +206,8 @@ enum class Moment(
             "Krate got an upgrade.",
             "Time for a fresh Krate.",
             "Something new for the Krate itself.",
+            "Krate has something new.",
+            "A newer Krate is out.",
         ),
     ),
     KRATE_UPDATED(
@@ -206,6 +218,7 @@ enum class Moment(
             "Krate is back, and better.",
             "New Krate, same you.",
             "Fresh coat of paint.",
+            "Same Krate, new tricks.",
         ),
     ),
     KRATE_LATEST(
@@ -215,6 +228,8 @@ enum class Moment(
             "Nothing newer yet.",
             "Still the newest Krate.",
             "You've got the newest one.",
+            "Krate's as fresh as it gets.",
+            "No newer Krate out there.",
         ),
     ),
     CHECKING_FOR_UPDATES(
@@ -224,6 +239,8 @@ enum class Moment(
             "Peeking for a newer Krate...",
             "Checking the shelves for updates...",
             "Looking for a fresh Krate...",
+            "Asking around for a newer Krate...",
+            "Peering at the release shelf...",
         ),
     ),
     INSTALLED(
@@ -234,6 +251,9 @@ enum class Moment(
             "All tucked in.",
             "Successfully packed.",
             "Ready to roll.",
+            "Landed safely.",
+            "Unpacked and ready.",
+            "Another one on the shelf.",
         ),
     ),
     PARTLY_INSTALLED(
@@ -243,6 +263,8 @@ enum class Moment(
             "Nearly everything made it in.",
             "Almost there.",
             "Most of it made it in.",
+            "Not quite all of it.",
+            "A few stayed in the box.",
         ),
     ),
     INSTALL_FAILED(
@@ -252,6 +274,8 @@ enum class Moment(
             "That didn't quite fit.",
             "Oops. That didn't make it in.",
             "Well... that didn't go to plan.",
+            "That one wouldn't go in.",
+            "The install tripped up.",
         ),
     ),
     DOWNLOADED(
@@ -262,6 +286,8 @@ enum class Moment(
             "Download complete. Nice.",
             "One more thing packed.",
             "Freshly downloaded.",
+            "Here and checked.",
+            "Arrived in one piece.",
         ),
     ),
     DOWNLOAD_FAILED(
@@ -270,7 +296,9 @@ enum class Moment(
             "That download slipped away.",
             "The download hit a snag.",
             "That one got lost on the way.",
-            "Well... that didn't go to plan.",
+            "That download took a wrong turn.",
+            "The parcel never arrived.",
+            "That download fell short.",
         ),
     ),
     REFRESH_FAILED(
@@ -280,6 +308,8 @@ enum class Moment(
             "The Krate lost the trail.",
             "That didn't get through.",
             "The Krate needs a little internet.",
+            "Couldn't reach the shelves.",
+            "The catalog didn't answer.",
         ),
     ),
     NOTHING_UNPACKED(
@@ -288,7 +318,9 @@ enum class Moment(
             "Nothing unpacked yet.",
             "A fresh, empty Krate.",
             "Clean slate so far.",
-            "Nothing here... yet.",
+            "Your first app will land here.",
+            "Plenty of room in here.",
+            "Waiting for the first unpack.",
         ),
     ),
     EMPTY_CATALOG(
@@ -298,6 +330,8 @@ enum class Moment(
             "Nothing on the shelves yet.",
             "Empty shelves, for now.",
             "Awaiting the first delivery.",
+            "Shelves going up soon.",
+            "Nothing stocked just yet.",
         ),
     ),
 
@@ -308,7 +342,8 @@ enum class Moment(
             "No Play Store was harmed in this Krate.",
             "All packed. Mind the bubble wrap.",
             "Straight from the source. No middlemen.",
-            "Your apps, minus the waiting in line.",
+            "Your apps, minus the queue.",
+            "Fresh apps, no detours.",
         ),
     ),
 
@@ -330,15 +365,235 @@ enum class Moment(
             "The back room stayed locked.",
             "No luck with that key.",
             "Hmm, that token opened nothing.",
+            "That key's not on the ring.",
         ),
     ),
     INVITE_UNREACHABLE(
         "Couldn't check the token.",
         listOf(
             "The back room isn't answering.",
-            "Couldn't knock on the back room.",
+            "No one's at the back room door.",
             "No answer from the back room.",
             "The back room is quiet right now.",
+            "The back room didn't pick up.",
+        ),
+    ),
+
+    // Track an app: while Krate reads a repository's releases, and while it checks the app file it picked
+    TRACK_LOOKING(
+        "Looking at its releases...",
+        listOf(
+            "Peeking at its releases...",
+            "Rummaging through its releases...",
+            "Following the trail to its releases...",
+            "Checking its shelf...",
+            "Reading the release shelf...",
+        ),
+    ),
+    TRACK_CHECKING(
+        "Checking the app...",
+        listOf(
+            "Reading the label on the box...",
+            "Giving it a good look...",
+            "Making sure it's the real thing...",
+            "Checking who packed it...",
+            "Checking the seal...",
+        ),
+    ),
+
+    // over the card showing what was found, before it's tracked
+    TRACK_FOUND(
+        "Here's what Krate found.",
+        listOf(
+            "Found it!",
+            "Look what turned up.",
+            "Here's what's inside.",
+            "One fresh find.",
+            "Here's the find.",
+        ),
+    ),
+
+    // in front of a lookup that came to nothing: a bad link, a missing repository, no app files, no connection
+    TRACK_DEAD_END(
+        "Couldn't add it.",
+        listOf(
+            "That trail went cold.",
+            "Hmm, no luck there.",
+            "Nothing on that shelf.",
+            "Dead end, sorry.",
+            "Nothing found down that road.",
+        ),
+    ),
+
+    // in front of an app Krate already has, from the catalog or tracked already
+    TRACK_ALREADY(
+        "Already there.",
+        listOf(
+            "Good news!",
+            "Already packed!",
+            "No need, it's here.",
+            "Already on the shelf!",
+            "Already sorted.",
+        ),
+    ),
+
+    // the page of an app that stopped being tracked, opened from an old link
+    TRACK_GONE(
+        "Not in your Krate any more.",
+        listOf(
+            "Packed up and gone.",
+            "This one's left the Krate.",
+            "This shelf's empty now.",
+            "Gone, but not from your phone.",
+        ),
+    ),
+
+    // the card on a tracked app's page asking to suggest it for everyone
+    TRACK_SHARE(
+        "Think others would like it?",
+        listOf(
+            "Found a gem? Pass it on.",
+            "Too good to keep to yourself?",
+            "Good find! Want it in the Krate?",
+            "Loving this one? Spread the word.",
+            "Worth a spot on the shelf?",
+        ),
+    ),
+
+    // a refresh that failed because the phone has no connection at all
+    OFFLINE(
+        "You're offline.",
+        listOf(
+            "No signal. The Krate will wait.",
+            "Offline for now. Nothing's lost.",
+            "No internet. Krate will try again.",
+            "Out of range. Back soon.",
+        ),
+    ),
+
+    // greetings that notice the battery: running low, or plugged in late at night
+    LOW_BATTERY(
+        "Welcome back.",
+        listOf(
+            "Battery's low. Updates can wait.",
+            "Running low? Krate will keep it light.",
+            "Low battery. Big downloads can wait.",
+            "Save some charge for later.",
+        ),
+    ),
+    CHARGING_AT_NIGHT(
+        "Welcome back.",
+        listOf(
+            "Charging up? Good time for updates.",
+            "Plugged in for the night?",
+            "Charging and checking.",
+            "Topping up the battery and the apps.",
+        ),
+    ),
+
+    // once in about forty plain hellos
+    RARE(
+        "Welcome back.",
+        listOf(
+            "A rare sighting: the shiny Krate.",
+            "You found a rare greeting.",
+            "This line only shows up now and then.",
+            "Lucky you. A rare one.",
+            "Krate tips its lid to you.",
+            "One in forty. Here it is.",
+        ),
+    ),
+
+    // the Home logo tapped five times in a row
+    SECRET(
+        "Hello there.",
+        listOf(
+            "You found the secret shelf.",
+            "Shh. This one's just for you.",
+            "Easter egg unpacked.",
+            "Tap, tap, tap. Hello to you too.",
+            "The Krate does a little spin.",
+            "Careful, it's dizzy now.",
+        ),
+    ),
+
+    // festivals, where the phone's region celebrates them; see Festivals.kt
+    DIWALI(
+        "Happy Diwali.",
+        listOf(
+            "Happy Diwali, Krate keeper.",
+            "Lights on, apps fresh.",
+            "Wishing you a bright Diwali.",
+            "A Krate full of light.",
+        ),
+    ),
+    HOLI(
+        "Happy Holi.",
+        listOf(
+            "Happy Holi, Krate keeper.",
+            "A colourful Krate today.",
+            "Colours everywhere, apps fresh.",
+            "Wishing you a bright Holi.",
+        ),
+    ),
+    EID(
+        "Eid Mubarak.",
+        listOf(
+            "Eid Mubarak, Krate keeper.",
+            "Wishing you a joyful Eid.",
+            "Eid Mubarak from the Krate.",
+            "Peace and joy this Eid.",
+        ),
+    ),
+    LUNAR_NEW_YEAR(
+        "Happy Lunar New Year.",
+        listOf(
+            "Happy Lunar New Year, Krate keeper.",
+            "A lucky new year to you.",
+            "New moon, new year, fresh Krate.",
+            "Wishing you a prosperous year.",
+        ),
+    ),
+
+    // in front of an update, by how big a step its version number takes
+    UPDATE_MAJOR(
+        "A big update.",
+        listOf(
+            "A whole new version.",
+            "Big one.",
+            "A major release.",
+            "This one's a big step.",
+        ),
+    ),
+    UPDATE_SMALL(
+        "A small update.",
+        listOf(
+            "Just a small fix.",
+            "A quick touch-up.",
+            "Small, but worth it.",
+            "A little polish.",
+        ),
+    ),
+
+    // a thank-you to the developer once their app is installed; {dev} is their GitHub name
+    DEVELOPER_THANKS(
+        "Installed.",
+        listOf(
+            "Thanks, {dev}.",
+            "Courtesy of {dev}.",
+            "Made by {dev}, packed by Krate.",
+            "All credit to {dev}.",
+        ),
+    ),
+
+    // over the week-in-review card on Home
+    WEEKLY(
+        "Your week in Krate.",
+        listOf(
+            "Your week in the Krate.",
+            "This week, in short.",
+            "A quick look back.",
+            "The week, unpacked.",
         ),
     ),
 }
@@ -347,6 +602,8 @@ object KrateVoice {
     private const val PREFS = "krate_voice"
     private const val KEY_PLAYFUL = "playful"
     private const val KEY_LAST_OPEN = "last_open"
+    private const val SPECIAL_ODDS = 3
+    private const val INSTALLED_LINE_MS = 60_000L
 
     private val picker = LinePicker()
 
@@ -354,11 +611,15 @@ object KrateVoice {
     var playful by mutableStateOf(true)
         private set
 
-    // run once per process: the switch, and the used-lines memory that keeps pools from repeating across launches
+    // the line shown for an install that just finished, so the progress step and the settled page say the same thing
+    private var installedLine: Triple<String, Long, String>? = null
+
+    // run once per process: the switches, and the used-lines memory that keeps pools from repeating across launches
     fun load(context: Context) {
         val prefs = prefs(context)
         playful = prefs.getBoolean(KEY_PLAYFUL, true)
         picker.memory = PrefsLineMemory(prefs)
+        KrateMemory.load(context)
     }
 
     fun setPlayful(
@@ -380,6 +641,32 @@ object KrateVoice {
         fact: String,
     ): String = if (playful) "${line(moment)} $fact" else fact
 
+    // the headline for an app that just went on: a milestone it reached, now and then its update count or a thank-you
+    // to whoever made it, otherwise the usual pool. Kept for a minute per app, so every place showing it agrees
+    fun installedLine(
+        appId: String,
+        packageName: String,
+        developer: String?,
+        nowMillis: Long = System.currentTimeMillis(),
+        random: Random = Random.Default,
+    ): String {
+        installedLine
+            ?.takeIf { (id, at, _) -> id == appId && nowMillis - at < INSTALLED_LINE_MS }
+            ?.let { return it.third }
+        val updates = KrateMemory.updatesOf(packageName)
+        val line =
+            KrateMemory.takeMilestone()
+                ?: if (updates >= 2 && random.nextInt(SPECIAL_ODDS) == 0) {
+                    "That's its ${ordinal(updates)} update with Krate."
+                } else if (developer != null && random.nextInt(SPECIAL_ODDS) == 0) {
+                    pick(Moment.DEVELOPER_THANKS).replace("{dev}", developer)
+                } else {
+                    pick(Moment.INSTALLED)
+                }
+        installedLine = Triple(appId, nowMillis, line)
+        return line
+    }
+
     // once per launch: reads how long it's been since the last one, then records this one
     fun greetingMoment(
         context: Context,
@@ -398,12 +685,37 @@ object KrateVoice {
                 sinceLastOpenMillis = lastOpen?.let { nowMillis - it },
                 firstOpenToday = lastOpenDate != now.toLocalDate(),
                 installedOn = installedOn(context),
+                region = if (playful) Locale.getDefault().country.ifEmpty { null } else null,
+                battery = batteryReading(context),
             ),
             random,
         )
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+}
+
+// 2nd, 3rd, 11th, 12th, 21st
+@Suppress("MagicNumber")
+internal fun ordinal(n: Int): String {
+    val suffix =
+        when {
+            n % 100 in 11..13 -> "th"
+            n % 10 == 1 -> "st"
+            n % 10 == 2 -> "nd"
+            n % 10 == 3 -> "rd"
+            else -> "th"
+        }
+    return "$n$suffix"
+}
+
+private const val FULL_BATTERY = 100
+
+// the battery's level and whether it's charging, read without any permission; null if the phone won't say
+private fun batteryReading(context: Context): BatteryReading? {
+    val battery = context.getSystemService(BatteryManager::class.java) ?: return null
+    val percent = battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    return if (percent in 0..FULL_BATTERY) BatteryReading(percent, battery.isCharging) else null
 }
 
 // each pool's used lines as one newline-joined string, so a pool keeps its place across launches
@@ -444,6 +756,25 @@ fun rememberKrateLeadIn(
 ): String {
     val line = rememberKrateLine(moment, key)
     return if (KrateVoice.playful) "$line $fact" else fact
+}
+
+// the install line for this app, settled once per showing
+@Composable
+fun rememberInstalledLeadIn(
+    appId: String,
+    packageName: String,
+    developer: String?,
+    fact: String,
+): String {
+    val line = rememberSaveable(appId) { KrateVoice.installedLine(appId, packageName, developer) }
+    return if (KrateVoice.playful) "$line $fact" else fact
+}
+
+// the all-caught-up headline, settled once per showing
+@Composable
+fun rememberCaughtUpLine(): String {
+    val line = rememberSaveable { caughtUpLine() }
+    return if (KrateVoice.playful) line else Moment.ALL_CAUGHT_UP.plain
 }
 
 // picked once per launch; saved state keeps it through tab switches and rotation

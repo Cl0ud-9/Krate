@@ -12,9 +12,11 @@ data class AppGuide(
     val restore: String? = null,
     // for apps whose backup is text in a box of their own, the way there, so Krate can save and restore it itself
     val autoBackup: AutoBackup? = null,
+    // settings the catalog recommends for the app, applied on request through the same box as automatic backups
+    val recommended: RecommendedSettings? = null,
 ) {
     val isEmpty: Boolean
-        get() = setup.isEmpty() && tips.isEmpty() && backup == null
+        get() = setup.isEmpty() && tips.isEmpty() && backup == null && recommended == null
 }
 
 // the taps from an app's first screen to the box holding its settings as text, and the buttons that close that box
@@ -23,6 +25,14 @@ data class AutoBackup(
     val path: List<UiTarget>,
     val close: String,
     val apply: String,
+)
+
+// the catalog's picks for an app: the settings as the app's own export writes them, what they change in plain words,
+// and a revision that changes whenever the picks do, so Krate can tell an applied set from a newer one
+data class RecommendedSettings(
+    val text: String,
+    val summary: List<String>,
+    val revision: String,
 )
 
 // something on screen to tap, by its visible text or, for an icon, the label read out for it

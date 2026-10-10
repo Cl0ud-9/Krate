@@ -1,31 +1,43 @@
 package dev.cl0ud9.krate.ui.details
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.domain.model.DownloadStatus
 import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.WaitingForUserStep
+import dev.cl0ud9.krate.platform.packageinfo.joinAreas
+import dev.cl0ud9.krate.platform.packageinfo.newSensitiveAreas
 import dev.cl0ud9.krate.ui.components.HelperText
 import dev.cl0ud9.krate.ui.components.KrateLinearProgress
 import dev.cl0ud9.krate.ui.components.ReopenPromptButton
 import dev.cl0ud9.krate.ui.components.StatusRow
+import dev.cl0ud9.krate.ui.components.fadeThrough
+import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.voice.Moment
 import dev.cl0ud9.krate.voice.rememberKrateLeadIn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // section 16 of the spec: the ui shows Install, Update, Reinstall or Roll back based on real device
 // state compared against whichever build is currently selected (App Details' version history lets
@@ -68,17 +80,18 @@ internal fun ReadyToInstallSection(
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
 ) {
+    // each side keeps the state it was drawn with, so the outgoing step never changes mid-fade
     AnimatedContent(
-        targetState = state.installStatus,
-        contentKey = { it::class },
-        transitionSpec = { fadeIn(tween(STATUS_FADE_MS)).togetherWith(fadeOut(tween(STATUS_FADE_MS))) },
-        modifier = Modifier.animateContentSize(),
+        targetState = state,
+        contentKey = { it.installStatus::class },
+        transitionSpec = fadeThrough(),
+        contentAlignment = Alignment.TopStart,
         label = "install-status",
-    ) { installStatus ->
+    ) { shown ->
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             InstallStatusContent(
-                installStatus = installStatus,
-                state = state,
+                installStatus = shown.installStatus,
+                state = shown,
                 actionLabel = actionLabel,
                 onInstall = onInstall,
                 onRetryAsCleanInstall = onRetryAsCleanInstall,
@@ -139,7 +152,7 @@ private fun InstallStatusContent(
             StatusRow(
                 icon = painterResource(R.drawable.ic_check_circle_rounded),
                 tint = MaterialTheme.colorScheme.primary,
-                text = rememberKrateLeadIn(Moment.INSTALLED, "${state.app.displayName} is installed."),
+                text = rememberInstalledText(state.app),
             )
             // previously nothing followed this message - the app was reachable again only after
             // leaving and re-entering App Details (which re-derives downloadStatus back to Idle and
@@ -176,6 +189,14 @@ private fun FailedInstallSection(
         }
     FailureStatusRow(failure = failure, text = text)
     if (installed && failure.mayBeAppLock) HelperText(APP_LOCK_HINT)
+    // a reinstall from scratch would uninstall the app first and then be stopped all the same; the way past Play
+    // Protect is the only useful step
+    val showGuide = LocalPlayProtectGuide.current
+    if (failure.blockedByPlayProtect && showGuide != null) {
+        Button(onClick = showGuide, modifier = Modifier.fillMaxWidth()) { Text("Show me how") }
+        TextButton(onClick = onInstall, modifier = Modifier.fillMaxWidth()) { Text("Try again") }
+        return
+    }
 
     // only for a real failure of an in-place update: not after the user said no, not for a first install
     val offerReinstall = installed && !failure.userCancelled && !fromScratch
@@ -216,6 +237,41 @@ internal fun FailureStatusRow(
 
 // the download is done and verified - otherwise identical to the not-yet-downloaded screen, which
 // also shows a lone button, so it says so
+// what this build can reach that the installed one can't, said beside Install so nothing new is a surprise. Only
+// information: Android still asks before the app uses most of it
+@Composable
+private fun NewPermissionsNote(state: AppDetailsUiState) {
+    val context = LocalContext.current
+    val file = (state.downloadStatus as? DownloadStatus.ReadyToInstall)?.filePath
+    val areas by produceState(emptyList<String>(), file, state.installed) {
+        if (file != null && state.installed != null) {
+            value = withContext(Dispatchers.IO) { newSensitiveAreas(context, state.app.packageName, file) }
+        }
+    }
+    if (areas.isEmpty()) return
+    Surface(shape = ShapeCache.rounded12, color = MaterialTheme.colorScheme.tertiaryContainer) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_security_rounded),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text =
+                    "This version can also use ${joinAreas(areas)}. Android asks you before ${state.app.displayName} " +
+                        "uses most of these.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ReadyToInstallContent(
     state: AppDetailsUiState,
@@ -228,6 +284,7 @@ private fun ReadyToInstallContent(
         tint = MaterialTheme.colorScheme.tertiary,
         text = rememberKrateLeadIn(Moment.DOWNLOADED, "Downloaded and checked, ready to install."),
     )
+    NewPermissionsNote(state)
     Button(
         onClick = onInstall,
         enabled = unmetDependencies.isEmpty(),

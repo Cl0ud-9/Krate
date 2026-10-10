@@ -1,6 +1,11 @@
 package dev.cl0ud9.krate.ui.details
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material.icons.filled.Tune
@@ -48,17 +54,22 @@ import dev.cl0ud9.krate.domain.model.AppGuide
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.SetupKind
 import dev.cl0ud9.krate.domain.model.SetupStep
+import dev.cl0ud9.krate.platform.setup.RESTRICTED_SETTINGS_HELP
 import dev.cl0ud9.krate.platform.setup.SetupMarks
 import dev.cl0ud9.krate.platform.setup.StepState
 import dev.cl0ud9.krate.platform.setup.appInfoIntent
 import dev.cl0ud9.krate.platform.setup.restrictedSettingsApply
+import dev.cl0ud9.krate.platform.setup.stepAvailable
 import dev.cl0ud9.krate.platform.setup.stepState
+import dev.cl0ud9.krate.ui.components.ButtonRow
 import dev.cl0ud9.krate.ui.components.SectionHeader
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.tappableRow
 
 private const val DIVIDER_ALPHA = 0.5f
 private val BADGE = 26.dp
+private const val DONE_LIST_MS = 250
 
 // once an app is installed: what's still to switch on, each a tap away and ticked off as Android reports it, then
 // what's done folded into a line, and the settings and backups a tap away in their own sheets. Re-read whenever
@@ -77,10 +88,12 @@ internal fun SetupCard(
         onPauseOrDispose { }
     }
     // what Android reports for each step; the ones it won't say are ticked by hand (manual)
-    val reported = remember(checks, guide) { guide.setup.map { stepState(context, app.packageName, it) } }
+    // only the steps this installed version can actually do
+    val steps = remember(checks, guide) { guide.setup.filter { stepAvailable(context, app.packageName, it) } }
+    val reported = remember(checks, steps) { steps.map { stepState(context, app.packageName, it) } }
     val rows =
         remember(checks, reported) {
-            guide.setup.mapIndexed { index, step ->
+            steps.mapIndexed { index, step ->
                 val manualDone = reported[index] == StepState.UNKNOWN && marks.isMarked(app.packageName, step.kind)
                 StepRow(
                     index + 1,
@@ -95,18 +108,34 @@ internal fun SetupCard(
         checks++
     }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SetupHeader(rows)
-            if (restorePending) RestoreReminder(app = app, guide = guide)
+            // putting their own settings back comes first; the picks are offered once that's out of the way
+            var recommendedOpen by rememberSaveable { mutableStateOf(false) }
+            val recommended = guide.recommended
+            if (restorePending) {
+                RestoreReminder(app = app, guide = guide)
+            } else if (recommended != null) {
+                RecommendedOffer(app = app, recommended = recommended, onSee = { recommendedOpen = true })
+            }
+            if (recommendedOpen && recommended != null) {
+                RecommendedSheet(app, guide, recommended, onDismiss = { recommendedOpen = false })
+            }
             StepList(app = app, rows = rows, onMark = onMark)
             // once, under the steps, while one Android may hold back is still to do
             val restricted = remember(checks) { restrictedSettingsApply(context, app.packageName) }
-            if (restricted && rows.any { it.step.kind in RESTRICTED_KINDS && !it.done }) RestrictedHelp(app = app)
-            MoreRows(app = app, guide = guide, divided = rows.isNotEmpty())
+            val held = rows.firstOrNull { it.step.kind in RESTRICTED_KINDS && !it.done }?.step
+            if (restricted && held != null) RestrictedHelp(app = app, step = held)
+            MoreRows(
+                app = app,
+                guide = guide,
+                divided = rows.isNotEmpty(),
+                onRecommended = { recommendedOpen = true },
+            )
         }
     }
 }
@@ -162,34 +191,46 @@ private fun StepList(
         )
     }
     if (done.isNotEmpty()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().tappableRow { showDone = !showDone },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            DoneBadge()
-            Text(
-                text = if (pending.isEmpty()) "Everything's switched on" else "${done.size} done",
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = if (showDone) "Hide" else "Show",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        AnimatedVisibility(visible = showDone) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(start = 38.dp)) {
-                done.forEach { row ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = row.step.title,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (row.manual) TextButton(onClick = { onMark(row.step, false) }) { Text("Undo") }
+        // one block, so the gap above the list grows and shrinks with it instead of snapping when it's removed
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().tappableRow { showDone = !showDone },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                DoneBadge()
+                Text(
+                    text = if (pending.isEmpty()) "Everything's switched on" else "${done.size} done",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = if (showDone) "Hide" else "Show",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            AnimatedVisibility(
+                visible = showDone,
+                enter = expandVertically(tween(DONE_LIST_MS), expandFrom = Alignment.Top) + fadeIn(tween(DONE_LIST_MS)),
+                exit =
+                    shrinkVertically(tween(DONE_LIST_MS), shrinkTowards = Alignment.Top) +
+                        fadeOut(tween(DONE_LIST_MS / 2)),
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(start = 38.dp, top = 10.dp),
+                ) {
+                    done.forEach { row ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = row.step.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (row.manual) TextButton(onClick = { onMark(row.step, false) }) { Text("Undo") }
+                        }
                     }
                 }
             }
@@ -274,13 +315,23 @@ private fun MoreRows(
     app: AppProfile,
     guide: AppGuide,
     divided: Boolean,
+    onRecommended: () -> Unit,
 ) {
     var tips by rememberSaveable { mutableStateOf(false) }
     var keep by rememberSaveable { mutableStateOf(false) }
     val backup = guide.backup
-    if (guide.tips.isEmpty() && backup == null) return
+    val recommended = guide.recommended
+    if (guide.tips.isEmpty() && backup == null && recommended == null) return
     if (divided) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = DIVIDER_ALPHA))
     Column {
+        if (recommended != null) {
+            SheetRow(
+                icon = rememberVectorPainter(Icons.Filled.AutoAwesome),
+                title = "Recommended settings",
+                subtitle = recommendedSubtitle(app, recommended),
+                onClick = onRecommended,
+            )
+        }
         if (guide.tips.isNotEmpty()) {
             SheetRow(
                 icon = rememberVectorPainter(Icons.Filled.Lightbulb),
@@ -353,6 +404,8 @@ private val RESTRICTED_KINDS = setOf(SetupKind.ACCESSIBILITY, SetupKind.USAGE_AC
 @Composable
 internal fun RestrictedHelp(
     app: AppProfile,
+    // the held-back switch to try first, so Android offers the way past it
+    step: SetupStep? = null,
     packageName: String = app.packageName,
 ) {
     val context = LocalContext.current
@@ -360,15 +413,15 @@ internal fun RestrictedHelp(
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(text = "Switch greyed out?", style = MaterialTheme.typography.labelLarge)
             Text(
-                text =
-                    "Android holds this back for apps installed from outside an app store. Try the switch once, " +
-                        "then open App info, tap ⋮ at the top right, choose Allow restricted settings, and come " +
-                        "back to turn it on.",
+                text = RESTRICTED_SETTINGS_HELP,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = { startSafely(context, appInfoIntent(packageName), null) }) {
-                Text("Open App info")
+            ButtonRow {
+                if (step != null) TextButton(onClick = { openStep(context, app, step) }) { Text("Try the switch") }
+                TextButton(
+                    onClick = { startSafely(context, appInfoIntent(packageName), null) },
+                ) { Text("Open App info") }
             }
         }
     }

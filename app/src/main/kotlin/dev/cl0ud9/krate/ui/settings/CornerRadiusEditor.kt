@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -59,6 +60,7 @@ import dev.cl0ud9.krate.ui.navigation.NavBarCompactContentHeight
 import dev.cl0ud9.krate.ui.navigation.NavBarContentHeight
 import dev.cl0ud9.krate.ui.navigation.SideInsets
 import dev.cl0ud9.krate.ui.navigation.floatingNavBarMargins
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import kotlinx.coroutines.delay
 
@@ -213,27 +215,19 @@ private fun RadiusControls(
 ) {
     val haptic = LocalHapticFeedback.current
     Surface(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 32.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 32.dp)
+                .glassRim(ShapeCache.rounded24),
         shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Row(modifier = Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Corner radius",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                AnimatedVisibility(
-                    visible = radius != DEFAULT_NAV_BAR_CORNER_RADIUS,
-                    enter = fadeIn() + scaleIn(initialScale = 0.8f),
-                    exit = fadeOut() + scaleOut(targetScale = 0.8f),
-                ) {
-                    ResetButton {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onReset()
-                    }
-                }
+            RadiusTitleRow(showReset = radius != DEFAULT_NAV_BAR_CORNER_RADIUS) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onReset()
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -266,6 +260,30 @@ private fun RadiusControls(
 }
 
 @Composable
+private fun RadiusTitleRow(
+    showReset: Boolean,
+    onReset: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 36.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Corner radius",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        AnimatedVisibility(
+            visible = showReset,
+            enter = fadeIn() + scaleIn(initialScale = 0.8f),
+            exit = fadeOut() + scaleOut(targetScale = 0.8f),
+        ) {
+            ResetButton(onClick = onReset)
+        }
+    }
+}
+
+@Composable
 private fun ResetButton(onClick: () -> Unit) {
     FilledTonalButton(
         onClick = onClick,
@@ -275,7 +293,7 @@ private fun ResetButton(onClick: () -> Unit) {
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
             ),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        modifier = Modifier.height(32.dp),
+        modifier = Modifier.heightIn(min = 32.dp),
     ) {
         Icon(
             painterResource(R.drawable.ic_restart_alt_rounded),

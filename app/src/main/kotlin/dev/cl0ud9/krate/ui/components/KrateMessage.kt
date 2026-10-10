@@ -34,6 +34,7 @@ import com.kyant.backdrop.backdrops.LayerBackdrop
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.ui.navigation.GlassEdge
 import dev.cl0ud9.krate.ui.navigation.liquidGlass
+import dev.cl0ud9.krate.ui.navigation.rememberGlassPress
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import kotlinx.coroutines.flow.Flow
 
@@ -93,8 +94,18 @@ private fun KrateSnackbar(
     val visuals = data.visuals
     val krate = visuals as? KrateMessage
     val color = MaterialTheme.colorScheme.surfaceContainerHighest
+    val press = rememberGlassPress(wide = true)
     Surface(
-        modifier = Modifier.fillMaxWidth().liquidGlass(glass, ShapeCache.rounded24, GlassEdge.ALL, color = color),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .liquidGlass(
+                    glass,
+                    ShapeCache.rounded24,
+                    GlassEdge.ALL,
+                    layerBlock = press.glassLayer,
+                    press = { press.progress },
+                ).then(if (glass != null) press.modifier else Modifier),
         shape = ShapeCache.rounded24,
         color = if (glass != null) Color.Transparent else color,
         contentColor = MaterialTheme.colorScheme.onSurface,

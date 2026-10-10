@@ -73,7 +73,12 @@ class UpdateAllEngine(
             artifactDownloader.deleteDownloadedFile(downloaded.filePath)
             UpdateAllOutcome(app, succeeded = true)
         } else {
-            UpdateAllOutcome(app, succeeded = false, reason = failure?.reason ?: "The install didn't finish.")
+            UpdateAllOutcome(
+                app,
+                succeeded = false,
+                reason = failure?.reason ?: "The install didn't finish.",
+                blockedByPlayProtect = failure?.blockedByPlayProtect == true,
+            )
         }
     }
 

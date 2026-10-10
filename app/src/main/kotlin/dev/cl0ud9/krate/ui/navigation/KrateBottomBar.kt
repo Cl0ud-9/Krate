@@ -2,6 +2,7 @@ package dev.cl0ud9.krate.ui.navigation
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -41,9 +42,15 @@ internal fun KrateBottomBar(
     barHeightPx: MutableIntState,
 ) {
     val geometry = rememberNavBarGeometry(appearance)
-    val compact = appearance.compactMode
     val full = appearance.style == NavBarStyle.FULL_WIDTH
     val shape = navBarShape(geometry.topRadius, geometry.bottomRadius)
+    val glass = appearance.glass
+    val destinations = KrateBottomNavDestinations
+    val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
+    val (motion, measureTabs) =
+        rememberGlassTabsMotion(selectedIndex, destinations.size) { index ->
+            navController.navigateToTab(destinations[index].route)
+        }
     Surface(
         modifier =
             Modifier
@@ -56,35 +63,41 @@ internal fun KrateBottomBar(
                 .then(if (full) Modifier else Modifier.windowInsetsPadding(SideInsets))
                 .padding(horizontal = geometry.sideMargin)
                 .liquidGlass(
-                    appearance.glass,
+                    glass,
                     shape,
                     edge = if (full) GlassEdge.TOP else GlassEdge.ALL,
                     cornerRadius = geometry.topRadius,
-                ),
+                    layerBlock = if (glass != null) motion.barLayer else null,
+                    press = { motion.highlight.progress },
+                ).then(if (glass != null) motion.highlight.modifier else Modifier),
         shape = shape,
         // Material's own navigation bar color: a tone above the surface panel behind it, plus the shadow; glass draws
         // its own surface and shadow instead
         color = if (appearance.glass != null) Color.Transparent else NavigationBarDefaults.containerColor,
         shadowElevation = if (appearance.glass != null) 0.dp else 3.dp,
     ) {
-        Row(
+        Box(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .then(if (full) Modifier.windowInsetsPadding(SideInsets) else Modifier)
                     .padding(horizontal = 12.dp)
-                    .padding(bottom = geometry.innerBottomPadding),
-            verticalAlignment = Alignment.CenterVertically,
+                    .padding(bottom = geometry.innerBottomPadding)
+                    .then(if (glass != null) measureTabs.then(motion.gestures) else Modifier),
         ) {
-            KrateBottomNavDestinations.forEach { destination ->
-                val selected = currentRoute == destination.route
-                KrateNavigationBarItem(
-                    selected = selected,
-                    onClick = { navController.navigateToTab(destination.route) },
-                    icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                    label = stringResource(destination.labelRes),
-                    compact = compact,
-                )
+            if (glass != null) GlassTabPill(motion, glass, appearance.compactMode)
+            Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                destinations.forEach { destination ->
+                    val selected = currentRoute == destination.route
+                    KrateNavigationBarItem(
+                        selected = selected,
+                        onClick = { navController.navigateToTab(destination.route) },
+                        icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                        label = stringResource(destination.labelRes),
+                        compact = appearance.compactMode,
+                        pill = glass == null,
+                    )
+                }
             }
         }
     }

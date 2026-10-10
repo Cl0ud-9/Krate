@@ -8,6 +8,7 @@ import dev.cl0ud9.krate.domain.model.DownloadStatus
 import dev.cl0ud9.krate.security.apk.ApkArchiveReader
 import dev.cl0ud9.krate.security.hash.hashesMatch
 import dev.cl0ud9.krate.security.hash.sha256Hex
+import dev.cl0ud9.krate.voice.KrateMemory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -71,7 +72,9 @@ class OkHttpArtifactDownloader(
         flow {
             val token = credentialStore.getToken()
             if (artifact.requiresAuth && token == null) {
-                emit(DownloadStatus.Failed("This app needs a GitHub access token - add one in Settings."))
+                emit(
+                    DownloadStatus.Failed("This app needs a GitHub access token. Add one in Settings > GitHub access."),
+                )
                 return@flow
             }
 
@@ -102,6 +105,7 @@ class OkHttpArtifactDownloader(
 
             partFile.copyTo(readyFile, overwrite = true)
             partFile.delete()
+            KrateMemory.noteVerified()
             emit(DownloadStatus.ReadyToInstall(readyFile.absolutePath))
         }.flowOn(Dispatchers.IO)
 
@@ -120,6 +124,24 @@ class OkHttpArtifactDownloader(
     ): String? {
         val readyFile = File(downloadsDir, "${fileIdFor(app, artifact)}.apk")
         return if (readyFile.exists()) readyFile.absolutePath else null
+    }
+
+    override fun adoptReadyFile(
+        app: AppProfile,
+        artifact: ArtifactInfo,
+        file: File,
+    ) {
+        downloadsDir.mkdirs()
+        val readyFile = File(downloadsDir, "${fileIdFor(app, artifact)}.apk")
+        if (!file.renameTo(readyFile)) {
+            file.copyTo(readyFile, overwrite = true)
+            file.delete()
+        }
+    }
+
+    override fun forgetDownloads(app: AppProfile) {
+        val prefix = "${app.id}-"
+        downloadsDir.listFiles()?.forEach { file -> if (file.name.startsWith(prefix)) file.delete() }
     }
 
     override fun pruneOtherBuilds(
@@ -228,7 +250,7 @@ class OkHttpArtifactDownloader(
         val isAuthCode = code == HTTP_UNAUTHORIZED || code == HTTP_FORBIDDEN || code == HTTP_NOT_FOUND
         if (!artifact.requiresAuth || !isAuthCode) return friendlyHttpError(code)
         return "GitHub didn't allow this download. Your access token in Settings > GitHub access may " +
-            "have expired or been removed - add a new one and try again."
+            "have expired or been removed. Add a new one and try again."
     }
 
     // streams the response body to the part file, resuming from its existing length when the server allows it
@@ -312,7 +334,8 @@ class OkHttpArtifactDownloader(
         expectedPackageName: String,
         file: File,
     ): String? {
-        val hashMatches = hashesMatch(artifact.sha256, sha256Hex(file))
+        // a tracked app's build can come without a published digest; its pinned signature still has to match below
+        val hashMatches = artifact.sha256.isBlank() || hashesMatch(artifact.sha256, sha256Hex(file))
         val archiveInfo = archiveReader.read(file.absolutePath)
         return when {
             !hashMatches -> {

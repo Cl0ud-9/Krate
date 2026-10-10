@@ -13,17 +13,19 @@ import dev.cl0ud9.krate.platform.appContainer
 import dev.cl0ud9.krate.ui.apps.SharedSuggestion
 import dev.cl0ud9.krate.ui.apps.SharedSuggestions
 import dev.cl0ud9.krate.ui.apps.SuggestAppSheet
+import dev.cl0ud9.krate.ui.apps.TrackAppSheet
 import dev.cl0ud9.krate.ui.apps.publishedFrom
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
-// a link shared to "Suggest to Krate": an app Krate already carries opens on its own page, anything else opens
-// Suggest an app with the link filled in
+// a link shared to "Suggest to Krate": an app Krate already carries (or one you track) opens on its own page, anything
+// else opens Suggest an app with the link filled in, which can also hand it to Track an app
 @Composable
 internal fun SharedSuggestionSheet(navController: NavHostController) {
     val pending by SharedSuggestions.pending.collectAsStateWithLifecycle()
     val catalog = LocalContext.current.appContainer().catalogRepository
     var showing by remember { mutableStateOf<SharedSuggestion?>(null) }
+    var tracking by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(pending) {
         val suggestion = pending ?: return@LaunchedEffect
         SharedSuggestions.clear()
@@ -33,7 +35,23 @@ internal fun SharedSuggestionSheet(navController: NavHostController) {
             }
         if (existing != null) navController.navigateFromOutside("apps/${existing.id}") else showing = suggestion
     }
-    showing?.let { SuggestAppSheet(onDismiss = { showing = null }, initial = it) }
+    showing?.let {
+        SuggestAppSheet(
+            onDismiss = { showing = null },
+            initial = it,
+            onTrackInstead = { link ->
+                showing = null
+                tracking = link
+            },
+        )
+    }
+    tracking?.let { link ->
+        TrackAppSheet(
+            onDismiss = { tracking = null },
+            onOpenApp = { id -> navController.navigateFromTap("apps/$id") },
+            initialLink = link,
+        )
+    }
 }
 
 private const val CATALOG_WAIT_MS = 3000L

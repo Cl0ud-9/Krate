@@ -1,6 +1,9 @@
 package dev.cl0ud9.krate.ui.details
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,6 +41,8 @@ import dev.cl0ud9.krate.domain.model.ArtifactInfo
 import dev.cl0ud9.krate.domain.repository.Baseline
 import dev.cl0ud9.krate.domain.repository.isNewerThan
 import dev.cl0ud9.krate.ui.components.SectionHeader
+import dev.cl0ud9.krate.ui.components.fadeThrough
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.formatMarkdownLite
 import dev.cl0ud9.krate.ui.util.releaseNotesPreview
@@ -103,7 +108,7 @@ private fun NotesCard(
     val shown = if (expanded) builds else builds.take(1)
     val missingPage = shown.firstOrNull()?.takeIf { notesFor(app, builds, it) == null }?.releasePageUrl()
     Card(
-        modifier = Modifier.fillMaxWidth().animateContentSize(),
+        modifier = Modifier.fillMaxWidth().animateContentSize().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
@@ -114,18 +119,37 @@ private fun NotesCard(
                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
             )
-            if (shown.isEmpty()) {
-                NotesBody(text = "No release notes available.", collapsed = !expanded)
-            }
-            shown.forEachIndexed { index, build ->
-                if (index > 0) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = DIVIDER_ALPHA))
+            // a different build picked above fades its notes in for the old ones; the card's own size animation eases
+            // the height, so this one only swaps. Showing more of the same build updates in place
+            AnimatedContent(
+                targetState = builds,
+                contentKey = { list -> list.firstOrNull()?.let { it.versionName to it.buildId } },
+                transitionSpec = {
+                    fadeThrough<List<ArtifactInfo>>()().using(
+                        SizeTransform(clip = false) { _, _ -> snap() },
+                    )
+                },
+                contentAlignment = Alignment.TopStart,
+                label = "release-notes",
+            ) { picked ->
+                val pickedShown = if (expanded) picked else picked.take(1)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (pickedShown.isEmpty()) {
+                        NotesBody(text = MISSING, collapsed = !expanded)
+                    }
+                    pickedShown.forEachIndexed { index, build ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = DIVIDER_ALPHA),
+                            )
+                        }
+                        BuildNotes(
+                            build = build,
+                            notes = notesFor(app, picked, build),
+                            collapsed = !expanded,
+                        )
+                    }
                 }
-                BuildNotes(
-                    build = build,
-                    notes = notesFor(app, builds, build),
-                    collapsed = !expanded,
-                )
             }
             NotesActionSlot(
                 label =
@@ -197,7 +221,7 @@ private fun BuildNotes(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Surface(shape = ShapeCache.pill, color = MaterialTheme.colorScheme.secondaryContainer) {
                 Text(
-                    text = build.patchesVersionName?.let { "${build.versionName}, patches $it" } ?: build.versionName,
+                    text = build.patchesVersionName?.let { "${build.versionName}, build $it" } ?: build.versionName,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,

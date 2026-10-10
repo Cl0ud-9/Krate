@@ -28,6 +28,7 @@ import dev.cl0ud9.krate.platform.backup.AppBackups
 import dev.cl0ud9.krate.platform.backup.AutoBackupRunner
 import dev.cl0ud9.krate.platform.backup.AutoBackupState
 import dev.cl0ud9.krate.platform.backup.BackupMode
+import dev.cl0ud9.krate.platform.setup.RESTRICTED_SETTINGS_HELP
 import dev.cl0ud9.krate.platform.setup.appInfoIntent
 import dev.cl0ud9.krate.ui.components.ButtonRow
 import dev.cl0ud9.krate.ui.theme.ShapeCache
@@ -41,7 +42,8 @@ internal fun rememberAutoBackupOn(): Boolean {
         checks++
         onPauseOrDispose { }
     }
-    return remember(checks) { AutoBackupRunner.isOn(context) }
+    val switchedOff by AutoBackupRunner.switchedOff.collectAsStateWithLifecycle()
+    return remember(checks, switchedOff) { AutoBackupRunner.isOn(context) }
 }
 
 // this app's backup or restore, if one is running or just finished
@@ -92,53 +94,22 @@ internal fun AutoBackupPanel(
     }
 }
 
-// whether automatic backups are on, for places about Krate as a whole rather than one app: how to switch them on, or
-// that they're on and how to switch them off
-@Composable
-internal fun AutoBackupSwitchPanel(on: Boolean) {
-    val context = LocalContext.current
-    Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.secondaryContainer) {
-        Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = if (on) "Automatic backups are on" else "Automatic backups",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-            if (on) {
-                PanelText(
-                    "Krate backs up an app's settings before a reinstall from scratch and puts them back after. To " +
-                        "stop, turn off Krate automatic backups in Android's accessibility settings.",
-                )
-                ButtonRow {
-                    TextButton(onClick = { startSafely(context, AutoBackupRunner.settingsIntent(context), null) }) {
-                        Text("Accessibility settings")
-                    }
-                }
-            } else {
-                TurnOnAutoBackup()
-            }
-        }
-    }
-}
-
 // what it does, that it asks for accessibility access, and the way past Android holding that back for Krate
 @Composable
-private fun TurnOnAutoBackup() {
-    val context = LocalContext.current
-    var restrictedHelp by rememberSaveable { mutableStateOf(false) }
-    PanelText(
+internal fun TurnOnAutoBackup(
+    what: String =
         "Krate can do this for you: it opens the app, goes to its backup screen and keeps a copy here, then puts it " +
             "back after a reinstall. It needs Android's accessibility access, and only uses it while a backup runs.",
-    )
+) {
+    val context = LocalContext.current
+    var restrictedHelp by rememberSaveable { mutableStateOf(false) }
+    PanelText(what)
     ButtonRow {
         TextButton(onClick = { restrictedHelp = !restrictedHelp }) { Text("Switch greyed out?") }
         Button(onClick = { startSafely(context, AutoBackupRunner.settingsIntent(context), null) }) { Text("Turn on") }
     }
     if (restrictedHelp) {
-        PanelText(
-            "Android holds this back for apps from outside an app store. Open Krate's App info, tap ⋮ at the top " +
-                "right, choose Allow restricted settings, then turn it on.",
-        )
+        PanelText(RESTRICTED_SETTINGS_HELP)
         FilledTonalButton(onClick = { startSafely(context, appInfoIntent(context.packageName), null) }) {
             Text("Open Krate's App info")
         }
@@ -146,7 +117,7 @@ private fun TurnOnAutoBackup() {
 }
 
 @Composable
-private fun PanelText(text: String) {
+internal fun PanelText(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
@@ -176,4 +147,5 @@ internal fun runningText(mode: BackupMode): String =
     when (mode) {
         BackupMode.SAVE -> "Backing up. Krate is going through the app's backup screen..."
         BackupMode.RESTORE -> "Putting your settings back..."
+        BackupMode.APPLY -> "Applying Krate's picks. Krate is going through the app's settings..."
     }

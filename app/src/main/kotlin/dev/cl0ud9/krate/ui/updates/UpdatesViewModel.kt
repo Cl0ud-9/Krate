@@ -72,6 +72,8 @@ class UpdatesViewModel(
     private val githubCredentialStore: GitHubCredentialStore,
     private val krateBaselineStore: KrateBaselineStore,
     private val downloadProgressNotifier: DownloadProgressNotifier,
+    // an install Play Protect stopped (true), or one that went through (false), by package
+    private val notePlayProtect: (packageName: String, stopped: Boolean) -> Unit = { _, _ -> },
 ) : ViewModel() {
     private val refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -163,6 +165,8 @@ class UpdatesViewModel(
     // records the version actually installed as this app's new Krate baseline - Update All always
     // installs an app's latestArtifact, so that's what just became true on the device
     private suspend fun recordActivity(outcomes: List<UpdateAllOutcome>) {
+        outcomes.filter { it.blockedByPlayProtect }.forEach { notePlayProtect(it.app.packageName, true) }
+        outcomes.filter { it.succeeded }.forEach { notePlayProtect(it.app.packageName, false) }
         outcomes.filterNot { it.succeeded }.forEach { outcome ->
             activityLogRepository.record(
                 ActivityEntry(
@@ -172,6 +176,7 @@ class UpdatesViewModel(
                     action = ActivityAction.FAILED,
                     timestampMillis = System.currentTimeMillis(),
                     detail = "${failurePrefix(outcome)} ${outcome.reason}",
+                    packageName = outcome.app.packageName,
                 ),
             )
         }
@@ -184,6 +189,7 @@ class UpdatesViewModel(
                     appName = outcome.app.displayName,
                     action = ActivityAction.UPDATED,
                     timestampMillis = System.currentTimeMillis(),
+                    packageName = outcome.app.packageName,
                 ),
             )
             outcome.app.latestArtifact?.let { artifact ->

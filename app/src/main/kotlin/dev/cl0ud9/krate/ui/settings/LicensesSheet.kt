@@ -19,7 +19,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -38,6 +37,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.ui.components.KrateSheet
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -49,7 +50,7 @@ private const val CHEVRON_EXPANDED_DEGREES = 90f
 @Composable
 internal fun LicensesSheet(onDismiss: () -> Unit) {
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
-    ModalBottomSheet(
+    KrateSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -62,7 +63,7 @@ internal fun LicensesSheet(onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "Licenses",
+                text = "Licences",
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
             )
@@ -85,7 +86,7 @@ private fun LicenseCard(
 ) {
     val chevron by animateFloatAsState(if (expanded) CHEVRON_EXPANDED_DEGREES else 0f, label = "licenseChevron")
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded20),
         shape = ShapeCache.rounded20,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
@@ -116,7 +117,7 @@ private fun LicenseCard(
                 }
                 Icon(
                     painter = painterResource(R.drawable.ic_chevron_right_rounded),
-                    contentDescription = if (expanded) "Hide license" else "Show license",
+                    contentDescription = if (expanded) "Hide licence" else "Show licence",
                     modifier = Modifier.rotate(chevron),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

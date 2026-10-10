@@ -32,6 +32,13 @@ object AppBackups {
             ?.let { file -> runCatching { SavedBackup(file.readText(), file.lastModified()) }.getOrNull() }
             ?.takeIf { it.text.isNotBlank() }
 
+    fun delete(
+        context: Context,
+        packageName: String,
+    ) {
+        fileFor(context, packageName).delete()
+    }
+
     private fun fileFor(
         context: Context,
         packageName: String,

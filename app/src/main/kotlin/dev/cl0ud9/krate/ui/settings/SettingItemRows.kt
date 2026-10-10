@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -29,7 +28,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.krate.ui.components.KrateSheet
 import dev.cl0ud9.krate.ui.components.KrateSwitch
+import dev.cl0ud9.krate.ui.navigation.glassRim
+import dev.cl0ud9.krate.ui.navigation.pressable
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
 // what a setting row shows: its icon, title and a line on what it does
@@ -75,12 +77,13 @@ internal fun SettingSwitchRow(
     checked: Boolean,
     shape: Shape,
     onCheckedChange: (Boolean) -> Unit,
+    switchModifier: Modifier = Modifier,
 ) {
     SettingRowFrame(
         item = item,
         shape = shape,
         onClick = { onCheckedChange(!checked) },
-        trailing = { KrateSwitch(checked = checked, onCheckedChange = onCheckedChange) },
+        trailing = { KrateSwitch(checked = checked, onCheckedChange = onCheckedChange, modifier = switchModifier) },
     )
 }
 
@@ -93,8 +96,12 @@ private fun SettingRowFrame(
     extra: @Composable ColumnScope.() -> Unit = {},
 ) {
     Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 76.dp)
+                .glassRim(shape)
+                .pressable(shape, onClick),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
@@ -140,7 +147,7 @@ internal fun <T> SettingOptionSheet(
     onSelect: (T) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(
+    KrateSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -180,8 +187,7 @@ private fun <T> OptionRow(
         label = "optionContent",
     )
     Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).pressable(ShapeCache.rounded24, onClick),
         shape = ShapeCache.rounded24,
         color = container,
         contentColor = content,

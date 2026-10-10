@@ -48,7 +48,17 @@ data class AppProfile(
     val highlights: List<String> = emptyList(),
     // setup steps, settings tips and backup steps; absent from older catalogs and for apps that need none
     val guide: AppGuide? = null,
+    // owner/repo for an app someone tracks themselves; null for the catalog's own apps
+    val trackedRepo: String? = null,
+    // the site a tracked app comes from, as Forge's id (github, codeberg, gitlab)
+    val trackedForge: String? = null,
+    // a tracked app's test releases are offered too
+    val trackedPrerelease: Boolean = false,
 )
+
+// added by the person themselves, rather than picked for the catalog
+val AppProfile.isTracked: Boolean
+    get() = trackedRepo != null
 
 // a withdrawn build stays listed in version history but is never the one offered as the update
 val AppProfile.latestArtifact: ArtifactInfo?

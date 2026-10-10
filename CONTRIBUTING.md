@@ -67,7 +67,8 @@ The same rules apply to text in the app, the docs and release notes.
 - **Talk to the reader.** Use "you", short sentences, and say what something does for them before how it works.
   Explain a technical term once, or leave it out.
 - **Be plain and honest.** Say what Krate can't do and what it asks for. No hype ("powerful", "seamless"), no filler
-  ("genuinely", "actually"), no exclamation marks.
+  ("genuinely", "actually"). No exclamation marks, except at most one in a playful greeting or celebration line;
+  never in instructions or errors.
 - **A little character, in the right places.** The odd crate-and-shelf joke is welcome in headlines and empty states,
   at most once a section. Never in instructions, errors, security or licence text.
 - **Punctuation and spelling.** No em dashes, and no spaced hyphen in their place: use a full stop, comma, colon or

@@ -44,6 +44,10 @@ import dev.cl0ud9.krate.ui.settings.ThemeModeCards
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.isShortScreen
 
+// glass only where the phone can draw it (Android 12 and newer), so the line only offers it there
+private const val NAV_PAGE_WITH_GLASS = "Choose how the bar at the bottom looks, and whether Krate turns to glass."
+private const val NAV_PAGE_PLAIN = "Choose how the bar at the bottom looks."
+
 @Composable
 internal fun ThemePage(viewModel: SettingsViewModel) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -63,7 +67,7 @@ internal fun NavigationPage(
     val pill = style == NavBarStyle.FLOATING_PILL
     CustomizePageLayout(
         title = "Navigation bar",
-        description = "Choose how the bar at the bottom looks, and whether Krate turns to glass.",
+        description = if (liquidGlassSupported) NAV_PAGE_WITH_GLASS else NAV_PAGE_PLAIN,
     ) {
         NavBarPreview(pill = pill, radius = radius, glass = glass && liquidGlassSupported)
         Spacer(modifier = Modifier.height(24.dp))
@@ -109,7 +113,7 @@ internal fun NavigationPage(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Customize corner radius")
+                        Text("Customise corner radius")
                     }
                 }
             }
@@ -133,7 +137,7 @@ internal fun UpdatesPage(viewModel: SettingsViewModel) {
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SwitchLine(
-                    title = "Download automatically",
+                    title = "Automatic downloads",
                     subtitle = "On Wi-Fi, so updates are ready to install in seconds.",
                     checked = automatic,
                     onCheckedChange = viewModel::setAutomaticDownloads,
@@ -147,7 +151,7 @@ internal fun UpdatesPage(viewModel: SettingsViewModel) {
                                 "Updates to apps from Krate install a day after release, while you're not using " +
                                     "them. It never rolls an app back or erases its data."
                             } else {
-                                "Turn on Download automatically first. It fetches the updates this installs."
+                                "Turn on Automatic downloads first, so there's something to install."
                             },
                         checked = autoInstall && automatic,
                         onCheckedChange = viewModel::setAutoInstallUpdates,

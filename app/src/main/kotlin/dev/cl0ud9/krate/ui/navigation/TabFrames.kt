@@ -17,7 +17,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.ui.theme.ShapeCache
@@ -56,7 +58,12 @@ internal fun TabFrame(
             containerColor = Color.Transparent,
         ) { innerPadding ->
             Surface(
-                modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding()),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(top = innerPadding.calculateTopPadding())
+                        // flying icons going back to this tab pass under the header from here down
+                        .onGloballyPositioned { IconFlight.panelTop = it.positionInWindow().y },
                 color = MaterialTheme.colorScheme.surface,
                 shape = ShapeCache.contentPanel(TabContentPanelRadius),
             ) {

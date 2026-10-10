@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
 private const val SOURCE_URL = "https://github.com/Cl0ud-9/Krate"
@@ -56,7 +57,7 @@ fun AboutPage(
         MaintainerCard()
         AboutSectionHeader(title = "Updates", subtitle = "Krate keeps itself current too.")
         KrateUpdatesCard(viewModel = viewModel)
-        AboutSectionHeader(title = "Project", subtitle = "Source available, and built on open source work.")
+        AboutSectionHeader(title = "Project", subtitle = "Source available, and built on open-source work.")
         SettingsNavRow(
             icon = painterResource(R.drawable.ic_github),
             title = "Source code",
@@ -67,8 +68,8 @@ fun AboutPage(
         )
         SettingsNavRow(
             icon = painterResource(R.drawable.ic_gavel_rounded),
-            title = "Licenses",
-            subtitle = "Krate's own, and the open source work it's built on",
+            title = "Licences",
+            subtitle = "Krate's own, and the open-source work it's built on",
             colors = SettingsTint.INDIGO.colors(),
             shape = settingsGroupShape(1, PROJECT_ROWS),
             onClick = { showLicenses = true },
@@ -81,7 +82,7 @@ fun AboutPage(
 @Composable
 private fun AboutHeroCard(versionName: String) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded28),
         shape = ShapeCache.rounded28,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {

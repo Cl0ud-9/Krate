@@ -21,15 +21,15 @@ class GitHubAccessSummaryTest {
     @Test
     fun noTokenAlwaysInvitesYouToAddOne() {
         statuses.forEach { status ->
-            assertEquals("Unlocks invite-only apps", gitHubAccessSummary(false, status, playful = true))
-            assertEquals("Unlocks invite-only apps", gitHubAccessSummary(false, status, playful = false))
+            assertEquals("Unlocks invite-only apps.", gitHubAccessSummary(false, status, playful = true))
+            assertEquals("Unlocks invite-only apps.", gitHubAccessSummary(false, status, playful = false))
         }
     }
 
     @Test
     fun unlockedAppsAreCountedInBothVoices() {
-        assertEquals("You're in. 1 invite-only app unlocked", gitHubAccessSummary(true, InviteStatus.Open(1), true))
-        assertEquals("3 invite-only apps unlocked", gitHubAccessSummary(true, InviteStatus.Open(3), false))
+        assertEquals("You're in. 1 invite-only app unlocked.", gitHubAccessSummary(true, InviteStatus.Open(1), true))
+        assertEquals("3 invite-only apps unlocked.", gitHubAccessSummary(true, InviteStatus.Open(3), false))
     }
 
     @Test

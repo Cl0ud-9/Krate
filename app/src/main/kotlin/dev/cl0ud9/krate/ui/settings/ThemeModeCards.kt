@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.ThemeMode
+import dev.cl0ud9.krate.ui.navigation.pressable
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
 private class ThemeOption(
@@ -88,8 +89,7 @@ private fun ThemeModeCard(
         label = "themeContent",
     )
     Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().pressable(ShapeCache.rounded28, onClick),
         shape = ShapeCache.rounded28,
         color = container,
         contentColor = content,

@@ -1,11 +1,11 @@
 package dev.cl0ud9.krate.ui.details
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,11 +20,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
@@ -36,14 +36,16 @@ import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.WaitingForUserStep
 import dev.cl0ud9.krate.ui.components.HelperText
 import dev.cl0ud9.krate.ui.components.KrateLinearProgress
-import dev.cl0ud9.krate.ui.components.ReopenPromptButton
+import dev.cl0ud9.krate.ui.components.ProgressCaption
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.components.StatusRow
+import dev.cl0ud9.krate.ui.components.downloadFraction
+import dev.cl0ud9.krate.ui.components.fadeThrough
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.navigation.heroGlow
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.voice.Moment
 import dev.cl0ud9.krate.voice.rememberKrateLeadIn
-import kotlinx.coroutines.delay
 
 @Suppress("LongParameterList")
 @Composable
@@ -55,11 +57,11 @@ internal fun DownloadSection(
     onCancelDownload: () -> Unit,
     onBackToLatest: () -> Unit,
 ) {
-    val status = state.downloadStatus
-    val actionLabel = actionLabelFor(state)
+    // Play Protect's guide stands between these actions and an app it stops
+    val gate = rememberPlayProtectGate(state, onDownload, onInstall)
     // boxed in a card like every other detail section, instead of sitting bare on the screen background
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
@@ -68,38 +70,55 @@ internal fun DownloadSection(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SectionHeader(title = "Get this app", icon = rememberVectorPainter(Icons.Filled.Download))
-            // crossfades between states (Idle -> Downloading -> Verifying -> ...) instead of the
-            // content just swapping instantly - contentKey groups by the status's own class, not
-            // its full value, so a Downloading progress tick (a genuinely new instance every time,
-            // bytesDownloaded included) updates in place rather than re-triggering the transition
+            // folds in and out, since it comes and goes as an install is stopped or gets through
+            AnimatedVisibility(
+                visible = gate.headsUp,
+                enter = fadeIn() + expandVertically(),
+                exit =
+                    fadeOut() + shrinkVertically(),
+            ) {
+                HelperText("Play Protect stopped this app before. Krate shows you the way past it when you go ahead.")
+            }
+            // fades through each real change (Install -> downloading -> ... and, once removed, Open -> Install)
+            // while the card eases to its new height; each side keeps the state it was drawn with, so the outgoing
+            // buttons never flip mid-fade. A progress tick has the same phase, so it updates in place
             AnimatedContent(
-                targetState = status,
-                contentKey = { it::class },
-                transitionSpec = {
-                    (fadeIn(tween(STATUS_FADE_MS)))
-                        .togetherWith(fadeOut(tween(STATUS_FADE_MS)))
-                },
-                modifier = Modifier.animateContentSize(),
+                targetState = state,
+                contentKey = ::downloadPhase,
+                transitionSpec = fadeThrough(),
+                contentAlignment = Alignment.TopStart,
                 label = "download-status",
-            ) { currentStatus ->
+            ) { shown ->
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    DownloadStatusContent(
-                        status = currentStatus,
-                        state = state,
-                        actionLabel = actionLabel,
-                        onDownload = onDownload,
-                        onInstall = onInstall,
-                        onRetryAsCleanInstall = onRetryAsCleanInstall,
-                        onCancelDownload = onCancelDownload,
-                        onBackToLatest = onBackToLatest,
-                    )
+                    CompositionLocalProvider(LocalPlayProtectGuide provides gate.showGuide) {
+                        DownloadStatusContent(
+                            status = shown.downloadStatus,
+                            state = shown,
+                            actionLabel = actionLabelFor(shown),
+                            onDownload = gate.download,
+                            onInstall = gate.install,
+                            onRetryAsCleanInstall = onRetryAsCleanInstall,
+                            onCancelDownload = onCancelDownload,
+                            onBackToLatest = onBackToLatest,
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-internal const val STATUS_FADE_MS = 220
+// what the card is showing, coarsely: a download's own steps, or for an idle one which set of buttons it offers
+private fun downloadPhase(state: AppDetailsUiState): Any {
+    val status = state.downloadStatus
+    return when {
+        status !is DownloadStatus.Idle -> status::class
+        state.isRollback || state.isSwitch -> "switch"
+        state.isUpToDate -> "current"
+        state.installedVersionName != null -> "behind"
+        else -> "new"
+    }
+}
 
 @Suppress("LongParameterList")
 @Composable
@@ -117,10 +136,9 @@ private fun DownloadStatusContent(
         is DownloadStatus.Idle -> IdleContent(state = state, onDownload = onDownload, onBackToLatest = onBackToLatest)
 
         is DownloadStatus.Downloading -> {
-            val total = status.totalBytes
-            val fraction = if (total != null && total > 0) status.bytesDownloaded / total.toFloat() else 0f
-            KrateLinearProgress(progress = if (total != null) fraction else null)
-            HelperText(downloadingLabel(status.bytesDownloaded, total, fraction))
+            val fraction = downloadFraction(status.bytesDownloaded, status.totalBytes)
+            KrateLinearProgress(progress = fraction)
+            ProgressCaption(downloadingLabel(status.bytesDownloaded, status.totalBytes, fraction ?: 0f))
             // a 170 MB download shouldn't be a commitment - the partial file is kept, so starting
             // again later resumes it
             OutlinedButton(onClick = onCancelDownload, modifier = Modifier.fillMaxWidth()) {
@@ -206,9 +224,7 @@ private fun IdleContent(
                 tint = if (state.justInstalled) colorScheme.primary else colorScheme.tertiary,
                 text = installedStatusText(state),
             )
-            if (uninstalling) {
-                UninstallingStatus(installStatus = state.installStatus)
-            } else {
+            UninstallSwap(uninstalling, state.installStatus) {
                 UpToDateActions(
                     packageName = state.app.packageName,
                     label = downloadLabelFor(state),
@@ -221,11 +237,14 @@ private fun IdleContent(
             StatusRow(
                 icon = painterResource(R.drawable.ic_system_update_alt_rounded),
                 tint = MaterialTheme.colorScheme.primary,
-                text = "Update available: ${selected?.buildDescription()}.",
+                text =
+                    rememberUpdateAvailableText(
+                        state.installedVersionName,
+                        selected?.versionName,
+                        "Update available: ${selected?.buildDescription()}.",
+                    ),
             )
-            if (uninstalling) {
-                UninstallingStatus(installStatus = state.installStatus)
-            } else {
+            UninstallSwap(uninstalling, state.installStatus) {
                 InstalledNotUpToDateActions(state = state, onDownload = onDownload)
             }
         }
@@ -245,7 +264,7 @@ private fun IdleContent(
 @Composable
 private fun installedStatusText(state: AppDetailsUiState): String =
     when {
-        state.justInstalled -> rememberKrateLeadIn(Moment.INSTALLED, "${state.app.displayName} is installed.")
+        state.justInstalled -> rememberInstalledText(state.app)
         state.signedDifferently -> "Installed from somewhere else."
         else -> "Up to date."
     }
@@ -353,36 +372,3 @@ internal fun OpenAppButton(
         }
     }
 }
-
-// installStatus is shared with the install flow elsewhere on this screen, but Uninstalling/
-// WaitingForUser(UNINSTALL_CONFIRM) are only ever emitted by the uninstall flow itself, so reading
-// them here is unambiguous. A successful uninstall isn't shown explicitly: refresh() flips
-// installedVersionName to null, which removes this whole control and reveals the Download button -
-// the same feedback any uninstall (from here or from system Settings) gives
-@Composable
-internal fun UninstallingStatus(installStatus: InstallStatus) {
-    KrateLinearProgress(progress = null)
-    HelperText(
-        if (installStatus is InstallStatus.Uninstalling) {
-            "Uninstalling..."
-        } else {
-            "Confirm the uninstall in the system dialog."
-        },
-    )
-    if (installStatus is InstallStatus.WaitingForUser) {
-        ReopenPromptButton()
-        // a phone's app lock can hold the dialog back without a word, so after a while it gets a mention
-        var stillWaiting by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            delay(APP_LOCK_HINT_DELAY_MS)
-            stillWaiting = true
-        }
-        if (stillWaiting) {
-            HelperText(
-                "No dialog? If this app is locked with your phone's app lock, unlock it, then show the prompt again.",
-            )
-        }
-    }
-}
-
-private const val APP_LOCK_HINT_DELAY_MS = 6_000L

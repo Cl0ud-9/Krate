@@ -1,5 +1,8 @@
 package dev.cl0ud9.krate.ui.settings
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -9,16 +12,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateStatus
 import dev.cl0ud9.krate.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.krate.ui.components.HelperText
 import dev.cl0ud9.krate.ui.components.KrateLinearProgress
+import dev.cl0ud9.krate.ui.components.ProgressCaption
 import dev.cl0ud9.krate.ui.components.ReopenPromptButton
+import dev.cl0ud9.krate.ui.components.fadeThrough
 import dev.cl0ud9.krate.ui.util.DebouncedButtonState
 
 // split out of SettingsScreen.kt purely to keep that file under detekt's per-file function-count
@@ -45,6 +52,35 @@ internal fun SelfUpdateAction(
     selfUpdateState: SelfUpdateState?,
     onInstallUpdate: (String) -> Unit,
 ) {
+    // fades through each step (start, downloading, waiting for the OK, installed) while the card eases to its new
+    // height; the percentage ticking over within the download updates in place
+    AnimatedContent(
+        targetState = selfUpdateState,
+        contentKey = ::selfUpdatePhase,
+        transitionSpec = fadeThrough(),
+        contentAlignment = Alignment.TopStart,
+        label = "self-update",
+    ) { shown ->
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SelfUpdateStep(status = status, selfUpdateState = shown, onInstallUpdate = onInstallUpdate)
+        }
+    }
+}
+
+// which step the update is at, coarsely: a new step fades, a tick within one doesn't
+private fun selfUpdatePhase(state: SelfUpdateState?): Any? =
+    when (state) {
+        null -> null
+        is SelfUpdateState.Installing -> state.installStatus::class
+        else -> state::class
+    }
+
+@Composable
+private fun SelfUpdateStep(
+    status: KrateUpdateStatus.UpdateAvailable,
+    selfUpdateState: SelfUpdateState?,
+    onInstallUpdate: (String) -> Unit,
+) {
     when (selfUpdateState) {
         null, is SelfUpdateState.DownloadFailed -> {
             if (selfUpdateState is SelfUpdateState.DownloadFailed) {
@@ -65,7 +101,7 @@ internal fun SelfUpdateAction(
         is SelfUpdateState.Downloading -> {
             val fraction = selfUpdateState.fraction
             KrateLinearProgress(progress = fraction)
-            HelperText(
+            ProgressCaption(
                 fraction?.let { "Downloading the update... ${(it * PERCENT).toInt()}%" } ?: "Downloading the update...",
             )
         }

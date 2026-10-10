@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.rememberDebouncedButtonState
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +55,7 @@ private val AVATAR_SIZE = 60.dp
 internal fun MaintainerCard() {
     val uriHandler = LocalUriHandler.current
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded24),
         shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
@@ -154,7 +155,7 @@ internal fun KrateUpdatesCard(viewModel: SettingsViewModel) {
     val selfUpdateState by viewModel.selfUpdateState.collectAsStateWithLifecycle()
     val checkForUpdateState = rememberDebouncedButtonState(onClick = { viewModel.checkForKrateUpdate() })
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded24),
         shape = ShapeCache.rounded24,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {

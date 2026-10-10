@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import dev.cl0ud9.krate.domain.model.ActivityAction
 import dev.cl0ud9.krate.domain.model.ActivityEntry
 import dev.cl0ud9.krate.domain.repository.ActivityLogRepository
+import dev.cl0ud9.krate.voice.KrateMemory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
@@ -28,6 +29,7 @@ private data class ActivityEntryDto(
     val action: String,
     val timestampMillis: Long,
     val detail: String? = null,
+    val packageName: String? = null,
 )
 
 private fun ActivityEntryDto.toDomain(): ActivityEntry =
@@ -38,10 +40,11 @@ private fun ActivityEntryDto.toDomain(): ActivityEntry =
         action = runCatching { ActivityAction.valueOf(action) }.getOrDefault(ActivityAction.UPDATED),
         timestampMillis = timestampMillis,
         detail = detail,
+        packageName = packageName,
     )
 
 private fun ActivityEntry.toDto(): ActivityEntryDto =
-    ActivityEntryDto(id, appId, appName, action.name, timestampMillis, detail)
+    ActivityEntryDto(id, appId, appName, action.name, timestampMillis, detail, packageName)
 
 // a small local history of completed installs/updates/uninstalls, capped to MAX_ENTRIES newest-first
 // - backs the Home screen's Recent activity section with real data instead of a permanent placeholder
@@ -59,6 +62,8 @@ class DataStoreActivityLogRepository(
         }
 
     override suspend fun record(entry: ActivityEntry) {
+        // counted for good, not just the last few shown on Home: milestones, update counts, the weekly round-up
+        KrateMemory.noteActivity(entry.action, entry.packageName, entry.timestampMillis)
         updateEntries { existing ->
             val kept =
                 if (entry.action == ActivityAction.FAILED) {

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.AnnouncementItem
 import dev.cl0ud9.krate.domain.model.AnnouncementSeverity
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
 // a catalog announcement (see catalog/announcements.json) - tinted by severity, with an optional
@@ -40,7 +41,7 @@ fun AnnouncementCard(
     val announcement = item.announcement
     val (container, content) = severityColors(announcement.severity)
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
     ) {

@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -34,6 +33,9 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.LaunchTab
 import dev.cl0ud9.krate.domain.model.NavBarStyle
 import dev.cl0ud9.krate.domain.model.ThemeMode
+import dev.cl0ud9.krate.ui.components.KrateSheet
+import dev.cl0ud9.krate.ui.navigation.keptOutOfGlassFade
+import dev.cl0ud9.krate.ui.navigation.rememberGlassToggle
 import dev.cl0ud9.krate.voice.KrateVoice
 
 // which choice sheet is open, if any
@@ -71,19 +73,7 @@ fun AppearanceRoute(
             openSheet = it
         }, onOpenCornerRadius = onOpenCornerRadius)
         EffectsRows(viewModel = viewModel)
-        SettingsSectionLabel("Personality")
-        val context = LocalContext.current
-        SettingSwitchRow(
-            item =
-                SettingItem(
-                    painterResource(R.drawable.ic_campaign_rounded),
-                    "Playful messages",
-                    "Krate's little one-liners in headlines and notifications. Off keeps everything plain.",
-                ),
-            checked = KrateVoice.playful,
-            shape = settingsGroupShape(0, 1),
-            onCheckedChange = { KrateVoice.setPlayful(context, it) },
-        )
+        PersonalityRows()
         SettingsSectionLabel("Launcher")
         LauncherIconRow()
     }
@@ -105,7 +95,8 @@ private fun EffectsRows(viewModel: SettingsViewModel) {
             ),
         checked = glass,
         shape = settingsGroupShape(0, 1),
-        onCheckedChange = viewModel::setLiquidGlass,
+        onCheckedChange = rememberGlassToggle(viewModel::setLiquidGlass),
+        switchModifier = Modifier.keptOutOfGlassFade(),
     )
 }
 
@@ -182,7 +173,7 @@ private fun AppearanceSheets(
     when (openSheet) {
         AppearanceSheet.THEME -> {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-            ModalBottomSheet(
+            KrateSheet(
                 onDismissRequest = onDismiss,
                 sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -258,3 +249,22 @@ private fun LaunchTab.iconRes(): Int =
         LaunchTab.APPS -> R.drawable.ic_nav_apps_filled
         LaunchTab.UPDATES -> R.drawable.ic_nav_update_filled
     }
+
+// how Krate talks: its one-liners, and with them festival greetings and the week in review on Home
+@Composable
+private fun PersonalityRows() {
+    SettingsSectionLabel("Personality")
+    val context = LocalContext.current
+    SettingSwitchRow(
+        item =
+            SettingItem(
+                painterResource(R.drawable.ic_campaign_rounded),
+                "Playful messages",
+                "Krate's little one-liners, festival greetings and a look back at your week. Off keeps everything " +
+                    "plain.",
+            ),
+        checked = KrateVoice.playful,
+        shape = settingsGroupShape(0, 1),
+        onCheckedChange = { KrateVoice.setPlayful(context, it) },
+    )
+}

@@ -8,8 +8,12 @@ import dev.cl0ud9.krate.data.activity.INSTALL_FAILURE_PREFIX
 import dev.cl0ud9.krate.domain.model.ActivityAction
 import dev.cl0ud9.krate.domain.model.ActivityEntry
 import dev.cl0ud9.krate.domain.model.AppProfile
+import dev.cl0ud9.krate.domain.model.InstallStatus
+import dev.cl0ud9.krate.domain.model.WaitingForUserStep
 import dev.cl0ud9.krate.domain.repository.buildKey
 import dev.cl0ud9.krate.platform.appContainer
+import dev.cl0ud9.krate.platform.packageinstaller.interpretInstallResult
+import dev.cl0ud9.krate.platform.selfupdate.notePlayProtect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -46,6 +50,14 @@ internal fun autoUpdateOutcome(
         -> AutoUpdateOutcome.GIVE_UP
         else -> if (triesSoFar + 1 >= MAX_AUTO_UPDATE_TRIES) AutoUpdateOutcome.GIVE_UP else AutoUpdateOutcome.TRY_AGAIN
     }
+
+// read the way the app's own installs are, so a background update is judged by the same rule
+private fun stoppedByPlayProtect(
+    status: Int,
+    message: String?,
+): Boolean =
+    (interpretInstallResult(status, message, WaitingForUserStep.INSTALL_CONFIRM) as? InstallStatus.Failed)
+        ?.blockedByPlayProtect == true
 
 // what a background install came to, recorded the same way an install in the app is
 internal object AutoUpdateResults {
@@ -86,8 +98,18 @@ internal object AutoUpdateResults {
                 .observeApps()
                 .first()
                 .find { it.id == appId } ?: return
+        // Play Protect stopping it counts as one failed try like any other, so the update is tried again (and the
+        // next version afresh); the user hears of it the first time, with the way past it on the app's page
+        val stopped = stoppedByPlayProtect(result.status, result.message)
+        if (stopped) {
+            notePlayProtect(context, app.packageName, stopped = true)
+            if (ledger.tries(appId, buildKey) == 0) AutoUpdateNotices.stoppedByPlayProtect(context, app)
+        }
         when (autoUpdateOutcome(result.status, ledger.tries(appId, buildKey))) {
-            AutoUpdateOutcome.UPDATED -> updated(context, app, buildKey)
+            AutoUpdateOutcome.UPDATED -> {
+                notePlayProtect(context, app.packageName, stopped = false)
+                updated(context, app, buildKey)
+            }
             AutoUpdateOutcome.NEEDS_YOU -> {
                 runCatching { context.packageManager.packageInstaller.abandonSession(result.sessionId) }
                 ledger.giveUp(appId, buildKey)
@@ -97,7 +119,13 @@ internal object AutoUpdateResults {
             AutoUpdateOutcome.TRY_AGAIN -> ledger.failed(appId, buildKey)
             AutoUpdateOutcome.GIVE_UP -> {
                 ledger.giveUp(appId, buildKey)
-                val reason = result.message ?: "the automatic update didn't finish."
+                val reason =
+                    if (stopped) {
+                        "Google Play Protect stopped this install."
+                    } else {
+                        result.message
+                            ?: "the automatic update didn't finish."
+                    }
                 log(context, app, ActivityAction.FAILED, "$INSTALL_FAILURE_PREFIX $reason")
                 AutoUpdateNotices.needsYou(context, app.displayName)
             }
@@ -138,6 +166,7 @@ internal object AutoUpdateResults {
             action = action,
             timestampMillis = System.currentTimeMillis(),
             detail = detail,
+            packageName = app.packageName,
         ),
     )
 

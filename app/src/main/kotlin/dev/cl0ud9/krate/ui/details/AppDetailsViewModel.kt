@@ -1,18 +1,9 @@
 package dev.cl0ud9.krate.ui.details
 
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.cl0ud9.krate.data.activity.DOWNLOAD_FAILURE_PREFIX
-import dev.cl0ud9.krate.data.activity.INSTALL_FAILURE_PREFIX
 import dev.cl0ud9.krate.data.downloads.ArtifactDownloader
-import dev.cl0ud9.krate.data.downloads.DownloadProgressNotifier
 import dev.cl0ud9.krate.domain.dependency.DependencyGraph
-import dev.cl0ud9.krate.domain.installer.CleanInstallOrchestrator
-import dev.cl0ud9.krate.domain.installer.InstallationEngine
-import dev.cl0ud9.krate.domain.model.ActivityAction
-import dev.cl0ud9.krate.domain.model.ActivityEntry
 import dev.cl0ud9.krate.domain.model.AnnouncementItem
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.ArtifactInfo
@@ -23,26 +14,22 @@ import dev.cl0ud9.krate.domain.model.isActive
 import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.domain.repository.ActivityLogRepository
 import dev.cl0ud9.krate.domain.repository.AnnouncementDismissalStore
-import dev.cl0ud9.krate.domain.repository.AutoUpdateStore
 import dev.cl0ud9.krate.domain.repository.Baseline
 import dev.cl0ud9.krate.domain.repository.CatalogRepository
 import dev.cl0ud9.krate.domain.repository.KrateBaselineStore
-import dev.cl0ud9.krate.domain.repository.buildKey
 import dev.cl0ud9.krate.domain.repository.effectiveBaseline
 import dev.cl0ud9.krate.domain.repository.forTrack
-import dev.cl0ud9.krate.domain.repository.newerThanPicked
 import dev.cl0ud9.krate.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
+import dev.cl0ud9.krate.platform.work.AppWork
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
@@ -53,14 +40,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
-import java.util.UUID
 
 data class DependencyInfo(
     val app: AppProfile,
     val installed: Boolean,
 )
-
-private const val MIN_ATTEMPT_VISIBLE_MS = 600L
 
 // how long a finished install waits for Android to report the new version before the page settles anyway
 private const val SETTLE_TIMEOUT_MS = 3000L
@@ -76,20 +60,25 @@ private const val SETTLE_TIMEOUT_MS = 3000L
 class AppDetailsViewModel(
     private val catalogRepository: CatalogRepository,
     private val artifactDownloader: ArtifactDownloader,
-    private val installationEngine: InstallationEngine,
-    private val cleanInstallOrchestrator: CleanInstallOrchestrator,
     private val installedPackageReader: InstalledPackageReader,
     private val activityLogRepository: ActivityLogRepository,
     private val krateBaselineStore: KrateBaselineStore,
-    private val downloadProgressNotifier: DownloadProgressNotifier,
     private val announcementDismissalStore: AnnouncementDismissalStore,
-    private val autoUpdateStore: AutoUpdateStore,
+    // the app's download, install or uninstall, kept going when this page closes
+    private val work: AppWork,
     private val appId: String,
 ) : ViewModel() {
     val app: StateFlow<AppProfile?> =
         catalogRepository
             .observeApp(appId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    // the list has loaded and this app isn't in it: one stopped being tracked, or a link to an app the Krate dropped
+    val missing: StateFlow<Boolean> =
+        catalogRepository
+            .observeApps()
+            .map { apps -> apps.none { it.id == appId } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
 
     // the build Krate itself last installed for this app, or null if it never has - App
     // Details reads this alongside installedVersion (the live device state) to tell "up to date"
@@ -101,9 +90,6 @@ class AppDetailsViewModel(
 
     // installed state is device-local, so a resume-triggered refresh() re-checks it - a successful
     // install also refreshes immediately below, section 13 + 42.19 of the spec
-    // set by a tap on Install, Update or Reinstall, cleared once acted on (see installIfStillWanted)
-    private var installWhenReady = false
-
     // an install just finished on this screen: its message stands in for "Up to date." until the next action
     private val mutableJustInstalled = MutableStateFlow(false)
     val justInstalled: StateFlow<Boolean> = mutableJustInstalled.asStateFlow()
@@ -152,18 +138,27 @@ class AppDetailsViewModel(
             .flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
-    private var downloadJob: Job? = null
+    // what AppWork has under way for this app; it carries on whether or not this page is open
+    val downloadStatus: StateFlow<DownloadStatus> =
+        work
+            .state(
+                appId,
+            ).map { it.download }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, work.current(appId).download)
 
-    private val mutableDownloadStatus = MutableStateFlow<DownloadStatus>(DownloadStatus.Idle)
-    val downloadStatus: StateFlow<DownloadStatus> = mutableDownloadStatus.asStateFlow()
-
-    private val mutableInstallStatus = MutableStateFlow<InstallStatus>(InstallStatus.Idle)
-    val installStatus: StateFlow<InstallStatus> = mutableInstallStatus.asStateFlow()
+    val installStatus: StateFlow<InstallStatus> =
+        work
+            .state(
+                appId,
+            ).map { it.install }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, work.current(appId).install)
 
     // null means "no explicit pick yet, use the newest" - only ever non-null once the user taps a
     // specific version in App Details' version history, section 9 of the spec (artifacts retains
     // more than just the latest so a broken newest build still leaves older ones installable)
-    private val mutableExplicitArtifact = MutableStateFlow<ArtifactInfo?>(null)
+    // a build already under way when the page opens is the one it shows
+    private val mutableExplicitArtifact =
+        MutableStateFlow(work.current(appId).takeIf { it.download !is DownloadStatus.Idle }?.artifact)
     val selectedArtifact: StateFlow<ArtifactInfo?> =
         combine(
             app,
@@ -187,15 +182,21 @@ class AppDetailsViewModel(
     // existingReadyFile() is a real (if small) blocking File.exists() call - withContext(IO) keeps
     // it off the main thread, same reasoning as installedVersion/dependencies above
     init {
+        // an install that went through while the page was closed: it opens settled, not on the success step
+        if (work.current(appId).install is InstallStatus.Success) {
+            work.setInstall(appId, InstallStatus.Idle)
+            work.setDownload(appId, DownloadStatus.Idle)
+        }
+        settleWhenFinished()
         viewModelScope.launch {
             combine(app.filterNotNull(), selectedArtifact.filterNotNull()) { profile, artifact ->
                 profile to artifact
             }.collect { (profile, artifact) ->
-                if (mutableDownloadStatus.value == DownloadStatus.Idle) {
+                if (work.current(appId).download == DownloadStatus.Idle) {
                     val readyFile =
                         withContext(Dispatchers.IO) { artifactDownloader.existingReadyFile(profile, artifact) }
                     if (readyFile != null) {
-                        mutableDownloadStatus.value = DownloadStatus.ReadyToInstall(readyFile)
+                        work.setDownload(appId, DownloadStatus.ReadyToInstall(readyFile))
                         // fetched some other way (automatic downloads, an earlier run), so an old failure is moot
                         activityLogRepository.clearFailures(profile.id, downloadsOnly = true)
                     }
@@ -207,7 +208,7 @@ class AppDetailsViewModel(
             combine(
                 InstallRequests.requested,
                 mutableFirstCheckDone,
-                mutableDownloadStatus,
+                downloadStatus,
             ) { requested, done, status ->
                 Triple(appId in requested, done, status)
             }.collect { (wanted, done, status) -> if (wanted && done) handleInstallRequest(status) }
@@ -244,7 +245,7 @@ class AppDetailsViewModel(
     // a ready download whose file is gone (installed and cleaned up, or the cache cleared) isn't ready any more
     private fun dropStaleReadyFile() {
         val ready = readyDownload() ?: return
-        if (!File(ready.filePath).exists()) mutableDownloadStatus.value = DownloadStatus.Idle
+        if (!File(ready.filePath).exists()) work.setDownload(appId, DownloadStatus.Idle)
     }
 
     // ignored while a download/install is actively in flight, same guard as startDownload/
@@ -256,125 +257,43 @@ class AppDetailsViewModel(
         mutableJustInstalled.value = false
         mutableRestorePending.value = false
         mutableExplicitArtifact.value = artifact
-        mutableDownloadStatus.value = DownloadStatus.Idle
+        work.setDownload(appId, DownloadStatus.Idle)
     }
 
     // drops a version picked in version history, back to the newest build
     fun backToLatest() {
         if (mutableExplicitArtifact.value == null || !canChangeVersion()) return
         mutableExplicitArtifact.value = null
-        mutableDownloadStatus.value = DownloadStatus.Idle
+        work.setDownload(appId, DownloadStatus.Idle)
     }
 
-    private fun canChangeVersion(): Boolean {
-        val status = mutableDownloadStatus.value
-        return !isBusy() && status !is DownloadStatus.Downloading && status !is DownloadStatus.Verifying
-    }
+    private fun canChangeVersion(): Boolean = !isBusy() && !work.downloading(appId)
 
     fun startDownload() {
         val currentApp = app.value
         val artifact = selectedArtifact.value
-        if (currentApp == null || artifact == null || isBusy()) return
-        if (mutableDownloadStatus.value is DownloadStatus.Downloading ||
-            mutableDownloadStatus.value is DownloadStatus.Verifying
-        ) {
-            return
-        }
-        // a new download starts a new install attempt - a finished earlier one (an uninstall's
-        // Success, say) would otherwise show as "Installed." once this download is ready
-        mutableInstallStatus.value = InstallStatus.Idle
+        val alreadyGoing = isBusy() || work.downloading(appId)
+        if (currentApp == null || artifact == null || alreadyGoing) return
+        // a new download starts a new attempt: an earlier "installed" message doesn't belong to it
         mutableJustInstalled.value = false
         mutableRestorePending.value = false
-        // the tap shows at once, even before the first byte arrives
-        mutableDownloadStatus.value = DownloadStatus.Downloading(0L, null)
         // Install, Update or Reinstall means the whole thing: the install follows the download by itself
-        installWhenReady = canInstallInPlace(currentApp, installedVersion.value, artifact)
-        // told right away, while Krate is still on screen: that's when it can keep the network for the whole
-        // download, which then runs for as long as this screen's ViewModel lives, app backgrounded or not
-        downloadProgressNotifier.onDownloading(currentApp.id, currentApp.displayName, 0L, null)
-        downloadJob =
-            viewModelScope.launch {
-                collectDownload(currentApp, artifact)
-            }
+        work.download(
+            currentApp,
+            artifact,
+            installAfter = canInstallInPlace(currentApp, installedVersion.value, artifact),
+        )
     }
 
     // stops an in-flight download; the partial file is kept, so starting again resumes it
-    fun cancelDownload() {
-        installWhenReady = false
-        downloadJob?.cancel()
-        downloadJob = null
-        mutableDownloadStatus.value = DownloadStatus.Idle
-        downloadProgressNotifier.clear(appId)
-    }
-
-    private suspend fun collectDownload(
-        currentApp: AppProfile,
-        artifact: ArtifactInfo,
-    ) {
-        val startedAt = System.currentTimeMillis()
-        artifactDownloader.download(currentApp, artifact).collect { status ->
-            // an instant failure (offline, say) still shows the attempt, so Try again visibly does something
-            if (status is DownloadStatus.Failed) {
-                delay(
-                    MIN_ATTEMPT_VISIBLE_MS - (System.currentTimeMillis() - startedAt),
-                )
-            }
-            mutableDownloadStatus.value = status
-            when (status) {
-                is DownloadStatus.Downloading ->
-                    downloadProgressNotifier.onDownloading(
-                        currentApp.id,
-                        currentApp.displayName,
-                        status.bytesDownloaded,
-                        status.totalBytes,
-                    )
-
-                is DownloadStatus.Verifying ->
-                    downloadProgressNotifier.onVerifying(currentApp.id, currentApp.displayName)
-
-                is DownloadStatus.ReadyToInstall -> {
-                    downloadProgressNotifier.onComplete(currentApp)
-                    activityLogRepository.clearFailures(currentApp.id, downloadsOnly = true)
-                    installIfStillWanted()
-                }
-
-                is DownloadStatus.Failed -> {
-                    installWhenReady = false
-                    downloadProgressNotifier.onFailed(currentApp, status.reason)
-                    recordActivity(currentApp, ActivityAction.FAILED, "$DOWNLOAD_FAILURE_PREFIX ${status.reason}")
-                }
-
-                is DownloadStatus.Idle -> downloadProgressNotifier.clear(currentApp.id)
-            }
-        }
-    }
-
-    // leaving this screen mid-download cancels the download itself (viewModelScope goes with it) -
-    // this makes sure a lingering progress notification doesn't outlive that
-    override fun onCleared() {
-        downloadProgressNotifier.clear(appId)
-    }
+    fun cancelDownload() = work.cancelDownload(appId)
 
     fun dismissAnnouncement(id: String) {
         viewModelScope.launch { announcementDismissalStore.dismiss(id) }
     }
 
-    // a CLEAN_INSTALL app always goes through the orchestrator, section 16, 42.12 of the spec, and so
-    // does installing an older build than the one on the device (a rollback) - Android refuses a
-    // lower versionCode as an in-place update. Everything else attempts an in-place install first
-    // only while Krate is on screen: a download that finished in the background waits behind its notification instead,
-    // and never past a required app (MicroG) that isn't installed yet
-    private fun installIfStillWanted() {
-        val wanted = installWhenReady
-        installWhenReady = false
-        val onScreen =
-            ProcessLifecycleOwner
-                .get()
-                .lifecycle.currentState
-                .isAtLeast(Lifecycle.State.STARTED)
-        if (wanted && onScreen && dependencies.value.all { it.installed }) startInstall()
-    }
-
+    // a CLEAN_INSTALL app always goes through the orchestrator, section 16, 42.12 of the spec, and so does installing
+    // an older build than the one on the device (a rollback): Android refuses a lower versionCode in place
     fun startInstall() {
         val currentApp = app.value
         val readyStatus = readyDownload()
@@ -382,20 +301,14 @@ class AppDetailsViewModel(
         val apkFile = File(readyStatus.filePath)
         // the file went away since it was ready: fetch it again rather than fail on a missing file
         if (!apkFile.exists()) {
-            mutableDownloadStatus.value = DownloadStatus.Idle
+            work.setDownload(appId, DownloadStatus.Idle)
             startDownload()
             return
         }
         val fromScratch =
             currentApp.installationMode == InstallationMode.CLEAN_INSTALL ||
                 requiresUninstall(installedVersion.value, selectedArtifact.value)
-        val flow =
-            if (fromScratch) {
-                cleanInstallOrchestrator.cleanInstall(currentApp, apkFile)
-            } else {
-                installationEngine.install(currentApp, apkFile)
-            }
-        runInstallFlow(flow, currentApp, fromScratch)
+        work.install(currentApp, apkFile, selectedArtifact.value, fromScratch)
     }
 
     // explicit, user-confirmed fallback after a normal update failed, section 17 of the spec
@@ -403,29 +316,16 @@ class AppDetailsViewModel(
         val currentApp = app.value
         val readyStatus = readyDownload()
         if (currentApp == null || readyStatus == null || isBusy()) return
-        runInstallFlow(cleanInstallOrchestrator.cleanInstall(currentApp, File(readyStatus.filePath)), currentApp, true)
+        work.install(currentApp, File(readyStatus.filePath), selectedArtifact.value, fromScratch = true)
     }
 
-    // a standalone uninstall, independent of any download - reuses the same InstallationEngine the
-    // clean-install path already drives for its own uninstall step, and the same system
-    // confirmation-dialog flow (WaitingForUser(UNINSTALL_CONFIRM) -> Uninstalling -> Success/Failed)
+    // through the system's confirmation, like the clean install's own uninstall step
     fun startUninstall() {
         val currentApp = app.value
         if (currentApp == null || installedVersion.value == null || isBusy()) return
         mutableJustInstalled.value = false
         mutableRestorePending.value = false
-        viewModelScope.launch {
-            installationEngine.uninstall(currentApp.packageName).collect { status ->
-                mutableInstallStatus.value = status
-                if (status is InstallStatus.Success) {
-                    recordActivity(currentApp, ActivityAction.UNINSTALLED)
-                    krateBaselineStore.clear(currentApp.packageName)
-                    // not shown as its own state: the page simply turns back into "Install"
-                    mutableInstallStatus.value = InstallStatus.Idle
-                    refresh()
-                }
-            }
-        }
+        work.uninstall(currentApp)
     }
 
     private fun resolveDependencies(
@@ -437,81 +337,36 @@ class AppDetailsViewModel(
         }
 
     private fun readyDownload(): DownloadStatus.ReadyToInstall? =
-        mutableDownloadStatus.value as? DownloadStatus.ReadyToInstall
+        work.current(appId).download as? DownloadStatus.ReadyToInstall
 
-    private fun isBusy(): Boolean =
-        when (mutableInstallStatus.value) {
-            InstallStatus.Installing, InstallStatus.PreparingRollback,
-            InstallStatus.Uninstalling, InstallStatus.RollingBack,
-            is InstallStatus.WaitingForUser,
-            -> true
+    private fun isBusy(): Boolean = work.busy(appId)
 
-            else -> false
-        }
-
-    private fun runInstallFlow(
-        flow: Flow<InstallStatus>,
-        targetApp: AppProfile,
-        fromScratch: Boolean = false,
-    ) {
-        // captured before the flow runs, not after: installedVersion reflects the OLD device state
-        // right now, which is exactly what decides whether this is an install or an update
-        val action = if (installedVersion.value != null) ActivityAction.UPDATED else ActivityAction.INSTALLED
-        val installedArtifact = selectedArtifact.value
+    // each install or uninstall AppWork finishes: the page refreshes, and after an install says so where "Up to date."
+    // would be, once Android reports the new version, so "Install" never flashes up meanwhile
+    private fun settleWhenFinished() {
         viewModelScope.launch {
-            flow.collect { status ->
-                mutableInstallStatus.value = status
-                if (status is InstallStatus.Failed && !status.userCancelled) {
-                    recordActivity(targetApp, ActivityAction.FAILED, "$INSTALL_FAILURE_PREFIX ${status.reason}")
+            var seen = work.current(appId).finished?.serial
+            work
+                .state(appId)
+                .map { it.finished }
+                .distinctUntilChanged()
+                .collect { done ->
+                    if (done == null || done.serial == seen) return@collect
+                    seen = done.serial
+                    if (done.uninstalled) refresh() else settleAfterInstall(done.erasedData)
                 }
-                if (status is InstallStatus.Success) {
-                    // the downloaded apk is redundant once PackageInstaller has actually committed it -
-                    // not deleted on failure, since a retry reuses this same file instead of re-downloading
-                    readyDownload()?.let { artifactDownloader.deleteDownloadedFile(it.filePath) }
-                    activityLogRepository.clearFailures(targetApp.id)
-                    recordActivity(targetApp, action)
-                    // this is now genuinely what Krate installed, real fact overriding whatever
-                    // guess effectiveBaseline() would otherwise have made
-                    if (installedArtifact != null) {
-                        krateBaselineStore.recordInstall(targetApp.packageName, installedArtifact)
-                        // a rollback stays put: the build it stepped back from never comes back by itself
-                        val steppedBackFrom = targetApp.newerThanPicked(installedArtifact)
-                        if (steppedBackFrom != null) autoUpdateStore.skip(targetApp.id, steppedBackFrom.buildKey)
-                    }
-                    // only an app that was there (and so had settings) lost anything
-                    mutableRestorePending.value = fromScratch && action == ActivityAction.UPDATED
-                    settleAfterInstall()
-                }
-            }
         }
     }
 
-    // the page goes straight to its normal state for the app as it is now (Open, Reinstall), the success message
-    // standing in for "Up to date." - once Android reports the new install, so "Install" never flashes up meanwhile
-    private suspend fun settleAfterInstall() {
+    private suspend fun settleAfterInstall(erasedData: Boolean) {
         val before = installedVersion.value
         refresh()
         withTimeoutOrNull(SETTLE_TIMEOUT_MS) { installedVersion.first { it != null && it != before } }
         mutableJustInstalled.value = true
-        mutableDownloadStatus.value = DownloadStatus.Idle
-        mutableInstallStatus.value = InstallStatus.Idle
-    }
-
-    private suspend fun recordActivity(
-        targetApp: AppProfile,
-        action: ActivityAction,
-        detail: String? = null,
-    ) {
-        activityLogRepository.record(
-            ActivityEntry(
-                id = UUID.randomUUID().toString(),
-                appId = targetApp.id,
-                appName = targetApp.displayName,
-                action = action,
-                timestampMillis = System.currentTimeMillis(),
-                detail = detail,
-            ),
-        )
+        // only an app that was there (and so had settings) lost anything
+        mutableRestorePending.value = erasedData
+        work.setDownload(appId, DownloadStatus.Idle)
+        work.setInstall(appId, InstallStatus.Idle)
     }
 
     private companion object {

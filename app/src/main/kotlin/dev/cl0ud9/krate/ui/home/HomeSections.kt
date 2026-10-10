@@ -55,11 +55,17 @@ import dev.cl0ud9.krate.ui.components.AppIconAvatar
 import dev.cl0ud9.krate.ui.components.BusyButtonContent
 import dev.cl0ud9.krate.ui.components.StatTile
 import dev.cl0ud9.krate.ui.navigation.LocalLiquidGlass
+import dev.cl0ud9.krate.ui.navigation.SharedIconOrigin
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.navigation.heroGlow
+import dev.cl0ud9.krate.ui.navigation.hiddenWhileIconsFly
+import dev.cl0ud9.krate.ui.navigation.sharedAppIcon
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.pressScale
 import dev.cl0ud9.krate.ui.util.rememberDebouncedOnClick
+import dev.cl0ud9.krate.voice.KrateMemory
 import dev.cl0ud9.krate.voice.Moment
+import dev.cl0ud9.krate.voice.rememberCaughtUpLine
 import dev.cl0ud9.krate.voice.rememberKrateLine
 import kotlinx.coroutines.delay
 
@@ -113,10 +119,14 @@ internal fun StatusHeroCard(
     onCheckAgain: () -> Unit,
 ) {
     val upToDate = pendingUpdateCount == 0
+    // how long you've been all caught up, for the odd streak line
+    LaunchedEffect(pendingUpdateCount, checking) {
+        if (!checking) KrateMemory.notePending(pendingUpdateCount, System.currentTimeMillis())
+    }
     val (container, content, icon) = heroColors(upToDate)
     val action = if (upToDate) onCheckAgain else onViewUpdates
     Card(
-        modifier = Modifier.fillMaxWidth().homeTappable(ShapeCache.rounded28, action),
+        modifier = Modifier.fillMaxWidth().homeTappable(ShapeCache.rounded28, action).glassRim(ShapeCache.rounded28),
         shape = ShapeCache.rounded28,
         colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
     ) {
@@ -134,7 +144,7 @@ internal fun StatusHeroCard(
                 modifier = Modifier.size(36.dp),
             )
             Text(
-                text = rememberKrateLine(if (upToDate) Moment.ALL_CAUGHT_UP else Moment.UPDATES_WAITING),
+                text = if (upToDate) rememberCaughtUpLine() else rememberKrateLine(Moment.UPDATES_WAITING),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
@@ -181,7 +191,10 @@ internal fun YourAppsRow(
             TextButton(onClick = onSeeAll) { Text("See all") }
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(apps, key = { it.app.id }) { item -> AppTile(item = item, onClick = { onOpenApp(item.app.id) }) }
+            // a newly installed app slides its neighbours along instead of shoving them in one frame
+            items(apps, key = { it.app.id }) { item ->
+                AppTile(item = item, onClick = { onOpenApp(item.app.id) }, modifier = Modifier.animateItem())
+            }
         }
     }
 }
@@ -190,24 +203,28 @@ internal fun YourAppsRow(
 private fun AppTile(
     item: HomeApp,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier =
-            Modifier
+            modifier
                 .width(76.dp)
-                .homeTappable(ShapeCache.rounded16, onClick)
-                .padding(vertical = 6.dp),
+                .homeTappable(ShapeCache.rounded16) {
+                    SharedIconOrigin.tapped(item.app.id, "home")
+                    onClick()
+                }.padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box {
-            AppIconAvatar(app = item.app, size = APP_TILE_SIZE)
+            AppIconAvatar(app = item.app, size = APP_TILE_SIZE, modifier = Modifier.sharedAppIcon(item.app.id, "home"))
             if (item.hasUpdate) {
                 Box(
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
                             .offset(x = 2.dp, y = (-2).dp)
+                            .hiddenWhileIconsFly()
                             .size(14.dp)
                             .background(MaterialTheme.colorScheme.surface, CircleShape)
                             .padding(2.dp)

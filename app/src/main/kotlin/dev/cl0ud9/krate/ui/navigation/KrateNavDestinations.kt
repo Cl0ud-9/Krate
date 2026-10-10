@@ -11,10 +11,12 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.ui.apps.AddAppAction
 import dev.cl0ud9.krate.ui.apps.AppsScreen
 import dev.cl0ud9.krate.ui.apps.rememberAppsSubtitle
 import dev.cl0ud9.krate.ui.components.HomeChangelogAction
 import dev.cl0ud9.krate.ui.details.AppDetailsScreen
+import dev.cl0ud9.krate.ui.details.ShareAppAction
 import dev.cl0ud9.krate.ui.home.HomeScreen
 import dev.cl0ud9.krate.ui.settings.AboutPage
 import dev.cl0ud9.krate.ui.settings.AppearanceRoute
@@ -39,44 +41,53 @@ private const val APP_ID_ARG = "appId"
 internal fun NavGraphBuilder.tabDestinations(navController: NavHostController) {
     val openSettings = { navController.navigateFromTap(KrateDestination.SETTINGS.route) }
     composable(KrateDestination.HOME.route) { entry ->
-        TabScreen(
-            title = stringResource(KrateDestination.HOME.titleRes),
-            navController = navController,
-            entry = entry,
-            titleIcon = painterResource(R.drawable.ic_krate),
-            subtitle = rememberKrateGreeting(),
-            actions = {
-                HomeChangelogAction()
-                SettingsShortcutAction(onClick = openSettings)
-            },
-        ) {
-            HomeScreen(
-                onNavigateToApps = { navController.navigateToTab(KrateDestination.APPS.route) },
-                onNavigateToUpdates = { navController.navigateToTab(KrateDestination.UPDATES.route) },
-                onNavigateToApp = { appId -> navController.navigateFromTap("apps/$appId") },
-            )
+        WithNavAnimation(entry, navController) {
+            TabScreen(
+                title = stringResource(KrateDestination.HOME.titleRes),
+                navController = navController,
+                entry = entry,
+                titleIcon = painterResource(R.drawable.ic_krate),
+                subtitle = rememberKrateGreeting(),
+                actions = {
+                    HomeChangelogAction()
+                    SettingsShortcutAction(onClick = openSettings)
+                },
+            ) {
+                HomeScreen(
+                    onNavigateToApps = { navController.navigateToTab(KrateDestination.APPS.route) },
+                    onNavigateToUpdates = { navController.navigateToTab(KrateDestination.UPDATES.route) },
+                    onNavigateToApp = { appId -> navController.navigateFromTap("apps/$appId") },
+                )
+            }
         }
     }
     composable(KrateDestination.APPS.route) { entry ->
-        TabScreen(
-            title = stringResource(KrateDestination.APPS.titleRes),
-            navController = navController,
-            entry = entry,
-            subtitle = rememberAppsSubtitle(),
-            actions = { SettingsShortcutAction(onClick = openSettings) },
-        ) {
-            AppsScreen(onAppClick = { appId -> navController.navigateFromTap("apps/$appId") })
+        WithNavAnimation(entry, navController) {
+            TabScreen(
+                title = stringResource(KrateDestination.APPS.titleRes),
+                navController = navController,
+                entry = entry,
+                subtitle = rememberAppsSubtitle(),
+                actions = {
+                    AddAppAction(onOpenApp = { appId -> navController.navigateFromTap("apps/$appId") })
+                    SettingsShortcutAction(onClick = openSettings)
+                },
+            ) {
+                AppsScreen(onAppClick = { appId -> navController.navigateFromTap("apps/$appId") })
+            }
         }
     }
     composable(KrateDestination.UPDATES.route) { entry ->
-        TabScreen(
-            title = stringResource(KrateDestination.UPDATES.titleRes),
-            navController = navController,
-            entry = entry,
-            subtitle = rememberUpdatesSubtitle(),
-            actions = { SettingsShortcutAction(onClick = openSettings) },
-        ) {
-            UpdatesScreen(onAppClick = { appId -> navController.navigateFromTap("apps/$appId") })
+        WithNavAnimation(entry, navController) {
+            TabScreen(
+                title = stringResource(KrateDestination.UPDATES.titleRes),
+                navController = navController,
+                entry = entry,
+                subtitle = rememberUpdatesSubtitle(),
+                actions = { SettingsShortcutAction(onClick = openSettings) },
+            ) {
+                UpdatesScreen(onAppClick = { appId -> navController.navigateFromTap("apps/$appId") })
+            }
         }
     }
 }
@@ -178,19 +189,22 @@ internal fun NavGraphBuilder.appDetailsDestination(navController: NavHostControl
         popEnterTransition = { detailsPopEnterTransition() },
         popExitTransition = { detailsPopExitTransition() },
     ) { entry ->
-        val appId = entry.arguments?.getString(APP_ID_ARG).orEmpty()
-        DetailScreen(
-            title = "App Details",
-            navController = navController,
-            entry = entry,
-            onBack = { navController.popBackFromTap() },
-        ) { scrollState, topContentPadding ->
-            AppDetailsScreen(
-                appId = appId,
-                onNavigateToApp = { dependencyId -> navController.navigateFromTap("apps/$dependencyId") },
-                scrollState = scrollState,
-                topContentPadding = topContentPadding,
-            )
+        WithNavAnimation(entry, navController) {
+            val appId = entry.arguments?.getString(APP_ID_ARG).orEmpty()
+            DetailScreen(
+                title = "App details",
+                navController = navController,
+                entry = entry,
+                onBack = { navController.popBackFromTap() },
+                action = { ShareAppAction(appId) },
+            ) { scrollState, topContentPadding ->
+                AppDetailsScreen(
+                    appId = appId,
+                    onNavigateToApp = { dependencyId -> navController.navigateFromTap("apps/$dependencyId") },
+                    scrollState = scrollState,
+                    topContentPadding = topContentPadding,
+                )
+            }
         }
     }
 }

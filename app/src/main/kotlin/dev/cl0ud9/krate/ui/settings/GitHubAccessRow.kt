@@ -68,15 +68,15 @@ internal fun gitHubAccessSummary(
     status: InviteStatus,
     playful: Boolean,
 ): String {
-    if (!hasToken) return "Unlocks invite-only apps"
+    if (!hasToken) return "Unlocks invite-only apps."
     return when (status) {
         is InviteStatus.Open -> openSummary(status.appCount, playful)
         InviteStatus.Rejected ->
-            if (playful) "That key stopped fitting. Ask for a new one" else "The saved token isn't working"
+            if (playful) "That key stopped fitting. Ask for a new one." else "The saved token isn't working."
         InviteStatus.Unreachable ->
-            if (playful) "Token saved. GitHub isn't answering yet" else "Token saved, GitHub unreachable"
+            if (playful) "Token saved. GitHub isn't answering yet." else "Token saved, but GitHub can't be reached."
         InviteStatus.Checking -> "Checking your token..."
-        else -> if (playful) "Invite saved. Checking it on the next refresh" else "Token saved"
+        else -> if (playful) "Invite saved. Checking it on the next refresh." else "Token saved."
     }
 }
 
@@ -86,10 +86,10 @@ private fun openSummary(
 ): String {
     val apps = if (appCount == 1) "1 invite-only app" else "$appCount invite-only apps"
     return when {
-        appCount == 0 && playful -> "You're in. Nothing secret on the shelf yet"
-        appCount == 0 -> "Token works, no invite-only apps yet"
-        playful -> "You're in. $apps unlocked"
-        else -> "$apps unlocked"
+        appCount == 0 && playful -> "You're in. Nothing secret on the shelf yet."
+        appCount == 0 -> "Token works. No invite-only apps yet."
+        playful -> "You're in. $apps unlocked."
+        else -> "$apps unlocked."
     }
 }
 

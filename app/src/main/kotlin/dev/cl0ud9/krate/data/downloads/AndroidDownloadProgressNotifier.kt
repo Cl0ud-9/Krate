@@ -84,7 +84,7 @@ class AndroidDownloadProgressNotifier(
         } else {
             // total size unknown (server didn't report Content-Length) - shown as an indeterminate
             // bar with the raw byte count instead of a fabricated percentage
-            builder.setContentText("${bytesDownloaded / BYTES_PER_MB}MB downloaded").setProgress(0, 0, true)
+            builder.setContentText("${bytesDownloaded / BYTES_PER_MB} MB downloaded").setProgress(0, 0, true)
         }
         NotificationManagerCompat.from(context).notify(progressIdFor(appId), builder.build())
     }
@@ -132,6 +132,11 @@ class AndroidDownloadProgressNotifier(
     // cancelled, or the page went away mid-download: the notification goes with it
     override fun clear(appId: String) {
         if (appId in activeAppIds) finish(appId, result = null)
+    }
+
+    override fun dismiss(appId: String) {
+        finish(appId, result = null)
+        NotificationManagerCompat.from(context).cancel(resultIdFor(appId))
     }
 
     // the result takes the progress notification's place when Krate is in the background; on screen, the page

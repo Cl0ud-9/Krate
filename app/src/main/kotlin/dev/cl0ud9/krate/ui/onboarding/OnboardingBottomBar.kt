@@ -125,7 +125,7 @@ private fun StepLabel(
     ) { current ->
         if (current == 0) {
             Text(
-                text = "Let's Go!",
+                text = "Let's go",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,

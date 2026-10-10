@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -30,12 +31,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +48,8 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.ActivityAction
 import dev.cl0ud9.krate.domain.model.ActivityEntry
 import dev.cl0ud9.krate.domain.model.AppProfile
+import dev.cl0ud9.krate.domain.model.InstallationMode
+import dev.cl0ud9.krate.domain.model.SupportStatus
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateStatus
 import dev.cl0ud9.krate.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
@@ -56,15 +61,19 @@ import dev.cl0ud9.krate.ui.components.LocalIntroPlaying
 import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
 import dev.cl0ud9.krate.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.krate.ui.components.WhatsNewDialog
+import dev.cl0ud9.krate.ui.navigation.SharedIconOrigin
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.navigation.glassSource
+import dev.cl0ud9.krate.ui.navigation.hiddenWhileIconsFly
 import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
+import dev.cl0ud9.krate.ui.navigation.sharedAppIcon
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
 import dev.cl0ud9.krate.ui.util.formatRelativeTime
 import dev.cl0ud9.krate.ui.util.krateViewModel
 import dev.cl0ud9.krate.ui.util.rememberLastNonNull
-import dev.cl0ud9.krate.voice.KrateVoice
 import dev.cl0ud9.krate.voice.Moment
+import dev.cl0ud9.krate.voice.refreshFailedLine
 import dev.cl0ud9.krate.voice.rememberKrateLeadIn
 
 private const val MAX_ACTIVITY_ROWS = 5
@@ -118,15 +127,16 @@ fun HomeScreen(
         KratePullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refreshFromNetwork,
-            modifier = Modifier.fillMaxSize().glassSource(pageGlass),
+            modifier = Modifier.fillMaxSize().glassSource(pageGlass, MaterialTheme.colorScheme.background),
         ) {
             HomeContent(viewModel, onNavigateToApps, onNavigateToUpdates, onNavigateToApp)
         }
+        val context = LocalContext.current
         RefreshFailureSnackbar(
             refreshFailed = viewModel.refreshFailed,
             message = {
                 KrateMessage(
-                    headline = KrateVoice.line(Moment.REFRESH_FAILED),
+                    headline = refreshFailedLine(context),
                     detail = "Couldn't refresh, so this is what Krate saw last.",
                     icon = R.drawable.ic_cloud_off_rounded,
                     actionLabel = "Retry",
@@ -188,11 +198,15 @@ private fun HomeContent(
         )
 
         HomeAppear(order = 3) {
-            RecentActivitySection(
-                entries = recentActivity.take(MAX_ACTIVITY_ROWS),
-                appsById = homeApps.associate { it.app.id to it.app },
-                onOpenApp = onNavigateToApp,
-            )
+            Column {
+                // last week, looked back on once a new one starts; it brings its own gap, so none is left when it goes
+                WeekInReviewCard(modifier = Modifier.padding(bottom = HOME_SECTION_GAP))
+                RecentActivitySection(
+                    entries = recentActivity.take(MAX_ACTIVITY_ROWS),
+                    appsById = homeApps.associate { it.app.id to it.app },
+                    onOpenApp = onNavigateToApp,
+                )
+            }
         }
     }
 }
@@ -221,7 +235,7 @@ private fun RecentActivitySection(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(text = "Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
             shape = ShapeCache.rounded16,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         ) {
@@ -237,9 +251,10 @@ private fun RecentActivitySection(
                     modifier = Modifier.padding(16.dp),
                 )
             } else {
-                Column {
+                // a new entry arriving while Home is open (an automatic update, say) grows the card instead of jumping
+                Column(modifier = Modifier.animateContentSize()) {
                     entries.forEachIndexed { index, entry ->
-                        ActivityRow(entry = entry, app = appsById[entry.appId], onOpenApp = onOpenApp)
+                        key(entry.id) { ActivityRow(entry = entry, app = appsById[entry.appId], onOpenApp = onOpenApp) }
                         if (index != entries.lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 64.dp),
@@ -253,7 +268,8 @@ private fun RecentActivitySection(
     }
 }
 
-// the app's own icon with a small badge for what happened; tapping the row opens that app
+// the app's own icon with a small badge for what happened; tapping the row opens that app, or for one that has left
+// the Krate, the page saying so
 @Composable
 private fun ActivityRow(
     entry: ActivityEntry,
@@ -261,44 +277,19 @@ private fun ActivityRow(
     onOpenApp: (String) -> Unit,
 ) {
     val presentation = activityPresentation(entry.action)
+    val place = "activity-${entry.id}"
     val rowModifier =
-        if (app !=
-            null
-        ) {
-            Modifier.homeTappable(ShapeCache.rounded16) { onOpenApp(entry.appId) }
-        } else {
-            Modifier
+        Modifier.homeTappable(ShapeCache.rounded16) {
+            // a gone app's page has no icon to fly to
+            if (app != null) SharedIconOrigin.tapped(entry.appId, place)
+            onOpenApp(entry.appId)
         }
     Row(
         modifier = Modifier.fillMaxWidth().then(rowModifier).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Box(modifier = Modifier.size(44.dp)) {
-            if (app != null) {
-                AppIconAvatar(app = app, size = 44.dp)
-            } else {
-                Box(modifier = Modifier.fillMaxSize().clip(ShapeCache.rounded12).background(presentation.badgeColor))
-            }
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .offset(x = 4.dp, y = 4.dp)
-                        .size(22.dp)
-                        .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape)
-                        .padding(2.dp)
-                        .background(presentation.badgeColor, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    presentation.icon,
-                    contentDescription = null,
-                    tint = presentation.onBadgeColor,
-                    modifier = Modifier.size(12.dp),
-                )
-            }
-        }
+        ActivityIcon(entry, app, presentation, place)
         Column(modifier = Modifier.weight(1f)) {
             Text(text = entry.appName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             Text(
@@ -316,6 +307,58 @@ private fun ActivityRow(
         )
     }
 }
+
+// the app's icon, or a plain tile for an app no longer in the catalog, with what happened as a badge on its corner
+@Composable
+private fun ActivityIcon(
+    entry: ActivityEntry,
+    app: AppProfile?,
+    presentation: ActivityPresentation,
+    place: String,
+) {
+    Box(modifier = Modifier.size(44.dp)) {
+        if (app != null) {
+            AppIconAvatar(app = app, size = 44.dp, modifier = Modifier.sharedAppIcon(app.id, place))
+        } else {
+            // an app that has since left Krate: its own icon while it's still on the phone, else its initial, the same
+            // as any app without an icon, never an empty tile
+            AppIconAvatar(app = remember(entry.id) { goneApp(entry) }, size = 44.dp)
+        }
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 4.dp, y = 4.dp)
+                    .hiddenWhileIconsFly()
+                    .size(22.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape)
+                    .padding(2.dp)
+                    .background(presentation.badgeColor, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                presentation.icon,
+                contentDescription = null,
+                tint = presentation.onBadgeColor,
+                modifier = Modifier.size(12.dp),
+            )
+        }
+    }
+}
+
+// just enough of an app for its avatar: the name for its initial, the package for its icon if it's still installed
+private fun goneApp(entry: ActivityEntry): AppProfile =
+    AppProfile(
+        id = entry.appId,
+        displayName = entry.appName,
+        packageName = entry.packageName.orEmpty(),
+        supportStatus = SupportStatus.SUPPORTED,
+        installationMode = InstallationMode.UPDATE,
+        dependencyIds = emptyList(),
+        releaseNotes = null,
+        enabled = true,
+        artifacts = emptyList(),
+    )
 
 private data class ActivityPresentation(
     val icon: Painter,

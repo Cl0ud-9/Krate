@@ -52,7 +52,7 @@ object UpdateNotifier {
         val notifications = context.getSystemService(NotificationManager::class.java)
         val channel =
             NotificationChannel(CHANNEL_ID, "Updates", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Notifies about app updates, Krate updates, and Update All results"
+                description = "Notifies about app updates, Krate updates, and Update all results"
             }
         notifications?.createNotificationChannel(channel)
     }

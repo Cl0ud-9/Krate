@@ -24,12 +24,16 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.platform.selfupdate.PlayProtect
 import dev.cl0ud9.krate.ui.components.ButtonRow
 import dev.cl0ud9.krate.ui.components.SectionHeader
+import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
-// Play Protect was paused to update Krate: once the update is in (or was given up on), ask for it back on until
-// the user has done it or says they have
+// Play Protect was paused to update Krate or install an app: once that's in (or was given up on), ask for it back on
+// until the user has done it or says they have. [onlyFor] keeps an app's page to its own reminder
 @Composable
-internal fun PlayProtectReminder() {
+internal fun PlayProtectReminder(
+    modifier: Modifier = Modifier,
+    onlyFor: String? = null,
+) {
     val context = LocalContext.current
     var checks by remember { mutableIntStateOf(0) }
     // re-read on every return to Krate, so coming back from Play Protect's screen settles it
@@ -37,10 +41,15 @@ internal fun PlayProtectReminder() {
         checks++
         onPauseOrDispose { }
     }
-    val due = remember(checks) { PlayProtect.reminderDue(context) }
+    val changes = PlayProtect.changes.intValue
+    val due =
+        remember(checks, changes) {
+            PlayProtect.reminderDue(context) && (onlyFor == null || PlayProtect.pausedForPackage(context) == onlyFor)
+        }
     if (!due) return
+    val pausedFor = remember(checks, changes) { PlayProtect.pausedForApp(context) }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
@@ -53,8 +62,8 @@ internal fun PlayProtectReminder() {
             )
             Text(
                 text =
-                    "You paused Play Protect to update Krate. Switching Scan apps with Play Protect back on keeps " +
-                        "it checking the apps you install.",
+                    "You paused Play Protect to ${pausedFor?.let { "install $it" } ?: "update Krate"}. Switching " +
+                        "Scan apps with Play Protect back on keeps it checking the apps you install.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

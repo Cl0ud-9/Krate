@@ -18,4 +18,6 @@ data class ActivityEntry(
     val action: ActivityAction,
     val timestampMillis: Long,
     val detail: String? = null,
+    // so a row whose app has since left Krate can still show it: its own icon while it's on the phone
+    val packageName: String? = null,
 )
