@@ -23,7 +23,9 @@ interface ArtifactDownloader {
     // manual purge for Settings - also catches anything deleteDownloadedFile missed (a download that
     // was never followed by a successful install: abandoned, or from a build before this existed).
     // Returns bytes freed, so the UI can confirm what actually happened.
-    fun clearCache(): Long
+    // frees what's stored, except files a download or an install still under way is using (and any in [keep], by path);
+    // returns the bytes freed
+    fun clearCache(keep: Set<String> = emptySet()): Long
 
     // a verified download for this exact app+version already sitting on disk from earlier - lets a
     // fresh AppDetailsViewModel (a plain revisit of the screen, not just process death: navigating

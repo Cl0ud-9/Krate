@@ -11,8 +11,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -20,7 +18,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -32,7 +29,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -61,8 +57,6 @@ internal val PageIconSize = 56.dp
 
 private const val ICON_DAMPING = 0.82f
 
-// the bar at the top of a page once it has collapsed, under which the page's icon is out of sight
-private val CollapsedBarHeight = 64.dp
 private const val ICON_STIFFNESS = 380f
 private const val BADGE_RETURN_MS = 180
 private const val BADGE_RETURN_SCALE = 0.6f
@@ -162,6 +156,18 @@ internal fun Modifier.sharedAppIcon(
                 if (home) BackFlight.launch(key)
             }
         }
+        // a very quick swipe can have the page "entering" for less than a frame, so the flight also goes when it's
+        // back on top after being covered: only then, so a row drawn again under an open page never launches one
+        LaunchedEffect(key) {
+            var covered = false
+            snapshotFlow { trip.onTop.value }.collect { onTop ->
+                if (!onTop) {
+                    covered = true
+                } else if (covered) {
+                    BackFlight.launch(key)
+                }
+            }
+        }
     }
     return onGloballyPositioned { coordinates ->
         BackFlight.rows[key] = coordinates
@@ -180,28 +186,17 @@ internal fun Modifier.sharedDetailsIcon(app: AppProfile): Modifier {
     val place = remember(app.id) { SharedIconOrigin.take(app.id) } ?: return this
     val key = iconKey(app.id, place)
     val trip = LocalPageTrip.current
-    // scrolled up under the bar, the icon has nowhere to fly from: going back, it would drop in from the top of the
-    // screen. Out of sight it simply waits in its row instead
-    var inSight by remember { mutableStateOf(true) }
+    // always armed, wherever the icon has scrolled to: whether it can fly is decided when the page goes, from where
+    // the icon is by then, not from where it happened to be a frame earlier. Dragging the page shrinks and moves it,
+    // so an icon tucked under the bar used to arm only on a slow drag and not at all on a quick one
     val armed = remember(key) { BackFlight.Armed(key, app) }
-    DisposableEffect(armed, inSight) {
-        if (inSight) {
-            BackFlight.armed = armed
-        } else if (BackFlight.armed === armed) {
-            BackFlight.armed = null
-        }
+    DisposableEffect(armed) {
+        BackFlight.armed = armed
         onDispose { if (BackFlight.armed === armed) BackFlight.armed = null }
     }
-    val density = LocalDensity.current
-    val barBottom = with(density) { CollapsedBarHeight.toPx() } + WindowInsets.statusBars.getTop(density)
-    val watched =
-        onGloballyPositioned { coordinates ->
-            armed.from = coordinates
-            val bounds = coordinates.boundsInWindow()
-            val seen = (bounds.top + bounds.bottom) / 2 > barBottom
-            if (seen != inSight) inSight = seen
-        }.graphicsLayer { alpha = if (BackFlight.flying?.key == key) 0f else 1f }
-    return if (inSight) watched.sharedIconFor(key) { trip?.leaving?.value != true } else watched
+    return onGloballyPositioned { coordinates -> armed.from = coordinates }
+        .graphicsLayer { alpha = if (BackFlight.flying?.key == key) 0f else 1f }
+        .sharedIconFor(key) { trip?.leaving?.value != true }
 }
 
 // a shared element only on the way in: [linked] is false for a trip back, which BackFlight flies instead

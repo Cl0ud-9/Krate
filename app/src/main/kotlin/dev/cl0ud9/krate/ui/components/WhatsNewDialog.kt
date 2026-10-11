@@ -38,7 +38,6 @@ fun WhatsNewDialog(
             )
         },
         footer = {
-            Spacer(modifier = Modifier.weight(1f))
             Button(onClick = onDismiss, shape = ShapeCache.rounded16) {
                 Icon(
                     painterResource(R.drawable.ic_arrow_forward_rounded),

@@ -56,6 +56,8 @@ class SettingsViewModel(
     private val krateBaselineStore: KrateBaselineStore,
     // copies of old apks kept around a reinstall from scratch, cleared along with the download cache
     private val rollbackStore: RollbackStore,
+    // the apks an install is reading right now: clearing the cache leaves them be
+    private val filesInUse: () -> Set<String>,
     // what the saved token got from the invite-only catalog, shown under GitHub access
     val inviteStatus: StateFlow<InviteStatus>,
 ) : ViewModel() {
@@ -253,7 +255,11 @@ class SettingsViewModel(
     // download, or a leftover from a build before that cleanup existed
     fun clearCache() {
         viewModelScope.launch {
-            val bytesFreed = withContext(Dispatchers.IO) { artifactDownloader.clearCache() + rollbackStore.clearAll() }
+            val bytesFreed =
+                withContext(Dispatchers.IO) {
+                    artifactDownloader.clearCache(filesInUse()) +
+                        rollbackStore.clearAll()
+                }
             mutableCacheClearedMessage.value =
                 if (bytesFreed > 0) "Freed ${formatMb(bytesFreed)}." else "Cache is already empty."
         }

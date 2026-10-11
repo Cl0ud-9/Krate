@@ -54,6 +54,13 @@ internal object BackFlight {
         val from: Rect,
     )
 
+    // an icon that had scrolled up under the page's bar starts just under the tab's header instead, which clips it, so
+    // it slides out from beneath the header rather than dropping in from above the screen or not flying at all
+    private fun startingAtMostJustUnderHeader(bounds: Rect): Rect {
+        val top = (IconFlight.panelTop - bounds.height).coerceAtLeast(0f)
+        return if (bounds.top >= top) bounds else bounds.translate(0f, top - bounds.top)
+    }
+
     // the page is going for good: the icon leaves the card from wherever it is now
     fun launch(key: String) {
         val armed = armed?.takeIf { it.key == key } ?: return
@@ -62,6 +69,7 @@ internal object BackFlight {
                 ?.takeIf { it.isAttached }
                 ?.boundsInWindow()
                 ?.takeIf { it.width > 0f }
+                ?.let(::startingAtMostJustUnderHeader)
         this.armed = null
         if (from != null && flying == null) flying = Flying(key, armed.app, from)
     }

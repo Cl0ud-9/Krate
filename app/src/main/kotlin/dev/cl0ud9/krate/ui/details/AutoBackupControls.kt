@@ -80,7 +80,9 @@ internal fun AutoBackupPanel(
                 return@Column
             }
             PanelText(panelText(state, saved?.savedAtMillis))
-            if (state !is AutoBackupState.Running) {
+            if (state is AutoBackupState.Running) {
+                ButtonRow { StopButton() }
+            } else {
                 ButtonRow {
                     if (saved != null) {
                         TextButton(
@@ -116,6 +118,12 @@ internal fun TurnOnAutoBackup(
     }
 }
 
+// ends what the helper is doing; it stops tapping at once and says it was stopped
+@Composable
+internal fun StopButton() {
+    TextButton(onClick = { AutoBackupRunner.cancel() }) { Text("Stop") }
+}
+
 @Composable
 internal fun PanelText(text: String) {
     Text(
@@ -148,4 +156,6 @@ internal fun runningText(mode: BackupMode): String =
         BackupMode.SAVE -> "Backing up. Krate is going through the app's backup screen..."
         BackupMode.RESTORE -> "Putting your settings back..."
         BackupMode.APPLY -> "Applying Krate's picks. Krate is going through the app's settings..."
+        BackupMode.LINK -> "Opening the app and tapping it through for you..."
+        BackupMode.OPEN_LINKS -> "Switching those links on in Android's settings..."
     }

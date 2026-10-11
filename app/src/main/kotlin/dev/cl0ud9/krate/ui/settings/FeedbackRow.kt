@@ -79,6 +79,7 @@ internal fun rememberSettingsViewModel(): SettingsViewModel =
             container.activityLogRepository,
             container.krateBaselineStore,
             container.rollbackStore,
+            container.appWork::filesInUse,
             container.privateCatalogSource.status,
         )
     }

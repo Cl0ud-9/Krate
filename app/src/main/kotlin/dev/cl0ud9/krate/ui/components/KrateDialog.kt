@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,14 +23,15 @@ import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
-// Krate's dialog: a headline block, an optional detail block, and a footer row of actions
+// Krate's dialog: a headline block, an optional detail block, and a footer row of actions that sit side by side when
+// they fit and stack when they don't
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KrateDialog(
     header: KrateDialogHeader,
     onDismissRequest: () -> Unit,
     detail: (@Composable ColumnScope.() -> Unit)? = null,
-    footer: @Composable RowScope.() -> Unit,
+    footer: @Composable () -> Unit,
 ) {
     BasicAlertDialog(onDismissRequest = onDismissRequest) {
         Surface(

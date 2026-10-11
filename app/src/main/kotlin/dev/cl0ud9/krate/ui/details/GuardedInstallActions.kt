@@ -2,7 +2,6 @@ package dev.cl0ud9.krate.ui.details
 
 import android.content.Context
 import android.content.Intent
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material3.Button
@@ -14,7 +13,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import dev.cl0ud9.krate.domain.model.AppProfile
@@ -116,7 +114,6 @@ private fun BackupFirstDialog(
                     TextButton(onClick = { startSafely(context, intent, null) }) { Text("Open app") }
                 }
             }
-            Spacer(modifier = Modifier.weight(1f))
             Button(onClick = onContinue) { Text("Continue") }
         },
     )
@@ -159,7 +156,6 @@ private fun AutoBackupFirstDialog(
         footer = {
             if (!running) {
                 TextButton(onClick = onContinue) { Text(if (failed != null) "Go ahead anyway" else "Skip") }
-                Spacer(modifier = Modifier.weight(1f))
                 Button(onClick = { started = AutoBackupRunner.save(app.packageName, spec) }) {
                     Text(if (failed != null) "Try again" else "Back up and continue")
                 }
@@ -184,10 +180,17 @@ internal fun openStep(
     startSafely(context, intent, fallbackIntent(app.packageName, step))
 }
 
+// the app's own launcher entry, or for one without an icon the screen the catalog names; null when there's neither
 internal fun launchIntent(
     context: Context,
     app: AppProfile,
-): Intent? = context.packageManager.getLaunchIntentForPackage(app.packageName)
+): Intent? {
+    val manager = context.packageManager
+    return manager.getLaunchIntentForPackage(app.packageName)
+        ?: app.openActivity
+            ?.let { Intent().setClassName(app.packageName, it) }
+            ?.takeIf { it.resolveActivity(manager) != null }
+}
 
 // some phones leave out a settings screen; the more general one still gets the person most of the way
 internal fun startSafely(

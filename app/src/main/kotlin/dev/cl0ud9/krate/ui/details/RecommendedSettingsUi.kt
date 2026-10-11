@@ -1,34 +1,31 @@
 package dev.cl0ud9.krate.ui.details
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.os.Build
-import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.domain.model.AppGuide
 import dev.cl0ud9.krate.domain.model.AppProfile
-import dev.cl0ud9.krate.domain.model.AutoBackup
 import dev.cl0ud9.krate.domain.model.RecommendedSettings
-import dev.cl0ud9.krate.platform.backup.AutoBackupRunner
 import dev.cl0ud9.krate.platform.backup.AutoBackupState
 import dev.cl0ud9.krate.platform.backup.RecommendedChoice
 import dev.cl0ud9.krate.platform.backup.RecommendedMarks
+import dev.cl0ud9.krate.ui.components.ActionSheet
 import dev.cl0ud9.krate.ui.components.ButtonRow
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
@@ -102,7 +99,11 @@ internal fun recommendedSubtitle(
     }
 }
 
-// what the picks change, and Krate applying them over the app's own settings, or a copy to paste by hand
+// how many of the picks the sheet lists before "Show all"
+internal const val PREVIEW_PICKS = 3
+
+// what the picks change, kept short; and Krate applying them over the app's own settings, with a copy to paste by hand
+// for anyone who'd rather. The buttons stay in view whatever the font size
 @Composable
 internal fun RecommendedSheet(
     app: AppProfile,
@@ -110,119 +111,79 @@ internal fun RecommendedSheet(
     recommended: RecommendedSettings,
     onDismiss: () -> Unit,
 ) {
-    SetupSheet(title = "Recommended settings", onDismiss = onDismiss) {
+    val context = LocalContext.current
+    val spec = guide.autoBackup
+    val helperOn = rememberAutoBackupOn()
+    val state = autoBackupStateFor(app.packageName)
+    val choice = rememberRecommendedChoice(app, recommended)
+    var restrictedHelp by rememberSaveable { mutableStateOf(false) }
+    var byHand by rememberSaveable { mutableStateOf(spec == null) }
+    val running = state is AutoBackupState.Running
+    val actions: (@Composable () -> Unit)? =
+        when {
+            running -> {
+                { StopButton() }
+            }
+            spec == null -> {
+                { ByHandActions(app, recommended) }
+            }
+            !helperOn -> {
+                { TurnOnActions(restrictedHelp) { restrictedHelp = !restrictedHelp } }
+            }
+            else -> {
+                {
+                    ApplyActions(
+                        ApplyPlan(app, spec, recommended, choice, canUndo(context, app, choice, state)),
+                        onDismiss,
+                    )
+                }
+            }
+        }
+    ActionSheet(title = "Recommended settings", onDismiss = onDismiss, actions = actions) {
         Text(
             text =
-                "Krate's picks for ${app.displayName}. Applying them adds these to the settings you have now: " +
-                    "anything else you've changed stays as it is, and your current settings are saved first, so " +
-                    "you can put them back.",
+                "Krate's picks for ${app.displayName}, added to your settings. Anything else you've changed stays as " +
+                    "it is, and yours are saved first, so Undo can put them back.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        recommended.summary.forEach { line ->
+        PicksList(recommended.summary)
+        if (spec != null) {
+            Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    PanelText(if (helperOn) applyText(state, choice) else HELPER_OFF_TEXT)
+                    if (!helperOn && restrictedHelp) RestrictedHelpText(context)
+                }
+            }
+            TextButton(onClick = {
+                byHand = !byHand
+            }) { Text(if (byHand) "Hide the by-hand way" else "Prefer to paste them yourself?") }
+        }
+        if (byHand) ByHandText(guide)
+    }
+}
+
+private const val HELPER_OFF_TEXT =
+    "Krate opens the app's Import / Export screen and applies them for you, the same way it makes backups. It needs " +
+        "Android's accessibility access, and only uses it while it runs."
+
+// the first few picks, the rest a tap away
+@Composable
+private fun PicksList(summary: List<String>) {
+    var all by rememberSaveable { mutableStateOf(false) }
+    val shown = if (all) summary else summary.take(PREVIEW_PICKS)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        shown.forEach { line ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(text = "•", color = MaterialTheme.colorScheme.primary)
+                Text(text = "\u2022", color = MaterialTheme.colorScheme.primary)
                 Text(text = line, style = MaterialTheme.typography.bodyMedium)
             }
         }
-        guide.autoBackup?.let { spec ->
-            ApplyPanel(app = app, spec = spec, recommended = recommended, onKeepOwn = onDismiss)
+        if (summary.size > PREVIEW_PICKS) {
+            TextButton(onClick = { all = !all }) { Text(if (all) "Show fewer" else "Show all ${summary.size}") }
         }
-        ByHandPanel(app = app, guide = guide, recommended = recommended)
-    }
-}
-
-// Krate applying them itself, through the same helper as automatic backups
-@Composable
-private fun ApplyPanel(
-    app: AppProfile,
-    spec: AutoBackup,
-    recommended: RecommendedSettings,
-    onKeepOwn: () -> Unit,
-) {
-    val context = LocalContext.current
-    val on = rememberAutoBackupOn()
-    val state = autoBackupStateFor(app.packageName)
-    val choice = rememberRecommendedChoice(app, recommended)
-    Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.secondaryContainer) {
-        Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Apply them for you",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-            if (!on) {
-                TurnOnAutoBackup(
-                    "Krate opens the app's Import / Export screen and applies them for you, the same way it makes " +
-                        "backups. It needs Android's accessibility access, and only uses it while it runs.",
-                )
-                return@Column
-            }
-            PanelText(applyText(state, choice))
-            if (state is AutoBackupState.Running) return@Column
-            ButtonRow {
-                if (canUndo(context, app, choice, state)) {
-                    TextButton(onClick = {
-                        // back to the settings they had, so this set counts as turned down
-                        if (AutoBackupRunner.restore(context, app.packageName, spec)) {
-                            RecommendedMarks.keptOwn(context, app.packageName, recommended.revision)
-                        }
-                    }) { Text("Undo") }
-                } else if (choice != RecommendedChoice.APPLIED && choice != RecommendedChoice.KEPT_OWN) {
-                    TextButton(onClick = {
-                        RecommendedMarks.keptOwn(context, app.packageName, recommended.revision)
-                        onKeepOwn()
-                    }) { Text("Keep mine") }
-                }
-                Button(onClick = { AutoBackupRunner.applyRecommended(app.packageName, spec, recommended) }) {
-                    Text(if (choice == RecommendedChoice.APPLIED) "Apply again" else "Apply")
-                }
-            }
-        }
-    }
-}
-
-// the picks to paste in the app's own Import / Export box, with the catch spelled out: pasted on their own, they
-// replace what's there
-@Composable
-private fun ByHandPanel(
-    app: AppProfile,
-    guide: AppGuide,
-    recommended: RecommendedSettings,
-) {
-    val context = LocalContext.current
-    Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = if (guide.autoBackup != null) "Or by hand" else "How",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text =
-                    "Copy them and paste them into the app's Import / Export box" +
-                        guide.settingsWhere?.let { " (in $it)" }.orEmpty() + ". Pasted on their own, they replace " +
-                        "what's in that box, so anything you've changed that isn't on the list goes back to its " +
-                        "default.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ButtonRow {
-                OpenAppTonal(app)
-                FilledTonalButton(onClick = { copyPicks(context, app, recommended) }) { Text("Copy") }
-            }
-        }
-    }
-}
-
-private fun copyPicks(
-    context: Context,
-    app: AppProfile,
-    recommended: RecommendedSettings,
-) {
-    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
-    clipboard.setPrimaryClip(ClipData.newPlainText("${app.displayName} recommended settings", recommended.text))
-    // Android 13 and later confirm a copy on their own
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        Toast.makeText(context, "Copied Krate's picks for ${app.displayName}", Toast.LENGTH_SHORT).show()
     }
 }

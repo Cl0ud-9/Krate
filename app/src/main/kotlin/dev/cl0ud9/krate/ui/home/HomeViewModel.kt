@@ -13,6 +13,8 @@ import dev.cl0ud9.krate.domain.repository.ActivityLogRepository
 import dev.cl0ud9.krate.domain.repository.AnnouncementDismissalStore
 import dev.cl0ud9.krate.domain.repository.CatalogRepository
 import dev.cl0ud9.krate.domain.repository.KrateBaselineStore
+import dev.cl0ud9.krate.domain.suggest.Suggestion
+import dev.cl0ud9.krate.domain.suggest.pickSuggestion
 import dev.cl0ud9.krate.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.krate.platform.packageinfo.isUpdateAvailable
 import dev.cl0ud9.krate.platform.selfupdate.KrateRelease
@@ -21,6 +23,7 @@ import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateChecker
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateStatus
 import dev.cl0ud9.krate.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.krate.platform.selfupdate.WhatsNewTracker
+import dev.cl0ud9.krate.platform.suggest.SuggestionStore
 import dev.cl0ud9.krate.ui.util.withMinimumDuration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -94,6 +97,26 @@ class HomeViewModel(
         }.flowOn(Dispatchers.IO)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
+    // the one app worth a mention: what fits what's on the phone, or what just joined the shelf. Worked out here, on
+    // the phone, from the catalog and the apps installed; nothing about either is sent anywhere
+    val suggestion: StateFlow<Suggestion?> =
+        combine(homeApps, SuggestionStore.memory) { apps, memory ->
+            val installed = apps.filter { it.installed }.mapTo(mutableSetOf()) { it.app.packageName }
+            // apps outside the catalog that make a suggestion a better fit (the ones it names), if they're installed
+            val companions =
+                apps
+                    .flatMap { it.app.suggestWhenInstalled }
+                    .filter { installedPackageReader.installedVersion(it) != null }
+            pickSuggestion(
+                apps = apps.map { it.app },
+                installed = installed + companions,
+                memory = memory,
+                nowMillis = System.currentTimeMillis(),
+                labelOf = installedPackageReader::labelOf,
+            )
+        }.flowOn(Dispatchers.IO)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
     val pendingUpdateCount: StateFlow<Int> =
         homeApps
             .map { apps -> apps.count { it.hasUpdate } }
@@ -137,6 +160,13 @@ class HomeViewModel(
         // it never spams GitHub's API. Silently does nothing for UpToDate/NoReleasePublished/Failed -
         // this is only for the genuinely actionable case
         showWhatsNewAfterUpdate()
+        // the shelf as it first stands isn't "new", and an app that goes on the phone stops being one
+        viewModelScope.launch {
+            homeApps.collect { apps ->
+                SuggestionStore.noteShelf(apps.filter { it.app.pitch != null }.mapTo(mutableSetOf()) { it.app.id })
+                SuggestionStore.noteInstalled(apps.filter { it.installed }.mapTo(mutableSetOf()) { it.app.id })
+            }
+        }
         viewModelScope.launch {
             val status = runCatching { krateUpdateChecker.check() }.getOrNull()
             if (status is KrateUpdateStatus.UpdateAvailable) {

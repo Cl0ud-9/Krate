@@ -9,6 +9,7 @@ import dev.cl0ud9.krate.security.apk.ApkArchiveReader
 import dev.cl0ud9.krate.security.hash.hashesMatch
 import dev.cl0ud9.krate.security.hash.sha256Hex
 import dev.cl0ud9.krate.voice.KrateMemory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -22,10 +23,16 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 private const val STREAM_BUFFER_SIZE = 8192
 private const val PROGRESS_EMIT_INTERVAL_BYTES = 256 * 1024L
+
+// a download gets a second go only when its file was cleared underneath it
+private const val ATTEMPTS = 2
+private const val CLEARED_MESSAGE =
+    "That download was cleared from the phone before it finished. Tap to start it again."
 private const val HTTP_PARTIAL_CONTENT = 206
 private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
@@ -65,6 +72,9 @@ class OkHttpArtifactDownloader(
     private val httpClient: OkHttpClient = downloadHttpClient(),
     private val retryDelaysMs: List<Long> = DEFAULT_RETRY_DELAYS_MS,
 ) : ArtifactDownloader {
+    // the files a download is working on right now, so clearing the cache leaves them alone
+    private val active: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
     override fun download(
         app: AppProfile,
         artifact: ArtifactInfo,
@@ -77,46 +87,106 @@ class OkHttpArtifactDownloader(
                 )
                 return@flow
             }
-
             downloadsDir.mkdirs()
             val fileId = fileIdFor(app, artifact)
-            val partFile = File(downloadsDir, "$fileId.apk.part")
-            val readyFile = File(downloadsDir, "$fileId.apk")
-
-            val preflightFailure = checkStoragePreflight(artifact, token)
-            if (preflightFailure != null) {
-                emit(DownloadStatus.Failed(preflightFailure))
-                return@flow
+            active += fileId
+            try {
+                fetch(app, artifact, token, fileId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (
+                @Suppress("TooGenericExceptionCaught") exception: Exception,
+            ) {
+                // whatever went wrong, it ends as a message on the app, never as the app closing
+                emit(DownloadStatus.Failed(unexpectedFailure(exception)))
+            } finally {
+                active -= fileId
             }
-
-            val downloadFailure = runDownload(artifact, token, partFile, this)
-            if (downloadFailure != null) {
-                emit(DownloadStatus.Failed(downloadFailure))
-                return@flow
-            }
-
-            emit(DownloadStatus.Verifying)
-            val verificationFailure = verify(artifact, app.packageName, partFile)
-            if (verificationFailure != null) {
-                partFile.delete()
-                emit(DownloadStatus.Failed(verificationFailure))
-                return@flow
-            }
-
-            partFile.copyTo(readyFile, overwrite = true)
-            partFile.delete()
-            KrateMemory.noteVerified()
-            emit(DownloadStatus.ReadyToInstall(readyFile.absolutePath))
         }.flowOn(Dispatchers.IO)
+
+    // from the first byte to a verified file ready to install. If the file disappears while it's being worked on (the
+    // phone's own "Clear cache", say), it starts again once, and only then gives up with a plain explanation
+    private suspend fun FlowCollector<DownloadStatus>.fetch(
+        app: AppProfile,
+        artifact: ArtifactInfo,
+        token: String?,
+        fileId: String,
+    ) {
+        val partFile = File(downloadsDir, "$fileId.apk.part")
+        val readyFile = File(downloadsDir, "$fileId.apk")
+        val storageProblem = checkStoragePreflight(artifact, token)
+        if (storageProblem != null) {
+            emit(DownloadStatus.Failed(storageProblem))
+            return
+        }
+        var outcome = Outcome.CLEARED
+        var attempt = 0
+        while (outcome == Outcome.CLEARED && attempt < ATTEMPTS) {
+            if (attempt > 0) emit(DownloadStatus.Downloading(0L, null))
+            outcome = attemptOnce(app, artifact, token, partFile, readyFile)
+            attempt++
+        }
+        if (outcome == Outcome.CLEARED) emit(DownloadStatus.Failed(CLEARED_MESSAGE))
+    }
+
+    // how an attempt ended: settled (ready, or failed with its reason already said), or its file went missing
+    private enum class Outcome { SETTLED, CLEARED }
+
+    private suspend fun FlowCollector<DownloadStatus>.attemptOnce(
+        app: AppProfile,
+        artifact: ArtifactInfo,
+        token: String?,
+        partFile: File,
+        readyFile: File,
+    ): Outcome {
+        val downloadFailure = runDownload(artifact, token, partFile, this)
+        if (downloadFailure != null) {
+            emit(DownloadStatus.Failed(downloadFailure))
+            return Outcome.SETTLED
+        }
+        emit(DownloadStatus.Verifying)
+        val check = runCatching { verify(artifact, app.packageName, partFile) }
+        // a file that couldn't be read is a file that's gone; any other failure to check is never taken as a pass
+        check.exceptionOrNull()?.let { if (it !is IOException) throw it }
+        val rejection = check.getOrNull()
+        return when {
+            check.isFailure || !partFile.exists() -> Outcome.CLEARED
+            rejection != null -> {
+                partFile.delete()
+                emit(DownloadStatus.Failed(rejection))
+                Outcome.SETTLED
+            }
+            runCatching { partFile.copyTo(readyFile, overwrite = true) }.isFailure -> Outcome.CLEARED
+            else -> {
+                partFile.delete()
+                KrateMemory.noteVerified()
+                emit(DownloadStatus.ReadyToInstall(readyFile.absolutePath))
+                Outcome.SETTLED
+            }
+        }
+    }
+
+    // plain words for the unexpected, never an exception's own text, which can carry file paths
+    private fun unexpectedFailure(exception: Exception): String =
+        if (exception is IOException) {
+            "Something got in the way of the download. Try again."
+        } else {
+            "The download didn't finish. Try again."
+        }
 
     override fun deleteDownloadedFile(filePath: String) {
         File(filePath).delete()
     }
 
-    override fun clearCache(): Long {
+    override fun clearCache(keep: Set<String>): Long {
         val files = downloadsDir.listFiles() ?: return 0L
-        return files.sumOf { file -> file.length().also { file.delete() } }
+        return files
+            .filterNot { file -> file.absolutePath in keep || file.name.fileId() in active }
+            .sumOf { file -> file.length().also { file.delete() } }
     }
+
+    // "<id>.apk" and "<id>.apk.part" are both the download <id>
+    private fun String.fileId(): String = removeSuffix(".part").removeSuffix(".apk")
 
     override fun existingReadyFile(
         app: AppProfile,

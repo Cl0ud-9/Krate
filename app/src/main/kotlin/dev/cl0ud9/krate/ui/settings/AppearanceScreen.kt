@@ -33,6 +33,7 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.LaunchTab
 import dev.cl0ud9.krate.domain.model.NavBarStyle
 import dev.cl0ud9.krate.domain.model.ThemeMode
+import dev.cl0ud9.krate.platform.suggest.SuggestionStore
 import dev.cl0ud9.krate.ui.components.KrateSheet
 import dev.cl0ud9.krate.ui.navigation.keptOutOfGlassFade
 import dev.cl0ud9.krate.ui.navigation.rememberGlassToggle
@@ -250,11 +251,13 @@ private fun LaunchTab.iconRes(): Int =
         LaunchTab.UPDATES -> R.drawable.ic_nav_update_filled
     }
 
-// how Krate talks: its one-liners, and with them festival greetings and the week in review on Home
+// how Krate talks: its one-liners, and with them festival greetings and the week in review on Home; and whether it
+// puts apps forward
 @Composable
 private fun PersonalityRows() {
     SettingsSectionLabel("Personality")
     val context = LocalContext.current
+    val suggestions by SuggestionStore.memory.collectAsStateWithLifecycle()
     SettingSwitchRow(
         item =
             SettingItem(
@@ -264,7 +267,19 @@ private fun PersonalityRows() {
                     "plain.",
             ),
         checked = KrateVoice.playful,
-        shape = settingsGroupShape(0, 1),
+        shape = settingsGroupShape(0, 2),
         onCheckedChange = { KrateVoice.setPlayful(context, it) },
+    )
+    SettingSwitchRow(
+        item =
+            SettingItem(
+                painterResource(R.drawable.ic_campaign_rounded),
+                "Suggest apps",
+                "Now and then, Krate points out an app from its shelf that might suit you. It only looks at your " +
+                    "apps on this phone, and nothing leaves it.",
+            ),
+        checked = suggestions.enabled,
+        shape = settingsGroupShape(1, 2),
+        onCheckedChange = { SuggestionStore.setEnabled(it) },
     )
 }

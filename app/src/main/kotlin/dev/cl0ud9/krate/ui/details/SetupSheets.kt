@@ -5,16 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.domain.model.AppGuide
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.platform.backup.AppBackups
-import dev.cl0ud9.krate.ui.components.KrateSheet
+import dev.cl0ud9.krate.ui.components.ActionSheet
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
 // the settings worth knowing about, where they are, and a way into the app to change them
@@ -125,29 +121,11 @@ internal fun relativeTime(millis: Long): String {
     return DateUtils.getRelativeTimeSpanString(millis, now, DateUtils.MINUTE_IN_MILLIS).toString().lowercase()
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// the details page's sheets share one frame: a title, content that scrolls, and actions kept in view when there are any
 @Composable
 internal fun SetupSheet(
     title: String,
     onDismiss: () -> Unit,
+    actions: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
-) {
-    KrateSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 16.dp)
-                    .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(text = title, style = MaterialTheme.typography.titleLarge)
-            content()
-        }
-    }
-}
+) = ActionSheet(title = title, onDismiss = onDismiss, actions = actions) { content() }

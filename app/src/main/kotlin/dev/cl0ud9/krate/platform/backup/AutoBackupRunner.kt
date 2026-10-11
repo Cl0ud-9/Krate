@@ -21,6 +21,12 @@ enum class BackupMode {
 
     // the catalog's recommended settings laid over the app's own, after keeping a copy of the app's own
     APPLY,
+
+    // a link opened inside the app, and the button it asks for tapped
+    LINK,
+
+    // an app's addresses switched on in Android's "Open by default" page, which is Settings' own screen
+    OPEN_LINKS,
 }
 
 // where a backup or restore Krate runs by itself stands; one at a time, for one app
@@ -51,15 +57,26 @@ sealed interface AutoBackupState {
 }
 
 // what the accessibility helper is asked to do
+internal const val SETTINGS_PACKAGE = "com.android.settings"
+
 internal data class AutoBackupJob(
     val packageName: String,
     val spec: AutoBackup,
     val mode: BackupMode,
+    // for a link: where to go, and the label of the button to tap once the app asks
+    val link: String? = null,
+    val confirm: String? = null,
+    // for OPEN_LINKS: the addresses to switch on
+    val hosts: List<String> = emptyList(),
     // the text to put back, for a restore; the recommended settings, for applying them
     val text: String? = null,
     // which set of recommended settings, so it's remembered as applied
     val revision: String? = null,
-)
+) {
+    // the app whose screens the job works in: the app itself, or Settings for its Open by default page
+    val watched: String
+        get() = if (mode == BackupMode.OPEN_LINKS) SETTINGS_PACKAGE else packageName
+}
 
 // starts a backup or restore through Krate's accessibility helper and reports how it went. The helper only acts
 // while a job runs, and only inside the app it's for
@@ -120,12 +137,17 @@ object AutoBackupRunner {
         return true
     }
 
+    // stops the job going on now, if any; the helper stops tapping at once
+    fun cancel() {
+        KrateBackupService.running?.interrupt()
+    }
+
     // the result has been shown, so the next look at this app starts clean
     fun acknowledge() {
         if (mutableState.value !is AutoBackupState.Running) mutableState.value = AutoBackupState.Idle
     }
 
-    private fun start(job: AutoBackupJob): Boolean {
+    internal fun start(job: AutoBackupJob): Boolean {
         val service = KrateBackupService.running?.takeIf { mutableState.value !is AutoBackupState.Running }
         service?.let {
             mutableState.value = AutoBackupState.Running(job.packageName, job.mode)
@@ -137,4 +159,28 @@ object AutoBackupRunner {
     internal fun finish(result: AutoBackupState) {
         mutableState.value = result
     }
+}
+
+// the jobs that go through an app's own screens rather than its backup box: a link opened inside it, and its addresses
+// ticked in Android's Open by default page
+object AutoLinks {
+    // opens [link] inside the app and taps [confirm] when it asks, for a step like "add the store"; false when the
+    // helper isn't running or a job is already going
+    fun confirmLink(
+        packageName: String,
+        link: String,
+        confirm: String,
+    ): Boolean =
+        AutoBackupRunner.start(
+            AutoBackupJob(packageName, EMPTY_SPEC, BackupMode.LINK, link = link, confirm = confirm),
+        )
+
+    // switches [hosts] on for the app in Android's Open by default page; false when the helper isn't running or a job
+    // is already going
+    fun openLinks(
+        packageName: String,
+        hosts: List<String>,
+    ): Boolean = AutoBackupRunner.start(AutoBackupJob(packageName, EMPTY_SPEC, BackupMode.OPEN_LINKS, hosts = hosts))
+
+    private val EMPTY_SPEC = AutoBackup(emptyList(), "", "")
 }

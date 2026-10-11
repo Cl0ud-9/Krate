@@ -197,6 +197,9 @@ private fun HomeContent(
             onNavigateToApp = onNavigateToApp,
         )
 
+        // one app worth a look; folds away when there's none, and brings no gap of its own
+        HomeSuggestion(viewModel = viewModel, onNavigateToApp = onNavigateToApp)
+
         HomeAppear(order = 3) {
             Column {
                 // last week, looked back on once a new one starts; it brings its own gap, so none is left when it goes

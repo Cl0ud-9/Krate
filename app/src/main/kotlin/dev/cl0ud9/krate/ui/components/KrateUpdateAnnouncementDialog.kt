@@ -3,7 +3,6 @@ package dev.cl0ud9.krate.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -108,7 +107,7 @@ internal fun ReleaseNotesHint(
 }
 
 @Composable
-private fun RowScope.UpdateFooter(
+private fun UpdateFooter(
     status: KrateUpdateStatus.UpdateAvailable,
     selfUpdateState: SelfUpdateState?,
     onUpdate: (String) -> Unit,
@@ -119,7 +118,6 @@ private fun RowScope.UpdateFooter(
         val uriHandler = LocalUriHandler.current
         if (downloadUrl != null) HelperText(PLAY_PROTECT_HEADS_UP, modifier = Modifier.fillMaxWidth())
         TextButton(onClick = onDismiss) { Text("Later") }
-        Spacer(modifier = Modifier.weight(1f))
         Button(
             onClick = { if (downloadUrl != null) onUpdate(downloadUrl) else uriHandler.openUri(status.releaseUrl) },
             shape = ShapeCache.rounded16,

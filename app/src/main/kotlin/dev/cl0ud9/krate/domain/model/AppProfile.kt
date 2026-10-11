@@ -48,6 +48,16 @@ data class AppProfile(
     val highlights: List<String> = emptyList(),
     // setup steps, settings tips and backup steps; absent from older catalogs and for apps that need none
     val guide: AppGuide? = null,
+    // for an app with no launcher icon, the screen its Open button goes to instead (an activity's full class name)
+    val openActivity: String? = null,
+    // the web addresses the app is meant to open, when it should be the one that does
+    val openLinks: dev.cl0ud9.krate.domain.links.OpenLinks? = null,
+    // a warm line on what the app does for someone, for suggestions; an app without one is never suggested
+    val pitch: String? = null,
+    // what it helps with ("Music", "Storage"), which the Apps tab can sort by
+    val needs: List<String> = emptyList(),
+    // packages that make it a better fit when they're on the phone, so a suggestion can say why
+    val suggestWhenInstalled: List<String> = emptyList(),
     // owner/repo for an app someone tracks themselves; null for the catalog's own apps
     val trackedRepo: String? = null,
     // the site a tracked app comes from, as Forge's id (github, codeberg, gitlab)

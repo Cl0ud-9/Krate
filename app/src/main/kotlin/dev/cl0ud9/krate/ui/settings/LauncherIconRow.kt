@@ -3,10 +3,8 @@ package dev.cl0ud9.krate.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
@@ -90,9 +88,7 @@ private fun HideIconDialog(
         onDismissRequest = onDismiss,
         detail = { HiddenIconSteps() },
         footer = {
-            Spacer(modifier = Modifier.weight(1f))
             TextButton(onClick = onDismiss) { Text("Keep it") }
-            Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = onConfirm, shape = ShapeCache.rounded16) { Text("Hide icon") }
         },
     )

@@ -8,14 +8,11 @@ import dev.cl0ud9.krate.domain.model.ArtifactInfo
 import dev.cl0ud9.krate.domain.model.AutoBackup
 import dev.cl0ud9.krate.domain.model.DeviceProfile
 import dev.cl0ud9.krate.domain.model.InstallationMode
-import dev.cl0ud9.krate.domain.model.RecommendedSettings
 import dev.cl0ud9.krate.domain.model.SetupKind
 import dev.cl0ud9.krate.domain.model.SetupStep
 import dev.cl0ud9.krate.domain.model.SupportStatus
 import dev.cl0ud9.krate.domain.model.UiTarget
-import dev.cl0ud9.krate.domain.settings.SettingsText
 import kotlinx.serialization.Serializable
-import java.security.MessageDigest
 import java.time.Instant
 
 // mirrors the real output of catalog/scripts/generate_manifest.py, section 9 of the spec. Every
@@ -66,6 +63,17 @@ data class ManifestAppDto(
     val description: String? = null,
     val highlights: List<String> = emptyList(),
     val guide: ManifestGuideDto? = null,
+    val pitch: String? = null,
+    val needs: List<String> = emptyList(),
+    val suggestWhenInstalled: List<String> = emptyList(),
+    val openActivity: String? = null,
+    val openLinks: ManifestOpenLinksDto? = null,
+)
+
+@Serializable
+data class ManifestOpenLinksDto(
+    val hosts: List<String> = emptyList(),
+    val unlessInstalled: Map<String, String> = emptyMap(),
 )
 
 @Serializable
@@ -77,6 +85,20 @@ data class ManifestGuideDto(
     val restore: String? = null,
     val autoBackup: ManifestAutoBackupDto? = null,
     val recommended: ManifestRecommendedDto? = null,
+    val walkthrough: List<ManifestWalkStepDto> = emptyList(),
+)
+
+@Serializable
+data class ManifestWalkStepDto(
+    val title: String = "",
+    val detail: String = "",
+    val copy: String? = null,
+    val copyLabel: String? = null,
+    val link: String? = null,
+    val linkLabel: String? = null,
+    val inApp: Boolean = false,
+    val confirm: String? = null,
+    val openApp: Boolean = false,
 )
 
 // settings the catalog recommends: the text exactly as the app exports it, and a line for each thing it changes
@@ -124,19 +146,8 @@ fun ManifestGuideDto.toDomain(): AppGuide =
         restore = restore,
         autoBackup = autoBackup?.toDomain(),
         recommended = recommended?.toDomain(),
+        walkthrough = walkthrough.mapNotNull { it.toDomain() },
     )
-
-// left out unless the settings read as JSON with at least one setting in them, and say what they change
-private fun ManifestRecommendedDto.toDomain(): RecommendedSettings? =
-    SettingsText.parse(settings)?.takeIf { it.isNotEmpty() && summary.isNotEmpty() }?.let { parsed ->
-        // the settings themselves, not their spacing, decide the revision
-        val canonical = SettingsText.write(parsed, braces = true)
-        val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
-        val revision = digest.take(REVISION_BYTES).joinToString("") { "%02x".format(it) }
-        RecommendedSettings(settings.trim(), summary, revision)
-    }
-
-private const val REVISION_BYTES = 8
 
 // left out unless it's complete: every step names something, and both buttons are there
 private fun ManifestAutoBackupDto.toDomain(): AutoBackup? =
@@ -169,6 +180,10 @@ fun ManifestArtifactDto.fitsDevice(device: DeviceProfile): Boolean =
     (minSdk == null || device.sdkInt >= minSdk) &&
         (maxSdk == null || device.sdkInt <= maxSdk) &&
         (abis.isEmpty() || abis.any { it in device.supportedAbis })
+
+// the builds of one release for different processors are one build to a person: the first that fits, which the catalog
+// lists in its order of preference, stands for them all
+private fun ManifestArtifactDto.sameBuild(): List<String?> = listOf(versionName, buildId, label, patchesVersionName)
 
 fun ManifestArtifactDto.toDomain(): ArtifactInfo =
     ArtifactInfo(
@@ -204,11 +219,16 @@ fun ManifestAppDto.toDomain(device: DeviceProfile): AppProfile? {
         dependencyIds = dependencyIds,
         releaseNotes = releaseNotes,
         enabled = enabled,
-        artifacts = artifacts.filter { it.fitsDevice(device) }.map { it.toDomain() },
+        artifacts = artifacts.filter { it.fitsDevice(device) }.distinctBy { it.sameBuild() }.map { it.toDomain() },
         iconPng = iconPng,
         description = description,
         highlights = highlights,
         guide = guide?.toDomain()?.takeUnless { it.isEmpty },
+        openActivity = openActivity?.trim()?.takeIf { it.isNotEmpty() },
+        openLinks = openLinks?.toDomain(),
+        pitch = pitch?.trim()?.takeIf { it.isNotEmpty() },
+        needs = needs.map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+        suggestWhenInstalled = suggestWhenInstalled.filter { it.isNotBlank() },
     )
 }
 

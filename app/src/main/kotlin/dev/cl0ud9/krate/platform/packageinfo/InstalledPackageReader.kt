@@ -19,6 +19,9 @@ data class InstalledVersion(
 
 interface InstalledPackageReader {
     fun installedVersion(packageName: String): InstalledVersion?
+
+    // the name its launcher shows for it, for saying "because you have X"
+    fun labelOf(packageName: String): String? = null
 }
 
 // true when the catalog's latest is newer than the effective baseline (see

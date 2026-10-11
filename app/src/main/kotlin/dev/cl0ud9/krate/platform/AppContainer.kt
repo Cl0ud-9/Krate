@@ -79,9 +79,16 @@ class AppContainer(
             supportedAbis,
         )
     val settingsRepository: SettingsRepository = DataStoreSettingsRepository(context.applicationContext)
+
+    init {
+        // an earlier build kept downloads in the cache; none can be in flight as the app starts, so they go
+        runCatching { File(context.applicationContext.cacheDir, "downloads").deleteRecursively() }
+    }
+
     val artifactDownloader: ArtifactDownloader =
         OkHttpArtifactDownloader(
-            downloadsDir = File(context.applicationContext.cacheDir, "downloads"),
+            // kept out of the cache, so Android's own "Clear cache" can't pull a download out from under itself
+            downloadsDir = File(context.applicationContext.filesDir, "downloads"),
             archiveReader = PackageManagerApkArchiveReader(context.applicationContext),
             credentialStore = githubCredentialStore,
         )

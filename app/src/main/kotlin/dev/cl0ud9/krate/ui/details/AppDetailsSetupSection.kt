@@ -18,14 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -41,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -67,8 +62,7 @@ import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.tappableRow
 
-private const val DIVIDER_ALPHA = 0.5f
-private val BADGE = 26.dp
+internal val BADGE = 26.dp
 private const val DONE_LIST_MS = 250
 
 // once an app is installed: what's still to switch on, each a tap away and ticked off as Android reports it, then
@@ -79,6 +73,7 @@ internal fun SetupCard(
     app: AppProfile,
     guide: AppGuide,
     restorePending: Boolean,
+    justInstalled: Boolean = false,
 ) {
     val context = LocalContext.current
     val marks = remember(context) { SetupMarks(context) }
@@ -124,6 +119,10 @@ internal fun SetupCard(
             }
             if (recommendedOpen && recommended != null) {
                 RecommendedSheet(app, guide, recommended, onDismiss = { recommendedOpen = false })
+            }
+            // right after the app first goes on, once; not when its own settings are being put back
+            if (justInstalled && !restorePending) {
+                InstallPrompts(app, guide, recommended, onOpenSheet = { recommendedOpen = true })
             }
             StepList(app = app, rows = rows, onMark = onMark)
             // once, under the steps, while one Android may hold back is still to do
@@ -307,84 +306,6 @@ private fun DoneBadge() {
         tint = MaterialTheme.colorScheme.tertiary,
         modifier = Modifier.size(BADGE),
     )
-}
-
-// the settings worth knowing and how to keep them, each a row that opens its own sheet
-@Composable
-private fun MoreRows(
-    app: AppProfile,
-    guide: AppGuide,
-    divided: Boolean,
-    onRecommended: () -> Unit,
-) {
-    var tips by rememberSaveable { mutableStateOf(false) }
-    var keep by rememberSaveable { mutableStateOf(false) }
-    val backup = guide.backup
-    val recommended = guide.recommended
-    if (guide.tips.isEmpty() && backup == null && recommended == null) return
-    if (divided) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = DIVIDER_ALPHA))
-    Column {
-        if (recommended != null) {
-            SheetRow(
-                icon = rememberVectorPainter(Icons.Filled.AutoAwesome),
-                title = "Recommended settings",
-                subtitle = recommendedSubtitle(app, recommended),
-                onClick = onRecommended,
-            )
-        }
-        if (guide.tips.isNotEmpty()) {
-            SheetRow(
-                icon = rememberVectorPainter(Icons.Filled.Lightbulb),
-                title = "Settings worth a look",
-                subtitle = guide.settingsWhere?.let { "In $it" } ?: "${guide.tips.size} tips",
-                onClick = { tips = true },
-            )
-        }
-        if (backup != null) {
-            SheetRow(
-                icon = rememberVectorPainter(Icons.Filled.SettingsBackupRestore),
-                title = "Keep your settings",
-                subtitle = keepSubtitle(app, guide),
-                onClick = { keep = true },
-            )
-        }
-    }
-    if (tips) TipsSheet(app = app, guide = guide, onDismiss = { tips = false })
-    if (keep && backup != null) KeepSettingsSheet(app = app, guide = guide, onDismiss = { keep = false })
-}
-
-@Composable
-private fun SheetRow(
-    icon: Painter,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().tappableRow(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(BADGE),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.titleSmall)
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Icon(
-            painterResource(R.drawable.ic_chevron_right_rounded),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }
 
 // one step as shown: its number, what Android reports, and whether it's ticked by hand

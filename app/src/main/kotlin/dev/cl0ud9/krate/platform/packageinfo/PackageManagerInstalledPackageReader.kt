@@ -19,4 +19,10 @@ class PackageManagerInstalledPackageReader(
                     signerSha256 = runCatching { it.signingInfo?.identitySha256() }.getOrNull(),
                 )
             }
+
+    override fun labelOf(packageName: String): String? =
+        runCatching {
+            val manager = context.packageManager
+            manager.getApplicationLabel(manager.getApplicationInfo(packageName, 0)).toString()
+        }.getOrNull()?.takeIf { it.isNotBlank() }
 }

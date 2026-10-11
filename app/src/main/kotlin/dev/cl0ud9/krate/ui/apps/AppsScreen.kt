@@ -177,6 +177,8 @@ private fun AppsList(
 ) {
     val listShownAt = rememberListShownAt()
     var adding by rememberSaveable { mutableStateOf(false) }
+    val filter = rememberNeedFilter(state.apps)
+    val shownApps = filter.shown
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp).plusBottom(LocalNavBarClearance.current),
@@ -189,6 +191,8 @@ private fun AppsList(
                 onRefresh = viewModel::refreshFromNetwork,
             )
         }
+
+        if (filter.needs.isNotEmpty()) item(key = "need-chips") { NeedChips(filter, Modifier.animateItem()) }
 
         // until the header's "+" has been found: the two ways to get an app that isn't here
         if (!KrateMemory.addHintDone) {
@@ -204,7 +208,7 @@ private fun AppsList(
             }
         }
 
-        itemsIndexed(state.apps, key = { _, app -> app.id }) { index, app ->
+        itemsIndexed(shownApps, key = { _, app -> app.id }) { index, app ->
             StaggeredAppear(index = index, listShownAt = listShownAt, modifier = Modifier.animateItem()) {
                 AppListItem(
                     app = app,
@@ -219,7 +223,7 @@ private fun AppsList(
         }
         item(key = "suggest") {
             StaggeredAppear(
-                index = state.apps.size,
+                index = shownApps.size,
                 listShownAt = listShownAt,
                 modifier = Modifier.animateItem(),
             ) {

@@ -439,6 +439,15 @@ def app_text(app):
         # what the app is for, in a line, and a few of the things it does
         "description": app.get("description"),
         "highlights": app.get("highlights", []),
+        # a warm line on what it does for someone, what it helps with, and the apps that make it a better fit (shown in
+        # Krate's suggestions)
+        "pitch": app.get("pitch"),
+        # for an app with no launcher icon, the screen its Open button goes to
+        "openActivity": app.get("openActivity"),
+        # the web addresses it should open, and ones it only takes while another app is absent
+        "openLinks": app.get("openLinks"),
+        "needs": app.get("needs", []),
+        "suggestWhenInstalled": app.get("suggestWhenInstalled", []),
     }
     # what it needs after installing, the settings worth knowing and how to back them up (shown in Krate's setup card)
     if app.get("guide"):

@@ -72,8 +72,8 @@ import dev.cl0ud9.krate.ui.util.krateViewModel
 import dev.cl0ud9.krate.ui.util.rememberDebouncedOnClick
 
 // how the setup and auto-update cards arrive and leave: unfolding, never a jump
-private val CardIn = fadeIn() + expandVertically()
-private val CardOut = fadeOut() + shrinkVertically()
+internal val CardIn = fadeIn() + expandVertically()
+internal val CardOut = fadeOut() + shrinkVertically()
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -358,13 +358,7 @@ private fun AppDetailsContent(
             )
 
             // what it needs switched on, and its settings, right under the action once it's installed
-            // both fold away as an uninstall starts and unfold after an install, instead of the page jumping
-            val guide = app.guide
-            val onPhone = state.installed != null && !uninstalling
-            AnimatedVisibility(visible = onPhone && guide != null, enter = CardIn, exit = CardOut) {
-                guide?.let { SetupCard(app = app, guide = it, restorePending = state.restorePending) }
-            }
-            AnimatedVisibility(visible = onPhone, enter = CardIn, exit = CardOut) { AutoUpdateCard(state) }
+            InstalledCards(app = app, state = state, uninstalling = uninstalling)
 
             // Play Protect was paused for this app: once it's in, ask for it back on right here
             PlayProtectReminder(onlyFor = app.packageName)

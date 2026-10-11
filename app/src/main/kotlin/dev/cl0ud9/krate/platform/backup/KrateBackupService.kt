@@ -5,6 +5,7 @@ import android.accessibilityservice.GestureDescription
 import android.content.Intent
 import android.graphics.Path
 import android.graphics.Rect
+import android.net.Uri
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -12,12 +13,19 @@ import android.widget.Toast
 import dev.cl0ud9.krate.KrateActivity
 import dev.cl0ud9.krate.domain.model.UiTarget
 import dev.cl0ud9.krate.domain.settings.SettingsText
+import dev.cl0ud9.krate.platform.links.OpenByDefault
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 private const val LAUNCH_SETTLE_MS = 2_500L
 private const val STEP_SETTLE_MS = 900L
@@ -55,6 +63,19 @@ private class WalkResult(
     val appSaid: String? = null,
 )
 
+// the longest a whole job may take before it's given up on, whatever it's stuck on
+private const val JOB_TIMEOUT_MS = 120_000L
+
+// system screens that can appear over the app being worked in (a permission question, say) without the person having
+// gone anywhere
+private val OVERLAY_PACKAGES =
+    setOf("android", SYSTEM_UI, "com.google.android.permissioncontroller", "com.android.permissioncontroller")
+
+private const val STOPPED = "Stopped when you left the app, so it may not have finished. Nothing else was touched."
+
+// the person went somewhere else (home, another app, back to Krate) while the helper was working
+private class Interrupted : Exception()
+
 // a step that couldn't be found, named for the message shown afterwards
 private class StepNotFound(
     val step: String,
@@ -76,10 +97,27 @@ class KrateBackupService : AccessibilityService() {
     private var jobPackage: String? = null
     private var appMessage: String? = null
 
+    // the job running now, and whether the helper has reached the app it's working in yet. After that, Krate's own
+    // window coming up means the person came back, and the helper stops at once
+    private var current: Job? = null
+    private var reachedApp = false
+    private var interrupted = false
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType != AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) return
-        // a notification carries its own data; a short on-screen message carries none. Android draws an app's short
-        // messages in its system interface, which may be reported as their sender
+        when (event?.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> noteWindow(event.packageName?.toString())
+            AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED -> noteMessage(event)
+        }
+    }
+
+    private fun noteWindow(sender: String?) {
+        if (sender == jobPackage) reachedApp = true
+        if (reachedApp && sender == packageName && jobPackage != null) interrupt()
+    }
+
+    // a notification carries its own data; a short on-screen message carries none. Android draws an app's short
+    // messages in its system interface, which may be reported as their sender
+    private fun noteMessage(event: AccessibilityEvent) {
         val sender = event.packageName?.toString()
         val fromApp = sender == jobPackage || (sender == SYSTEM_UI && event.className == Toast::class.java.name)
         if (jobPackage == null || !fromApp || event.parcelableData != null) return
@@ -96,44 +134,147 @@ class KrateBackupService : AccessibilityService() {
 
     override fun onDestroy() {
         if (running === this) running = null
+        // a job cut off by the helper going away must not leave Krate saying it's still working
+        if (current?.isActive == true) AutoBackupRunner.finish(AutoBackupState.Idle)
         scope.cancel()
         super.onDestroy()
     }
 
+    // stops the job now: no more taps, no Back presses, and no pulling the person back to Krate
+    internal fun interrupt() {
+        if (current?.isActive != true) return
+        interrupted = true
+        current?.cancel()
+    }
+
     internal fun run(job: AutoBackupJob) {
-        scope.launch {
-            val result =
-                try {
-                    listenTo(job.packageName)
-                    jobPackage = job.packageName
-                    val walked = walk(job)
-                    val text = walked.text
-                    if (!text.isNullOrBlank()) AppBackups.save(this@KrateBackupService, job.packageName, text)
-                    if (job.mode == BackupMode.APPLY) {
-                        job.revision?.let { RecommendedMarks.applied(this@KrateBackupService, job.packageName, it) }
-                    }
-                    AutoBackupState.Done(
-                        job.packageName,
-                        job.mode,
-                        nothingToSave = job.mode == BackupMode.SAVE && text.isNullOrBlank(),
-                        changed = walked.changed,
-                        appSaid = walked.appSaid,
-                    )
-                } catch (missing: StepNotFound) {
-                    AutoBackupState.Failed(job.packageName, job.mode, "Couldn't find \"${missing.step}\" in the app.")
-                } catch (failure: IllegalStateException) {
-                    AutoBackupState.Failed(job.packageName, job.mode, failure.message ?: "Something got in the way.")
-                }
-            jobPackage = null
-            leave(job.packageName)
-            listenTo(packageName)
+        interrupted = false
+        reachedApp = false
+        current = scope.launch { runJob(job) }
+    }
+
+    private suspend fun runJob(job: AutoBackupJob) {
+        val result = outcomeOf(job)
+        jobPackage = null
+        listenTo(packageName)
+        // someone who has gone elsewhere is left where they are: no Back presses in their other app, no being pulled
+        // back here
+        if (interrupted) {
             AutoBackupRunner.finish(result)
-            returnToKrate()
+            return
+        }
+        withContext(NonCancellable) { leave(job.watched) }
+        AutoBackupRunner.finish(result)
+        returnToKrate()
+    }
+
+    // how the job ended, whatever happened: done, or why not. An interruption is not an error; it's the person leaving
+    private suspend fun outcomeOf(job: AutoBackupJob): AutoBackupState {
+        val stopped = AutoBackupState.Failed(job.packageName, job.mode, STOPPED)
+        return try {
+            listenTo(job.watched)
+            jobPackage = job.watched
+            finished(job, withTimeout(JOB_TIMEOUT_MS) { walk(job) })
+        } catch (_: TimeoutCancellationException) {
+            AutoBackupState.Failed(job.packageName, job.mode, "That took too long, so Krate stopped.")
+        } catch (_: Interrupted) {
+            interrupted = true
+            stopped
+        } catch (_: CancellationException) {
+            stopped
+        } catch (missing: StepNotFound) {
+            AutoBackupState.Failed(job.packageName, job.mode, "Couldn't find \"${missing.step}\" in the app.")
+        } catch (failure: IllegalStateException) {
+            AutoBackupState.Failed(job.packageName, job.mode, failure.message ?: "Something got in the way.")
         }
     }
 
+    // what a finished walk leaves behind: the text saved, the picks remembered as applied, and the result to show
+    private fun finished(
+        job: AutoBackupJob,
+        walked: WalkResult,
+    ): AutoBackupState {
+        val text = walked.text
+        if (!text.isNullOrBlank()) AppBackups.save(this, job.packageName, text)
+        if (job.mode == BackupMode.APPLY) job.revision?.let { RecommendedMarks.applied(this, job.packageName, it) }
+        return AutoBackupState.Done(
+            job.packageName,
+            job.mode,
+            nothingToSave = job.mode == BackupMode.SAVE && text.isNullOrBlank(),
+            changed = walked.changed,
+            appSaid = walked.appSaid,
+        )
+    }
+
+    // Android's "Open by default" page for the app, the wanted addresses ticked in its "Add link" box, then Add. Only
+    // the
+    // addresses asked for are touched, and one the page doesn't list (already on, or not the app's) is simply skipped
+    private suspend fun openLinks(job: AutoBackupJob): WalkResult {
+        if (job.hosts.isEmpty()) error("There were no links to switch on.")
+        val opened = runCatching { startActivity(OpenByDefault.intent(job.packageName)) }.isSuccess
+        if (!opened) error("This phone has no Open by default page Krate can reach.")
+        delay(LAUNCH_SETTLE_MS)
+        tap(job.watched, UiTarget(text = "Add link"))
+        delay(STEP_SETTLE_MS)
+        val ticked = job.hosts.count { host -> tickHost(job.watched, host) }
+        if (ticked == 0) error("Couldn't find those links on the page.")
+        tap(job.watched, UiTarget(text = "Add"))
+        delay(STEP_SETTLE_MS)
+        return WalkResult(changed = ticked)
+    }
+
+    // the row whose label starts with the address (a note naming the app that has it now can follow it), tapped
+    private fun tickHost(
+        watched: String,
+        host: String,
+    ): Boolean {
+        val row =
+            appWindows(watched)
+                .flatMap { root ->
+                    root.findAll { node ->
+                        node.text
+                            ?.toString()
+                            ?.trim()
+                            ?.lowercase()
+                            ?.startsWith(host) == true
+                    }
+                }.firstOrNull() ?: return false
+        val clickable = row.clickableSelfOrAncestor()
+        if (clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) != true) tapOnScreen(watched, row)
+        return true
+    }
+
+    // opens the link inside the app (and only that app), then taps the button it asks for. It worked when the button's
+    // gone afterwards; a button still there means the app didn't take it
+    private suspend fun confirmLink(job: AutoBackupJob): WalkResult {
+        val link = job.link ?: error("There was no link to open.")
+        val confirm = job.confirm ?: error("There was nothing to tap.")
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link)).setPackage(job.packageName)
+        if (!runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) {
+            error("This version of the app can't take that link. Update it first.")
+        }
+        delay(LAUNCH_SETTLE_MS)
+        val target = UiTarget(text = confirm)
+        // the app's own screen can carry a button with the same label as the one it asks about, so it's the count that
+        // tells: one fewer once the question has been answered
+        val before = appWindows(job.packageName).sumOf { root -> root.matchCount(target) }
+        tap(job.packageName, target)
+        delay(STEP_SETTLE_MS * 2)
+        val after = appWindows(job.packageName).sumOf { root -> root.matchCount(target) }
+        check(after < before) { "The app is still asking. Tap $confirm in it yourself." }
+        return WalkResult()
+    }
+
     // from the app's first screen to its backup box; the text read out, for a backup
-    private suspend fun walk(job: AutoBackupJob): WalkResult {
+    private suspend fun walk(job: AutoBackupJob): WalkResult =
+        when (job.mode) {
+            BackupMode.LINK -> confirmLink(job)
+            BackupMode.OPEN_LINKS -> openLinks(job)
+            else -> walkBackupBox(job)
+        }
+
+    // from the app's first screen to its backup box, for a backup, a restore or applying picks
+    private suspend fun walkBackupBox(job: AutoBackupJob): WalkResult {
         val launch =
             packageManager.getLaunchIntentForPackage(job.packageName)
                 ?: error("The app isn't installed.")
@@ -154,6 +295,8 @@ class KrateBackupService : AccessibilityService() {
             }
             BackupMode.RESTORE -> WalkResult(appSaid = paste(job, field, job.text.orEmpty()))
             BackupMode.APPLY -> applyRecommended(job, field, boxText)
+            // these two never come through the backup box
+            BackupMode.LINK, BackupMode.OPEN_LINKS -> WalkResult()
         }
     }
 
@@ -218,6 +361,7 @@ class KrateBackupService : AccessibilityService() {
         while (node == null && dismissals > 0) {
             node = waitFor(packageName, DIALOG_CHECK_MS) { root -> root.match(target) }
             if (node == null) {
+                stillThere(packageName)
                 performGlobalAction(GLOBAL_ACTION_BACK)
                 delay(STEP_SETTLE_MS)
             }
@@ -236,7 +380,32 @@ class KrateBackupService : AccessibilityService() {
         if (node == null && target.optional) return
         val found = node ?: throw StepNotFound(target.text ?: target.description.orEmpty())
         val clickable = found.clickableSelfOrAncestor()
-        if (clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) != true) tapAt(found)
+        stillThere(packageName)
+        if (clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) != true) tapOnScreen(packageName, found)
+    }
+
+    // whether the person has left the app being worked in: another app, home, or Krate itself is in front. System
+    // questions over the app don't count
+    private fun personLeft(watched: String): Boolean {
+        val front = rootInActiveWindow?.packageName?.toString()
+        // not before the helper has reached the app: Krate is in front until the app opens
+        return reachedApp && front != null && front != watched && front !in OVERLAY_PACKAGES
+    }
+
+    private fun stillThere(watched: String) {
+        if (personLeft(watched)) throw Interrupted()
+    }
+
+    internal fun checkStillThere(watched: String) = stillThere(watched)
+
+    // a tap on the node's own spot, only while the app is still in front: bounds from earlier would otherwise land on
+    // whatever is under them now, which could be Krate's own screen
+    private fun tapOnScreen(
+        watched: String,
+        node: AccessibilityNodeInfo,
+    ) {
+        stillThere(watched)
+        tapAt(node)
     }
 
     // backs out of the app's screens it opened, all the way, so the app opens on its own first screen next time rather
@@ -291,6 +460,7 @@ private suspend fun AccessibilityService.waitFor(
     var waited = 0L
     var scrolls = 0
     while (waited < timeout) {
+        (this as? KrateBackupService)?.checkStillThere(packageName)
         appWindows(packageName).firstNotNullOfOrNull(find)?.let { return it }
         if (timeout > DIALOG_CHECK_MS && waited >= SCROLL_AFTER_MS * (scrolls + 1) && scrolls < MAX_SCROLLS) {
             val scrollable = appWindows(packageName).firstNotNullOfOrNull { root -> root.find { it.isScrollable } }
@@ -337,6 +507,15 @@ private fun AccessibilityNodeInfo.match(target: UiTarget): AccessibilityNodeInfo
         }
     return matches.lastOrNull { it.clickableSelfOrAncestor() != null } ?: matches.lastOrNull()
 }
+
+// how many buttons or labels on screen carry the target's words
+private fun AccessibilityNodeInfo.matchCount(target: UiTarget): Int =
+    findAll { node ->
+        val text = node.text?.toString()?.trim()
+        val description = node.contentDescription?.toString()?.trim()
+        (target.text != null && text.equals(target.text, ignoreCase = true)) ||
+            (target.description != null && description.equals(target.description, ignoreCase = true))
+    }.size
 
 private fun AccessibilityNodeInfo.find(predicate: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? =
     findAll(predicate).firstOrNull()

@@ -14,10 +14,29 @@ data class AppGuide(
     val autoBackup: AutoBackup? = null,
     // settings the catalog recommends for the app, applied on request through the same box as automatic backups
     val recommended: RecommendedSettings? = null,
+    // for setups that happen inside the app, one short screen at a time
+    val walkthrough: List<WalkStep> = emptyList(),
 ) {
     val isEmpty: Boolean
-        get() = setup.isEmpty() && tips.isEmpty() && backup == null && recommended == null
+        get() = setup.isEmpty() && tips.isEmpty() && backup == null && recommended == null && walkthrough.isEmpty()
 }
+
+// one screen of a walkthrough: what to do, in a line or two, with the text to copy and the link to open when there are
+// any, so someone never has to type or hunt for either
+data class WalkStep(
+    val title: String,
+    val detail: String,
+    val copy: String? = null,
+    val copyLabel: String? = null,
+    val link: String? = null,
+    val linkLabel: String? = null,
+    // the link is one only the app itself understands, so it's opened inside that app and nowhere else
+    val inApp: Boolean = false,
+    // the button the app then asks to be tapped (its own "Add"), which Krate's helper can tap for the person
+    val confirm: String? = null,
+    // a button that opens the app, for a step that starts there
+    val openApp: Boolean = false,
+)
 
 // the taps from an app's first screen to the box holding its settings as text, and the buttons that close that box
 // and apply text pasted into it

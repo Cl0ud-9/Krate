@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.DownloadStatus
 import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.WaitingForUserStep
@@ -171,7 +172,7 @@ private fun DownloadStatusContent(
             // uses, just also applied to the Failed branch, so the app stays reachable while the
             // retry option sits alongside it instead of replacing it
             if (state.isUpToDate) {
-                OpenAppButton(packageName = state.app.packageName)
+                OpenAppButton(app = state.app)
             }
             Button(
                 onClick = onDownload,
@@ -226,7 +227,7 @@ private fun IdleContent(
             )
             UninstallSwap(uninstalling, state.installStatus) {
                 UpToDateActions(
-                    packageName = state.app.packageName,
+                    app = state.app,
                     label = downloadLabelFor(state),
                     onDownload = onDownload,
                 )
@@ -300,7 +301,7 @@ private fun InstalledNotUpToDateActions(
 ) {
     val selected = state.selectedArtifact
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        OpenAppButton(packageName = state.app.packageName, secondary = true)
+        OpenAppButton(app = state.app, secondary = true)
         Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
             Text(downloadLabelFor(state))
         }
@@ -312,16 +313,15 @@ private fun InstalledNotUpToDateActions(
 // of an installed package with no launcher activity (a pure library/dependency app, e.g. microG RE)
 @Composable
 private fun UpToDateActions(
-    packageName: String,
+    app: AppProfile,
     label: String,
     onDownload: () -> Unit,
 ) {
     val context = LocalContext.current
-    val launchIntent =
-        remember(packageName) { context.packageManager.getLaunchIntentForPackage(packageName) }
+    val launchIntent = remember(app.packageName, app.openActivity) { launchIntent(context, app) }
     if (launchIntent != null) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OpenAppButton(packageName = packageName)
+            OpenAppButton(app = app)
             Button(
                 onClick = onDownload,
                 modifier = Modifier.fillMaxWidth(),
@@ -347,12 +347,11 @@ private fun UpToDateActions(
 // secondary = tonal instead of filled, for when another action on the card is the main one
 @Composable
 internal fun OpenAppButton(
-    packageName: String,
+    app: AppProfile,
     secondary: Boolean = false,
 ) {
     val context = LocalContext.current
-    val launchIntent =
-        remember(packageName) { context.packageManager.getLaunchIntentForPackage(packageName) }
+    val launchIntent = remember(app.packageName, app.openActivity) { launchIntent(context, app) }
     if (launchIntent != null) {
         val colors =
             if (secondary) {

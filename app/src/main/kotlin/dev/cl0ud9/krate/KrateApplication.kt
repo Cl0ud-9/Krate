@@ -10,6 +10,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dev.cl0ud9.krate.platform.AppContainer
 import dev.cl0ud9.krate.platform.LauncherIcon
+import dev.cl0ud9.krate.platform.suggest.SuggestionStore
 import dev.cl0ud9.krate.platform.workers.ManifestCheckWorker
 import dev.cl0ud9.krate.platform.workers.UpdateNotifier
 import dev.cl0ud9.krate.voice.KrateVoice
@@ -34,6 +35,7 @@ class KrateApplication : Application() {
         container = AppContainer(this)
         LauncherIcon.showUnlessHidden(this)
         KrateVoice.load(this)
+        SuggestionStore.load(this)
         UpdateNotifier.ensureChannel(this)
         scheduleManifestCheck()
     }

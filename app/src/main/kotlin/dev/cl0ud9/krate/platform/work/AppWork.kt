@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.platform.work
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import dev.cl0ud9.krate.data.activity.DOWNLOAD_FAILURE_PREFIX
@@ -24,6 +25,7 @@ import dev.cl0ud9.krate.domain.repository.buildKey
 import dev.cl0ud9.krate.domain.repository.newerThanPicked
 import dev.cl0ud9.krate.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.krate.platform.selfupdate.notePlayProtect
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -112,6 +114,11 @@ class AppWork(
             else -> false
         }
 
+    // the apks an install is reading right now, which clearing the cache must leave alone
+    private val installing: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    fun filesInUse(): Set<String> = installing.toSet()
+
     fun downloading(appId: String): Boolean =
         current(appId).download.let { it is DownloadStatus.Downloading || it is DownloadStatus.Verifying }
 
@@ -131,16 +138,27 @@ class AppWork(
         downloads[app.id] =
             scope.launch {
                 val startedAt = System.currentTimeMillis()
-                downloader.download(app, artifact).collect { status ->
-                    if (status is DownloadStatus.Failed) {
-                        delay(
-                            MIN_ATTEMPT_VISIBLE_MS - (System.currentTimeMillis() - startedAt),
-                        )
+                try {
+                    downloader.download(app, artifact).collect { status ->
+                        if (status is DownloadStatus.Failed) {
+                            delay(
+                                MIN_ATTEMPT_VISIBLE_MS - (System.currentTimeMillis() - startedAt),
+                            )
+                        }
+                        setDownload(app.id, status)
+                        downloaded(app, artifact, status, installAfter)
                     }
-                    setDownload(app.id, status)
-                    downloaded(app, artifact, status, installAfter)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") exception: Exception,
+                ) {
+                    // a safety net: nothing in the middle of a download may close the app
+                    Log.w(TAG, "download of ${app.id} stopped unexpectedly", exception)
+                    setDownload(app.id, DownloadStatus.Failed(UNEXPECTED_DOWNLOAD))
+                } finally {
+                    downloads.remove(app.id)
                 }
-                downloads.remove(app.id)
             }
     }
 
@@ -171,14 +189,35 @@ class AppWork(
             }
         val flow = if (fromScratch) orchestrator.cleanInstall(app, apk) else engine.install(app, apk)
         change(app.id) { it.copy(install = InstallStatus.Installing, artifact = artifact ?: it.artifact) }
+        installing += apk.absolutePath
         scope.launch {
-            flow.collect { status ->
-                if (status is InstallStatus.Success) {
-                    succeeded(app, apk, artifact, erasedData = fromScratch && action == ActivityAction.UPDATED, action)
-                } else {
-                    setInstall(app.id, status)
-                    failed(app, status)
+            try {
+                flow.collect { status ->
+                    if (status is InstallStatus.Success) {
+                        succeeded(
+                            app,
+                            apk,
+                            artifact,
+                            erasedData = fromScratch && action == ActivityAction.UPDATED,
+                            action,
+                        )
+                    } else {
+                        setInstall(app.id, status)
+                        failed(app, status)
+                    }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (
+                @Suppress("TooGenericExceptionCaught") exception: Exception,
+            ) {
+                Log.w(TAG, "install of ${app.id} stopped unexpectedly", exception)
+                InstallStatus.Failed(UNEXPECTED_INSTALL).let {
+                    setInstall(app.id, it)
+                    failed(app, it)
+                }
+            } finally {
+                installing -= apk.absolutePath
             }
         }
     }
@@ -186,16 +225,25 @@ class AppWork(
     fun uninstall(app: AppProfile) {
         if (busy(app.id)) return
         scope.launch {
-            engine.uninstall(app.packageName).collect { status ->
-                if (status is InstallStatus.Success) {
-                    record(app, ActivityAction.UNINSTALLED)
-                    baselines.clear(app.packageName)
-                    change(
-                        app.id,
-                    ) { it.copy(install = InstallStatus.Idle, finished = Finished(++serial, uninstalled = true)) }
-                } else {
-                    setInstall(app.id, status)
+            try {
+                engine.uninstall(app.packageName).collect { status ->
+                    if (status is InstallStatus.Success) {
+                        record(app, ActivityAction.UNINSTALLED)
+                        baselines.clear(app.packageName)
+                        change(
+                            app.id,
+                        ) { it.copy(install = InstallStatus.Idle, finished = Finished(++serial, uninstalled = true)) }
+                    } else {
+                        setInstall(app.id, status)
+                    }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (
+                @Suppress("TooGenericExceptionCaught") exception: Exception,
+            ) {
+                Log.w(TAG, "uninstall of ${app.id} stopped unexpectedly", exception)
+                setInstall(app.id, InstallStatus.Failed(UNEXPECTED_UNINSTALL))
             }
         }
     }
@@ -294,3 +342,8 @@ class AppWork(
         states.update { all -> all + (appId to transform(all[appId] ?: AppWorkState())) }
     }
 }
+
+private const val TAG = "AppWork"
+private const val UNEXPECTED_DOWNLOAD = "The download didn't finish. Try again."
+private const val UNEXPECTED_INSTALL = "The install didn't finish. Try again."
+private const val UNEXPECTED_UNINSTALL = "The uninstall didn't finish. Try again."

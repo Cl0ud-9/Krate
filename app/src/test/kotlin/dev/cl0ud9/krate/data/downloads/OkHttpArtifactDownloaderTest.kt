@@ -210,6 +210,94 @@ class OkHttpArtifactDownloaderTest {
             assertTrue(!reason.contains("access token"))
         }
 
+    // answers the size question, then the file itself, as often as it's asked
+    private fun serveAlways() {
+        server.dispatcher =
+            object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse =
+                    if (request.method == "HEAD") {
+                        MockResponse().setHeader("Content-Length", payload.size.toString())
+                    } else {
+                        MockResponse().setBody(Buffer().write(payload))
+                    }
+            }
+    }
+
+    // a reader that clears the download (the phone's own "Clear cache") the first [times] times it's asked to look
+    private inner class ClearingReader(
+        private val dir: File,
+        private var times: Int,
+    ) : ApkArchiveReader {
+        override fun read(apkPath: String): ApkArchiveInfo {
+            if (times > 0) {
+                times--
+                dir.listFiles()?.forEach { it.delete() }
+            }
+            return ApkArchiveInfo(MATCHING_PACKAGE, matchingCertSha256)
+        }
+    }
+
+    @Test
+    fun `a download cleared from under it starts again once and still completes`() =
+        runBlocking {
+            serveAlways()
+            val dir = tempFolder.newFolder()
+            val downloader = downloaderWithReader(ClearingReader(dir, times = 1), dir)
+            val app = appProfile()
+
+            val statuses = downloader.download(app, app.artifacts.single()).toList()
+
+            assertTrue(statuses.last().toString(), statuses.last() is DownloadStatus.ReadyToInstall)
+        }
+
+    @Test
+    fun `a download cleared every time gives up in plain words instead of crashing`() =
+        runBlocking {
+            serveAlways()
+            val dir = tempFolder.newFolder()
+            val downloader = downloaderWithReader(ClearingReader(dir, times = 5), dir)
+            val app = appProfile()
+
+            val statuses = downloader.download(app, app.artifacts.single()).toList()
+
+            val failure = statuses.last()
+            assertTrue(failure is DownloadStatus.Failed)
+            assertTrue((failure as DownloadStatus.Failed).reason.contains("cleared"))
+        }
+
+    @Test
+    fun `a check that blows up fails the download and never lets it through`() =
+        runBlocking {
+            serveAlways()
+            val exploding =
+                object : ApkArchiveReader {
+                    override fun read(apkPath: String): ApkArchiveInfo = error("boom at ${File(apkPath).name}")
+                }
+            val downloader = downloaderWithReader(exploding)
+            val app = appProfile()
+
+            val statuses = downloader.download(app, app.artifacts.single()).toList()
+
+            val failure = statuses.last()
+            assertTrue(statuses.toString(), failure is DownloadStatus.Failed)
+            // plain words, never the exception's own text with a file name in it
+            assertTrue(!(failure as DownloadStatus.Failed).reason.contains("boom"))
+        }
+
+    @Test
+    fun `clearCache leaves alone the files it's told are in use`() {
+        val dir = tempFolder.newFolder()
+        val inUse = File(dir, "installing.apk").apply { writeBytes(ByteArray(10)) }
+        val spare = File(dir, "spare.apk").apply { writeBytes(ByteArray(20)) }
+        val downloader = downloaderWithReader(FakeArchiveReader("x", "y"), dir)
+
+        val bytesFreed = downloader.clearCache(keep = setOf(inUse.absolutePath))
+
+        assertEquals(20L, bytesFreed)
+        assertTrue(inUse.exists())
+        assertTrue(!spare.exists())
+    }
+
     @Test
     fun `deleteDownloadedFile removes only the given file`() {
         val dir = tempFolder.newFolder()

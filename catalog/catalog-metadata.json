@@ -10,6 +10,8 @@
         "Pick exactly what gets cleaned, and whitelist what stays",
         "Open source, with no ads or trackers"
       ],
+      "pitch": "Give your phone a tidy-up. It sweeps out the junk files apps quietly leave behind.",
+      "needs": ["Storage"],
       "packageName": "io.mdp43140.ltecleaner",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
@@ -56,6 +58,8 @@
         "Uses Android's accessibility service to do the tapping for you",
         "Open source, with no ads or trackers"
       ],
+      "pitch": "Every app's cache, gone in one go. Spring cleaning without the elbow grease.",
+      "needs": ["Storage"],
       "packageName": "com.github.bmx666.appcachecleaner",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
@@ -100,17 +104,27 @@
         "Other apps in the Krate may list it as a requirement"
       ],
       "packageName": "app.revanced.android.gms",
+      "openActivity": "org.microg.gms.ui.MainSettingsActivity",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
       "dependencyIds": [],
       "enabled": true,
-      "source": {
-        "repo": "MorpheApp/MicroG-RE",
-        "assetPattern": "^microg-[0-9.]+(-icon)?-arm64-v8a\\.apk$",
-        "includePrerelease": false,
-        "retainVersions": 3,
-        "expectedCertificateSha256": "0b6c9515afb195fac59601696ba0a7907a0b217ccf720b43148427ccf64343e7"
-      },
+      "sources": [
+        {
+          "repo": "MorpheApp/MicroG-RE",
+          "assetPattern": "^microg-[0-9.]+-noicon-arm64-v8a\\.apk$",
+          "includePrerelease": false,
+          "retainVersions": 3,
+          "expectedCertificateSha256": "0b6c9515afb195fac59601696ba0a7907a0b217ccf720b43148427ccf64343e7"
+        },
+        {
+          "repo": "MorpheApp/MicroG-RE",
+          "assetPattern": "^microg-[0-9.]+-noicon-armeabi-v7a\\.apk$",
+          "includePrerelease": false,
+          "retainVersions": 3,
+          "expectedCertificateSha256": "0b6c9515afb195fac59601696ba0a7907a0b217ccf720b43148427ccf64343e7"
+        }
+      ],
       "guide": {
         "setup": [
           {
@@ -128,14 +142,15 @@
           {
             "kind": "IN_APP",
             "title": "Add your Google account",
-            "detail": "Only if you want to sign in to apps that use it. Open microG Settings and go to Accounts.",
+            "detail": "Only if you want to sign in to apps that use it. Tap Open on this page and go to Accounts.",
             "optional": true
           }
         ],
-        "settingsWhere": "microG Settings (its own icon in your app drawer)",
+        "settingsWhere": "microG Settings (the Open button on this page)",
         "tips": [
           "Self-Check shows at a glance whether everything is set up",
-          "Keep Cloud Messaging on for notifications from apps that rely on it"
+          "Keep Cloud Messaging on for notifications from apps that rely on it",
+    "Krate installs the build without a launcher icon, so Open on this page is the way in. microG's own hide-icon switch isn't needed, and it can swap in a newer test build"
         ]
       }
     },
@@ -148,6 +163,8 @@
         "Track your reading with AniList, MyAnimeList and more",
         "Download chapters to read offline, with backups built in"
       ],
+      "pitch": "Your manga shelf, in your pocket. Read, collect and pick up right where you left off.",
+      "needs": ["Reading"],
       "packageName": "app.mihon",
       "supportStatus": "SUPPORTED",
       "installationMode": "UPDATE",
@@ -183,6 +200,27 @@
             "title": "Let it run in the background",
             "detail": "Keeps long library updates, downloads and backup restores from being cut off.",
             "optional": true
+          }
+        ],
+        "walkthrough": [
+          {
+            "title": "Say hello to Mihon",
+            "detail": "Mihon opens with a few welcome pages. Pick a folder for its downloads when it asks, and say yes to installing extensions. Finish those pages first, because the store can only be added after them.",
+            "openApp": true
+          },
+          {
+            "title": "Add the extension store",
+            "detail": "Mihon starts with an empty shelf. Extensions are its sources: they bring the manga, and their updates show up in Mihon too. This store, from the Keiyoushi project, is where most of them come from. Tap the button and Krate adds it for you.",
+            "link": "mihon://extension-store?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fkeiyoushi%2Fextensions%40repo%2Findex.pb",
+            "linkLabel": "Add the store",
+            "inApp": true,
+            "confirm": "Add",
+            "copy": "https://cdn.jsdelivr.net/gh/keiyoushi/extensions@repo/index.pb",
+            "copyLabel": "Copy the store address"
+          },
+          {
+            "title": "Pick your sources",
+            "detail": "Open Browse in Mihon, then Extensions, and install the sources you like. When one has an update, it shows up right there. Prefer to add the store yourself? In Browse > Extensions, open the menu, choose Extension stores and paste the address from the last step."
           }
         ],
         "settingsWhere": "More > Settings",
