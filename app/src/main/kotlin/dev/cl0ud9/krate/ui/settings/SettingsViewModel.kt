@@ -15,6 +15,7 @@ import dev.cl0ud9.krate.domain.repository.ActivityLogRepository
 import dev.cl0ud9.krate.domain.repository.CatalogRepository
 import dev.cl0ud9.krate.domain.repository.KrateBaselineStore
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
+import dev.cl0ud9.krate.platform.diagnostics.KrateLog
 import dev.cl0ud9.krate.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.krate.platform.rollback.RollbackStore
 import dev.cl0ud9.krate.platform.selfupdate.KrateSelfUpdateInstaller
@@ -169,6 +170,7 @@ class SettingsViewModel(
                         recentActivity = recentActivity,
                         hasGitHubToken = githubCredentialStore.getToken() != null,
                         generatedAtMillis = System.currentTimeMillis(),
+                        log = KrateLog.read(),
                     )
                 }
             mutableDiagnosticReport.value = report

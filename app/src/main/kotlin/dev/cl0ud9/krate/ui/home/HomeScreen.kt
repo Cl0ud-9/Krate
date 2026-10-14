@@ -30,9 +30,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.ActivityAction
 import dev.cl0ud9.krate.domain.model.ActivityEntry
+import dev.cl0ud9.krate.domain.model.AnnouncementItem
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.SupportStatus
@@ -55,6 +61,7 @@ import dev.cl0ud9.krate.platform.selfupdate.SelfUpdateState
 import dev.cl0ud9.krate.platform.workers.UpdateNoticeClearing
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
+import dev.cl0ud9.krate.ui.components.FoldAway
 import dev.cl0ud9.krate.ui.components.KrateMessage
 import dev.cl0ud9.krate.ui.components.KratePullToRefreshBox
 import dev.cl0ud9.krate.ui.components.KrateUpdateAnnouncementDialog
@@ -77,6 +84,7 @@ import dev.cl0ud9.krate.ui.util.rememberLastNonNull
 import dev.cl0ud9.krate.voice.Moment
 import dev.cl0ud9.krate.voice.refreshFailedLine
 import dev.cl0ud9.krate.voice.rememberKrateLeadIn
+import kotlinx.coroutines.delay
 
 private const val MAX_ACTIVITY_ROWS = 5
 private val HOME_SECTION_GAP = 20.dp
@@ -176,46 +184,49 @@ private fun HomeContent(
                 .verticalScroll(rememberScrollState())
                 // the last section scrolls clear of the nav bar floating over the bottom
                 .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + LocalNavBarClearance.current),
-        verticalArrangement = Arrangement.spacedBy(HOME_SECTION_GAP),
     ) {
-        // above the status hero - these only exist when something needs the user's attention
+        // above the status hero - these only exist when something needs the user's attention, and each brings its own
+        // gap, so there's none when there are none and one going away closes up smoothly
         announcements.forEach { item ->
-            AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = viewModel::dismissAnnouncement)
+            key(item.announcement.id) {
+                DismissibleAnnouncement(item, onNavigateToApp, viewModel::dismissAnnouncement)
+            }
         }
         // once, for anyone who had Krate before it could update apps by itself
         AutoUpdateOffer()
         // after Krate's own update, if Play Protect was paused for it
-        PlayProtectReminder()
-
-        HomeAppear(order = 0) {
-            StatusHeroCard(
-                pendingUpdateCount = pendingUpdateCount,
-                checking = checking,
-                onViewUpdates = onNavigateToUpdates,
-                onCheckAgain = viewModel::refreshFromNetwork,
-            )
-        }
-
-        StatsAndYourApps(
-            counts = Triple(catalogCount, installedCount, pendingUpdateCount),
-            installedApps = homeApps.filter { it.installed },
-            onNavigateToApps = onNavigateToApps,
-            onNavigateToUpdates = onNavigateToUpdates,
-            onNavigateToApp = onNavigateToApp,
-        )
-
-        // one app worth a look; folds away when there's none, and brings no gap of its own
-        HomeSuggestion(viewModel = viewModel, onNavigateToApp = onNavigateToApp)
-
-        HomeAppear(order = 3) {
-            Column {
-                // last week, looked back on once a new one starts; it brings its own gap, so none is left when it goes
-                WeekInReviewCard(modifier = Modifier.padding(bottom = HOME_SECTION_GAP))
-                RecentActivitySection(
-                    entries = recentActivity.take(MAX_ACTIVITY_ROWS),
-                    appsById = homeApps.associate { it.app.id to it.app },
-                    onOpenApp = onNavigateToApp,
+        PlayProtectReminder(gap = HOME_SECTION_GAP)
+        Column(verticalArrangement = Arrangement.spacedBy(HOME_SECTION_GAP)) {
+            HomeAppear(order = 0) {
+                StatusHeroCard(
+                    pendingUpdateCount = pendingUpdateCount,
+                    checking = checking,
+                    onViewUpdates = onNavigateToUpdates,
+                    onCheckAgain = viewModel::refreshFromNetwork,
                 )
+            }
+
+            StatsAndYourApps(
+                counts = Triple(catalogCount, installedCount, pendingUpdateCount),
+                installedApps = homeApps.filter { it.installed },
+                onNavigateToApps = onNavigateToApps,
+                onNavigateToUpdates = onNavigateToUpdates,
+                onNavigateToApp = onNavigateToApp,
+            )
+
+            // one app worth a look; folds away when there's none, and brings no gap of its own
+            HomeSuggestion(viewModel = viewModel, onNavigateToApp = onNavigateToApp)
+
+            HomeAppear(order = 3) {
+                Column {
+                    // last week, looked back on once a new one starts; it brings its own gap, so none is left after
+                    WeekInReviewCard(gap = HOME_SECTION_GAP)
+                    RecentActivitySection(
+                        entries = recentActivity.take(MAX_ACTIVITY_ROWS),
+                        appsById = homeApps.associate { it.app.id to it.app },
+                        onOpenApp = onNavigateToApp,
+                    )
+                }
             }
         }
     }
@@ -440,3 +451,35 @@ private fun StatsAndYourApps(
         }
     }
 }
+
+// an announcement that folds away when put away, rather than vanishing; the store is told once the fold is under way
+@Composable
+private fun DismissibleAnnouncement(
+    item: AnnouncementItem,
+    onOpenApp: (String) -> Unit,
+    onDismiss: (String) -> Unit,
+) {
+    var gone by remember { mutableStateOf(false) }
+    // saved once, after the fold has had its moment, or at once if the screen goes first
+    val saved = remember { BooleanArray(1) }
+    val save =
+        rememberUpdatedState {
+            if (!saved[0]) {
+                saved[0] = true
+                onDismiss(item.announcement.id)
+            }
+        }
+    val goneNow = rememberUpdatedState(gone)
+    LaunchedEffect(gone) {
+        if (gone) {
+            delay(ANNOUNCEMENT_FOLD_MS)
+            save.value()
+        }
+    }
+    DisposableEffect(Unit) { onDispose { if (goneNow.value) save.value() } }
+    FoldAway(visible = !gone, gap = HOME_SECTION_GAP) {
+        AnnouncementCard(item = item, onOpenApp = onOpenApp, onDismiss = { gone = true })
+    }
+}
+
+private const val ANNOUNCEMENT_FOLD_MS = 450L

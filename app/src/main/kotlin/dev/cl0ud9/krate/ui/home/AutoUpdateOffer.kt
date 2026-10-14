@@ -22,6 +22,7 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
 import dev.cl0ud9.krate.ui.components.ButtonRow
+import dev.cl0ud9.krate.ui.components.FoldAway
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
@@ -55,7 +56,14 @@ class AutoUpdateOfferViewModel(
 internal fun AutoUpdateOffer() {
     val viewModel = krateViewModel { AutoUpdateOfferViewModel(it.settingsRepository) }
     val visible by viewModel.visible.collectAsStateWithLifecycle()
-    if (!visible) return
+    // kept while it folds away, so it doesn't go blank halfway
+    FoldAway(visible = visible, gap = OFFER_GAP) { OfferCard(viewModel) }
+}
+
+private val OFFER_GAP = 20.dp
+
+@Composable
+private fun OfferCard(viewModel: AutoUpdateOfferViewModel) {
     Card(
         modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,

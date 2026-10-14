@@ -107,6 +107,16 @@ class FeedbackFormatTest {
     }
 
     @Test
+    fun `report carries Krate's own log last, and leaves it out when empty`() {
+        fun report(log: String) = formatDiagnosticReport("App: x", emptyList(), emptyList(), false, 0, log)
+
+        val with = report("10-14 07:44:02 helper failed APPLY pkg: Stopped (in front: other)")
+        assertTrue(with.contains("Krate's own log"))
+        assertTrue(with.trimEnd().endsWith("(in front: other)"))
+        assertFalse(report("").contains("Krate's own log"))
+    }
+
+    @Test
     fun `suggestion links need to look like a web address`() {
         listOf("github.com/mihonapp/mihon", "https://github.com/a/b", "http://f-droid.org", "mihon.app").forEach {
             assertTrue(it, looksLikeLink(it))

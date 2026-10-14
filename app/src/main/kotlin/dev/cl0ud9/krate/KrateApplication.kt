@@ -10,6 +10,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dev.cl0ud9.krate.platform.AppContainer
 import dev.cl0ud9.krate.platform.LauncherIcon
+import dev.cl0ud9.krate.platform.diagnostics.KrateLog
 import dev.cl0ud9.krate.platform.suggest.SuggestionStore
 import dev.cl0ud9.krate.platform.workers.ManifestCheckWorker
 import dev.cl0ud9.krate.platform.workers.UpdateNotifier
@@ -32,6 +33,12 @@ class KrateApplication : Application() {
         super.onCreate()
         // frame-based text input scheduling, so moving between text fields doesn't drop and re-show the keyboard
         AndroidComposeUiFlags.isOutOfFrameSchedulerForTextInputEventsEnabled = false
+        KrateLog.init(this)
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            KrateLog.crash(thread.name, error)
+            previous?.uncaughtException(thread, error)
+        }
         container = AppContainer(this)
         LauncherIcon.showUnlessHidden(this)
         KrateVoice.load(this)

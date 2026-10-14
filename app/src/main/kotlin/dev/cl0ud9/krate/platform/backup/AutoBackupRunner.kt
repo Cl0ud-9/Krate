@@ -114,7 +114,7 @@ object AutoBackupRunner {
         spec: AutoBackup,
     ): Boolean {
         val text = AppBackups.read(context, packageName)?.text ?: return false
-        return start(AutoBackupJob(packageName, spec, BackupMode.RESTORE, text))
+        return start(restoreJob(packageName, spec, text))
     }
 
     // the catalog's picks over the app's own settings; false when the helper isn't running or a job is already going
@@ -122,7 +122,7 @@ object AutoBackupRunner {
         packageName: String,
         spec: AutoBackup,
         recommended: RecommendedSettings,
-    ): Boolean = start(AutoBackupJob(packageName, spec, BackupMode.APPLY, recommended.text, recommended.revision))
+    ): Boolean = start(applyJob(packageName, spec, recommended))
 
     private val mutableSwitchedOff = MutableStateFlow(0)
 
@@ -189,3 +189,23 @@ object AutoLinks {
 
     private val EMPTY_SPEC = AutoBackup(emptyList(), "", "")
 }
+
+// the jobs built by name, never by position: AutoBackupJob has several optional fields before the text, and a text
+// handed over by position landed in the wrong one, so restoring and applying pasted nothing
+internal fun restoreJob(
+    packageName: String,
+    spec: AutoBackup,
+    text: String,
+) = AutoBackupJob(packageName = packageName, spec = spec, mode = BackupMode.RESTORE, text = text)
+
+internal fun applyJob(
+    packageName: String,
+    spec: AutoBackup,
+    recommended: RecommendedSettings,
+) = AutoBackupJob(
+    packageName = packageName,
+    spec = spec,
+    mode = BackupMode.APPLY,
+    text = recommended.text,
+    revision = recommended.revision,
+)

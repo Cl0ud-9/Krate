@@ -25,9 +25,8 @@ internal data class ReportedApp(
 
 // device/package facts read via Context, gathered here rather than in SettingsViewModel - matching
 // how rememberVersionName() already keeps this kind of PackageManager lookup in the UI layer instead
-// of smuggling a Context into a ViewModel. Android has no public API for a normal (non-system) app to
-// read its own logcat output, so "attach logs" here means this self-assembled diagnostic summary -
-// device/app/catalog facts plus recent activity - not a raw system log
+// of smuggling a Context into a ViewModel. Android won't show a normal app its system log after a restart, so
+// the report is assembled from device/app/catalog facts, recent activity and Krate's own short log (KrateLog)
 @Composable
 internal fun rememberDeviceSummary(): String {
     val context = LocalContext.current
@@ -49,12 +48,14 @@ internal fun rememberDeviceSummary(): String {
 
 // what someone helping with a problem needs: the device, what each app is at versus the catalog,
 // and what recently happened - failures included, with the reason that was shown
+@Suppress("LongParameterList")
 internal fun formatDiagnosticReport(
     deviceSummary: String,
     apps: List<ReportedApp>,
     recentActivity: List<ActivityEntry>,
     hasGitHubToken: Boolean,
     generatedAtMillis: Long,
+    log: String = "",
 ): String =
     buildString {
         appendLine("Krate diagnostic report")
@@ -80,6 +81,11 @@ internal fun formatDiagnosticReport(
                     "- ${formatReportTime(entry.timestampMillis)} ${entry.appName}: ${entry.action.label()}$detail",
                 )
             }
+        }
+        if (log.isNotBlank()) {
+            appendLine()
+            appendLine("Krate's own log (newest last; no settings, tokens or web addresses):")
+            appendLine(log)
         }
     }
 

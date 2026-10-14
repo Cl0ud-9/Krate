@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Path
 import android.graphics.Rect
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
@@ -14,6 +15,7 @@ import android.widget.Toast
 import dev.cl0ud9.krate.KrateActivity
 import dev.cl0ud9.krate.domain.model.UiTarget
 import dev.cl0ud9.krate.domain.settings.SettingsText
+import dev.cl0ud9.krate.platform.diagnostics.KrateLog
 import dev.cl0ud9.krate.platform.links.OpenByDefault
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -192,6 +194,24 @@ class KrateBackupService : AccessibilityService() {
 
     // how the job ended, whatever happened: done, or why not. An interruption is not an error; it's the person leaving
     private suspend fun outcomeOf(job: AutoBackupJob): AutoBackupState {
+        KrateLog.event("helper start", "${job.mode} ${job.packageName} (${Build.MANUFACTURER} ${Build.MODEL})")
+        val result = walked(job)
+        val front = rootInActiveWindow?.packageName?.toString()
+        KrateLog.event(outcomeLine(result), "${job.mode} ${job.packageName}${outcomeDetail(result)} (in front: $front)")
+        return result
+    }
+
+    private fun outcomeLine(result: AutoBackupState) =
+        if (result is AutoBackupState.Failed) "helper stopped" else "helper done"
+
+    private fun outcomeDetail(result: AutoBackupState): String =
+        when (result) {
+            is AutoBackupState.Done -> " changed=${result.changed}"
+            is AutoBackupState.Failed -> ": ${result.reason}"
+            else -> ""
+        }
+
+    private suspend fun walked(job: AutoBackupJob): AutoBackupState {
         val stopped = { AutoBackupState.Failed(job.packageName, job.mode, stoppedText()) }
         return try {
             listenTo(job.watched)
@@ -365,6 +385,11 @@ class KrateBackupService : AccessibilityService() {
             error("Couldn't read the app's current settings, so nothing was changed.")
         }
         val changed = SettingsText.changes(ownSettings, pickedSettings)
+        KrateLog.event(
+            "helper read",
+            "box ${own.length} chars, ${ownSettings.size} settings; picks ${pickedSettings.size}; " +
+                "to change ${changed.size}",
+        )
         if (changed.isEmpty()) {
             tap(job.packageName, UiTarget(text = job.spec.close))
             return WalkResult()
@@ -429,6 +454,7 @@ class KrateBackupService : AccessibilityService() {
         }
         if (node == null && target.optional) return
         val found = node ?: throw StepNotFound(target.text ?: target.description.orEmpty())
+        KrateLog.event("helper step", "${target.text ?: target.description} found in $packageName")
         val clickable = found.clickableSelfOrAncestor()
         stillThere(packageName)
         if (clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) != true) tapOnScreen(packageName, found)

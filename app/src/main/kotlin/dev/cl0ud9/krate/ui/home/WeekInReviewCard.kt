@@ -1,8 +1,5 @@
 package dev.cl0ud9.krate.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,8 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.ui.components.FoldAway
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.voice.KrateVoice
@@ -41,15 +40,18 @@ import java.time.ZonedDateTime
 // a look back at last week, from the first open of a new week until it's put away; only with playful messages on,
 // and only when last week had something in it
 @Composable
-internal fun WeekInReviewCard(modifier: Modifier = Modifier) {
+internal fun WeekInReviewCard(
+    modifier: Modifier = Modifier,
+    gap: Dp = 0.dp,
+) {
     val now = remember { ZonedDateTime.now() }
     val text = remember { weekInReviewText(KrateWeek.lastWeek(now)) }
     var shown by remember { mutableStateOf(!KrateWeek.dismissed(now)) }
-    AnimatedVisibility(
+    FoldAway(
         visible = shown && text != null && KrateVoice.playful,
-        enter = androidx.compose.animation.EnterTransition.None,
-        exit = fadeOut() + shrinkVertically(),
         modifier = modifier,
+        gap = gap,
+        animateIn = false,
     ) {
         Card(
             modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),

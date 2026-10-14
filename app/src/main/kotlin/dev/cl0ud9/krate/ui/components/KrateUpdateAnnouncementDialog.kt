@@ -43,6 +43,7 @@ fun KrateUpdateAnnouncementDialog(
     onDismiss: () -> Unit,
 ) {
     val notes = releaseNoteItems(status.releaseNotes.orEmpty())
+    val headsUp = selfUpdateState == null && status.downloadUrl != null
     KrateDialog(
         header =
             KrateDialogHeader(
@@ -54,16 +55,20 @@ fun KrateUpdateAnnouncementDialog(
                         "and keeps your apps and settings.",
             ),
         onDismissRequest = onDismiss,
+        // the Play Protect heads-up goes with the notes, so the footer holds just the two buttons, side by side
         detail =
-            if (notes.isEmpty()) {
+            if (notes.isEmpty() && !headsUp) {
                 null
             } else {
                 {
-                    ReleaseNotesHint(
-                        title = "What's new in ${status.latestVersion}",
-                        notes = notes,
-                        intro = releaseNoteIntro(status.releaseNotes.orEmpty()),
-                    )
+                    if (notes.isNotEmpty()) {
+                        ReleaseNotesHint(
+                            title = "What's new in ${status.latestVersion}",
+                            notes = notes,
+                            intro = releaseNoteIntro(status.releaseNotes.orEmpty()),
+                        )
+                    }
+                    if (headsUp) HelperText(PLAY_PROTECT_HEADS_UP, modifier = Modifier.fillMaxWidth())
                 }
             },
         footer = { UpdateFooter(status, selfUpdateState, onUpdate, onDismiss) },
@@ -116,7 +121,6 @@ private fun UpdateFooter(
     val downloadUrl = status.downloadUrl
     if (selfUpdateState == null) {
         val uriHandler = LocalUriHandler.current
-        if (downloadUrl != null) HelperText(PLAY_PROTECT_HEADS_UP, modifier = Modifier.fillMaxWidth())
         TextButton(onClick = onDismiss) { Text("Later") }
         Button(
             onClick = { if (downloadUrl != null) onUpdate(downloadUrl) else uriHandler.openUri(status.releaseUrl) },

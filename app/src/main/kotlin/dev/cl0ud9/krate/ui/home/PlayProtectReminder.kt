@@ -18,11 +18,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.platform.selfupdate.PlayProtect
 import dev.cl0ud9.krate.ui.components.ButtonRow
+import dev.cl0ud9.krate.ui.components.FoldAway
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
@@ -33,6 +35,8 @@ import dev.cl0ud9.krate.ui.theme.ShapeCache
 internal fun PlayProtectReminder(
     modifier: Modifier = Modifier,
     onlyFor: String? = null,
+    // space it leaves below it when shown, folded away with it; for a page whose layout has no spacing of its own
+    gap: Dp = 0.dp,
 ) {
     val context = LocalContext.current
     var checks by remember { mutableIntStateOf(0) }
@@ -46,8 +50,22 @@ internal fun PlayProtectReminder(
         remember(checks, changes) {
             PlayProtect.reminderDue(context) && (onlyFor == null || PlayProtect.pausedForPackage(context) == onlyFor)
         }
-    if (!due) return
+    // the app that was paused for, kept while the card folds away
     val pausedFor = remember(checks, changes) { PlayProtect.pausedForApp(context) }
+    if (gap > 0.dp) {
+        FoldAway(visible = due, gap = gap) { ReminderCard(modifier, pausedFor, context) { checks++ } }
+    } else if (due) {
+        ReminderCard(modifier, pausedFor, context) { checks++ }
+    }
+}
+
+@Composable
+private fun ReminderCard(
+    modifier: Modifier,
+    pausedFor: String?,
+    context: android.content.Context,
+    onChanged: () -> Unit,
+) {
     Card(
         modifier = modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
         shape = ShapeCache.rounded16,
@@ -71,7 +89,7 @@ internal fun PlayProtectReminder(
                 TextButton(
                     onClick = {
                         PlayProtect.clearReminder(context)
-                        checks++
+                        onChanged()
                     },
                 ) { Text("It's back on") }
                 FilledTonalButton(
