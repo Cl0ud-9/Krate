@@ -13,8 +13,10 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -76,13 +78,20 @@ fun KrateSheet(
     }
 }
 
-// narrows the sheet and lifts it off the bottom by the gap; the gap closes as the sheet's top nears the screen's
+// narrows the sheet and lifts it off the bottom by the gap; the gap closes as the sheet's top nears the screen's.
+// The gap depends on where the top is, the top on how tall the content is, and that on how its text wraps at the
+// width the gap leaves: with a line that only just fits, that is a loop flipping between two answers for as long as
+// the sheet is open. So the gap follows the sheet up, and is kept as it is once the sheet has come to rest
 @OptIn(ExperimentalMaterial3Api::class)
-private fun Modifier.floating(state: SheetState): Modifier =
-    layout { measurable, constraints ->
+@Composable
+private fun Modifier.floating(state: SheetState): Modifier {
+    val settledGap = remember { intArrayOf(NOT_SETTLED) }
+    return layout { measurable, constraints ->
         val top = runCatching { state.requireOffset() }.getOrDefault(Float.MAX_VALUE)
         val share = (top / (constraints.maxHeight * FULL_HEIGHT_SHARE)).coerceIn(0f, 1f)
-        val gap = (FloatingGap.toPx() * share).roundToInt()
+        val following = (FloatingGap.toPx() * share).roundToInt()
+        if (settledGap[0] == NOT_SETTLED && state.currentValue == SheetValue.Expanded) settledGap[0] = following
+        val gap = if (settledGap[0] == NOT_SETTLED) following else settledGap[0]
         val width = (constraints.maxWidth - gap * 2).coerceAtLeast(0)
         val placeable =
             measurable.measure(
@@ -90,3 +99,6 @@ private fun Modifier.floating(state: SheetState): Modifier =
             )
         layout(placeable.width + gap * 2, placeable.height) { placeable.place(gap, -gap) }
     }
+}
+
+private const val NOT_SETTLED = -1

@@ -20,6 +20,7 @@ import dev.cl0ud9.krate.platform.backup.RecommendedChoice
 import dev.cl0ud9.krate.platform.backup.RecommendedMarks
 import dev.cl0ud9.krate.platform.setup.RESTRICTED_SETTINGS_HELP
 import dev.cl0ud9.krate.platform.setup.appInfoIntent
+import dev.cl0ud9.krate.ui.components.ButtonRow
 
 @Composable
 internal fun ApplyActions(
@@ -78,6 +79,19 @@ internal fun ByHandActions(
     val context = LocalContext.current
     OpenAppTonal(app)
     Button(onClick = { copyPicks(context, app, recommended) }) { Text("Copy") }
+}
+
+// the same two buttons, for the by-hand way when the footer is busy with Krate's own: open the app, and copy the picks
+@Composable
+internal fun ByHandButtons(
+    app: AppProfile,
+    recommended: RecommendedSettings,
+) {
+    val context = LocalContext.current
+    ButtonRow {
+        OpenAppTonal(app)
+        Button(onClick = { copyPicks(context, app, recommended) }) { Text("Copy the picks") }
+    }
 }
 
 // the catch with doing it by hand, spelled out: pasted on their own, the picks replace what's in the box

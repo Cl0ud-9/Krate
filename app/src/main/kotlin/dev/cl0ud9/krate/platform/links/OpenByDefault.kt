@@ -48,6 +48,16 @@ object OpenByDefault {
         return now != packageName && now != unowned && now != "android"
     }
 
+    // the app that opens this address now, or null when nobody in particular does (the browser, the chooser, no answer)
+    fun ownerOf(
+        context: Context,
+        host: String,
+    ): String? {
+        val unowned = openedBy(context, "https://unowned.invalid/")
+        val now = openedBy(context, "https://$host/") ?: return null
+        return now.takeIf { it != unowned && it != "android" }
+    }
+
     private fun openedBy(
         context: Context,
         url: String,

@@ -12,11 +12,14 @@ import android.graphics.Bitmap
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
 import dev.cl0ud9.krate.EXTRA_NOTIFICATION_ID
 import dev.cl0ud9.krate.EXTRA_TARGET_ROUTE
 import dev.cl0ud9.krate.KrateActivity
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.AppProfile
+import dev.cl0ud9.krate.platform.autoupdate.AutoUpdateNotices
 import dev.cl0ud9.krate.platform.notifications.NotificationIcons
 import dev.cl0ud9.krate.platform.notifications.krateContent
 import dev.cl0ud9.krate.platform.selfupdate.PLAY_PROTECT_ROUTE
@@ -33,14 +36,16 @@ import dev.cl0ud9.krate.voice.Moment
 // being requested here, so it was stuck at whatever it originally shipped with; a new id is the only
 // reliable fix - the old "updates" channel is simply orphaned, which is harmless
 private const val CHANNEL_ID = "updates_v2"
-private const val PENDING_UPDATES_NOTIFICATION_ID = 1001
-private const val KRATE_UPDATE_NOTIFICATION_ID = 1002
-private const val UPDATE_ALL_RESULT_NOTIFICATION_ID = 1003
+internal const val PENDING_UPDATES_NOTIFICATION_ID = 1001
+internal const val KRATE_UPDATE_NOTIFICATION_ID = 1002
+internal const val AUTO_UPDATED_NOTIFICATION_ID = 1005
+internal const val AUTO_UPDATE_NEEDS_YOU_NOTIFICATION_ID = 1006
+internal const val UPDATE_ALL_RESULT_NOTIFICATION_ID = 1003
 internal const val KRATE_UPDATED_NOTIFICATION_ID = 1004
-private const val STATE_PREFS = "update_notifier"
+internal const val STATE_PREFS = "update_notifier"
 private const val KEY_PENDING_SIGNATURE = "pending_signature"
 private const val KEY_PENDING_READY = "pending_ready"
-private const val KEY_KRATE_VERSION = "krate_version"
+internal const val KEY_KRATE_VERSION = "krate_version"
 
 // local notifications for update-related events the user might not be watching the app for -
 // a pending catalog update found by ManifestCheckWorker (section 24 + 44.4 of the spec), a Krate
@@ -65,18 +70,19 @@ object UpdateNotifier {
         signature: String,
         downloaded: Boolean,
     ) {
+        // with Krate open the Updates tab and Home already show them; the next check says so if they're still there
+        if (appInForeground()) return
         val prefs = state(context)
         val sameUpdates = prefs.getString(KEY_PENDING_SIGNATURE, null) == signature
         val wasReady = sameUpdates && prefs.getBoolean(KEY_PENDING_READY, false)
-        // the same updates stay quiet, unless they've since been downloaded - that's worth one more "ready" notice
-        if (sameUpdates && wasReady == downloaded) return
-        prefs
-            .edit()
-            .putString(KEY_PENDING_SIGNATURE, signature)
-            .putBoolean(KEY_PENDING_READY, downloaded)
-            .apply()
-        // a "ready" notice whose file has gone (cache cleared) is corrected in place, never raised again once dismissed
-        if (sameUpdates && !downloaded && !isShowing(context, PENDING_UPDATES_NOTIFICATION_ID)) return
+        val covered = AutoUpdateNotices.needsYouCovers(context, apps.map { it.displayName })
+        val showing = isShowing(context, PENDING_UPDATES_NOTIFICATION_ID)
+        if (!shouldPostPendingNotice(sameUpdates, wasReady, downloaded, showing, covered)) {
+            // what changed is still remembered, so it isn't raised again later
+            if (!sameUpdates || wasReady != downloaded) rememberPending(prefs, signature, downloaded)
+            return
+        }
+        rememberPending(prefs, signature, downloaded)
         // names the apps instead of only counting them - "Mihon has an update" says what
         // to do with it at a glance, a bare "1 update available" doesn't
         val single = apps.singleOrNull()
@@ -126,6 +132,8 @@ object UpdateNotifier {
     ) {
         val prefs = state(context)
         if (prefs.getString(KEY_KRATE_VERSION, null) == version) return
+        // with Krate open, Home's own dialog says it, and says it better
+        if (appInForeground()) return
         prefs.edit().putString(KEY_KRATE_VERSION, version).apply()
         notify(
             context,
@@ -178,6 +186,8 @@ object UpdateNotifier {
         succeeded: Int,
         failed: Int,
     ) {
+        // the result is on the Updates screen when Krate is open, and a notification on top of it would say it twice
+        if (appInForeground()) return
         val moment =
             when {
                 failed == 0 -> Moment.INSTALLED
@@ -264,3 +274,39 @@ internal class KrateNotification(
     val actionLabel: String,
     val largeIcon: Bitmap? = null,
 )
+
+// whether the pending-updates notice goes up (or is corrected): a new set of updates does; the same set stays quiet,
+// except that its "ready" line is corrected in place while the notice is still there, never raised again once it has
+// been tapped or swiped away. When the "needs you" notice already names these apps, a second one would only repeat it
+internal fun shouldPostPendingNotice(
+    sameUpdates: Boolean,
+    wasReady: Boolean,
+    downloaded: Boolean,
+    showing: Boolean,
+    coveredByNeedsYou: Boolean,
+): Boolean =
+    when {
+        coveredByNeedsYou -> false
+        !sameUpdates -> true
+        wasReady == downloaded -> false
+        else -> showing
+    }
+
+private fun rememberPending(
+    prefs: SharedPreferences,
+    signature: String,
+    downloaded: Boolean,
+) {
+    prefs
+        .edit()
+        .putString(KEY_PENDING_SIGNATURE, signature)
+        .putBoolean(KEY_PENDING_READY, downloaded)
+        .apply()
+}
+
+private fun appInForeground(): Boolean =
+    ProcessLifecycleOwner
+        .get()
+        .lifecycle
+        .currentState
+        .isAtLeast(Lifecycle.State.STARTED)

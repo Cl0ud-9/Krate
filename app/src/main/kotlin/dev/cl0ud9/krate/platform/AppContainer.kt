@@ -29,6 +29,7 @@ import dev.cl0ud9.krate.domain.repository.CatalogRepository
 import dev.cl0ud9.krate.domain.repository.KrateBaselineStore
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.domain.updateall.UpdateAllEngine
+import dev.cl0ud9.krate.platform.autoupdate.AutoUpdateStanding
 import dev.cl0ud9.krate.platform.packageinfo.InstalledPackageReader
 import dev.cl0ud9.krate.platform.packageinfo.PackageManagerInstalledPackageReader
 import dev.cl0ud9.krate.platform.packageinstaller.PackageInstallerEngine
@@ -107,6 +108,7 @@ class AppContainer(
     val activityLogRepository: ActivityLogRepository = DataStoreActivityLogRepository(context.applicationContext)
     val krateBaselineStore: KrateBaselineStore = DataStoreKrateBaselineStore(context.applicationContext)
     val autoUpdateStore: AutoUpdateStore = DataStoreAutoUpdateStore(context.applicationContext)
+    internal val autoUpdateStanding = AutoUpdateStanding(settingsRepository, autoUpdateStore)
 
     // downloads, installs and uninstalls, kept going whether or not the app's page stays open
     val appWork =

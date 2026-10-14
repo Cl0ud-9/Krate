@@ -1,14 +1,16 @@
 package dev.cl0ud9.krate.platform.autoupdate
 
 import android.content.Context
+import androidx.core.app.NotificationManagerCompat
 import dev.cl0ud9.krate.domain.model.AppProfile
+import dev.cl0ud9.krate.platform.workers.AUTO_UPDATE_NEEDS_YOU_NOTIFICATION_ID
 import dev.cl0ud9.krate.platform.workers.KrateNotification
+import dev.cl0ud9.krate.platform.workers.PENDING_UPDATES_NOTIFICATION_ID
 import dev.cl0ud9.krate.platform.workers.UpdateNotifier
 import dev.cl0ud9.krate.voice.KrateVoice
 import dev.cl0ud9.krate.voice.Moment
 
 private const val AUTO_UPDATED_NOTIFICATION_ID = 1005
-private const val AUTO_UPDATE_NEEDS_YOU_NOTIFICATION_ID = 1006
 private const val PLAY_PROTECT_STOPPED_NOTIFICATION_ID = 1009
 private const val NOTICE_PREFS = "auto_update_notices"
 private const val NAME_SEPARATOR = '\u001f'
@@ -39,6 +41,8 @@ internal object AutoUpdateNotices {
         appName: String,
     ) {
         val names = gather(context, AUTO_UPDATE_NEEDS_YOU_NOTIFICATION_ID, appName)
+        // this one is the more specific; the general "updates are waiting" notice would only say it twice
+        NotificationManagerCompat.from(context).cancel(PENDING_UPDATES_NOTIFICATION_ID)
         UpdateNotifier.notify(
             context,
             AUTO_UPDATE_NEEDS_YOU_NOTIFICATION_ID,
@@ -70,6 +74,25 @@ internal object AutoUpdateNotices {
                 actionLabel = "Show me how",
             ),
         )
+    }
+
+    // whether the "needs you" notice is up and already names every one of these apps
+    fun needsYouCovers(
+        context: Context,
+        appNames: List<String>,
+    ): Boolean {
+        if (appNames.isEmpty() ||
+            !UpdateNotifier.isShowing(context, AUTO_UPDATE_NEEDS_YOU_NOTIFICATION_ID)
+        ) {
+            return false
+        }
+        val shown =
+            context
+                .getSharedPreferences(NOTICE_PREFS, Context.MODE_PRIVATE)
+                .getString("names:$AUTO_UPDATE_NEEDS_YOU_NOTIFICATION_ID", null)
+                ?.split(NAME_SEPARATOR)
+                .orEmpty()
+        return shown.containsAll(appNames)
     }
 
     // the names already on a notification that's still showing, plus this one

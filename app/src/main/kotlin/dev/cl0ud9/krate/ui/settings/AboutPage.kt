@@ -35,8 +35,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.platform.workers.UpdateNoticeClearing
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
+import dev.cl0ud9.krate.ui.util.ClearNoticesOnResume
 
 private const val SOURCE_URL = "https://github.com/Cl0ud-9/Krate"
 private val HERO_ICON_SIZE = 60.dp
@@ -50,6 +52,8 @@ fun AboutPage(
 ) {
     val viewModel = rememberSettingsViewModel()
     val uriHandler = LocalUriHandler.current
+    // the update notification points here; with the page open it has nothing left to say
+    ClearNoticesOnResume(UpdateNoticeClearing::clearKrateUpdateNotice)
     var showLicenses by rememberSaveable { mutableStateOf(false) }
     SettingsPage(scrollState, topContentPadding) {
         AboutHeroCard(versionName = rememberVersionName())

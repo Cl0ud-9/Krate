@@ -52,6 +52,11 @@ internal class PageTrip(
     val onTop: State<Boolean>,
 )
 
+// whether the page the icon is on is being scrolled, or already is: a flight that is still landing would otherwise go
+// on towards where the icon's slot was a moment ago, trailing behind the card as it moves, drawn over the page and
+// clipped like a list icon, so the icon seems to slip away and come back. A scroll ends the flight where it is
+internal val LocalPageScrolled = staticCompositionLocalOf<State<Boolean>?> { null }
+
 // the size the app's page shows its icon at, which the flight home starts from
 internal val PageIconSize = 56.dp
 
@@ -189,6 +194,7 @@ internal fun Modifier.sharedDetailsIcon(app: AppProfile): Modifier {
     // always armed, wherever the icon has scrolled to: whether it can fly is decided when the page goes, from where
     // the icon is by then, not from where it happened to be a frame earlier. Dragging the page shrinks and moves it,
     // so an icon tucked under the bar used to arm only on a slow drag and not at all on a quick one
+    val scrolled = LocalPageScrolled.current
     val armed = remember(key) { BackFlight.Armed(key, app) }
     DisposableEffect(armed) {
         BackFlight.armed = armed
@@ -196,7 +202,8 @@ internal fun Modifier.sharedDetailsIcon(app: AppProfile): Modifier {
     }
     return onGloballyPositioned { coordinates -> armed.from = coordinates }
         .graphicsLayer { alpha = if (BackFlight.flying?.key == key) 0f else 1f }
-        .sharedIconFor(key) { trip?.leaving?.value != true }
+        // only while the page is arriving, and only until it's touched: at rest there is nothing for the icon to fly to
+        .sharedIconFor(key) { trip?.entering?.value == true && scrolled?.value != true }
 }
 
 // a shared element only on the way in: [linked] is false for a trip back, which BackFlight flies instead

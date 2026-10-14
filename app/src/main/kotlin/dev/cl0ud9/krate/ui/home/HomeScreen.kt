@@ -52,6 +52,7 @@ import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.SupportStatus
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateStatus
 import dev.cl0ud9.krate.platform.selfupdate.SelfUpdateState
+import dev.cl0ud9.krate.platform.workers.UpdateNoticeClearing
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
 import dev.cl0ud9.krate.ui.components.KrateMessage
@@ -68,6 +69,7 @@ import dev.cl0ud9.krate.ui.navigation.hiddenWhileIconsFly
 import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.navigation.sharedAppIcon
 import dev.cl0ud9.krate.ui.theme.ShapeCache
+import dev.cl0ud9.krate.ui.util.ClearNoticesOnResume
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
 import dev.cl0ud9.krate.ui.util.formatRelativeTime
 import dev.cl0ud9.krate.ui.util.krateViewModel
@@ -108,13 +110,18 @@ fun HomeScreen(
     val updateAnnouncement by viewModel.updateAnnouncement.collectAsStateWithLifecycle()
     val selfUpdateState by viewModel.selfUpdateState.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
+    // Recent activity below lists what was updated while they were away
+    ClearNoticesOnResume(UpdateNoticeClearing::clearAutoUpdatedNotice)
 
-    // held back while the post-setup intro plays, then shown the moment the Krate mark lands
+    // held back while the post-setup intro plays, then shown the moment the Krate mark lands. One at a time: the notes
+    // of the update just installed first, and a newer one's announcement only once they're closed
     val whatsNew by viewModel.whatsNew.collectAsStateWithLifecycle()
     if (!LocalIntroPlaying.current) {
-        KrateUpdatePrompt(updateAnnouncement, selfUpdateState, viewModel)
-        whatsNew?.takeIf { updateAnnouncement == null }?.let { release ->
-            WhatsNewDialog(release = release, onDismiss = viewModel::dismissWhatsNew)
+        val notes = whatsNew
+        if (notes != null) {
+            WhatsNewDialog(release = notes, onDismiss = viewModel::dismissWhatsNew)
+        } else {
+            KrateUpdatePrompt(updateAnnouncement, selfUpdateState, viewModel)
         }
     }
 

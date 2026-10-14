@@ -12,6 +12,8 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,7 +32,10 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,15 +58,19 @@ import dev.cl0ud9.krate.domain.repository.Baseline
 import dev.cl0ud9.krate.domain.repository.effectiveBaseline
 import dev.cl0ud9.krate.domain.repository.forTrack
 import dev.cl0ud9.krate.domain.repository.isNewerThan
+import dev.cl0ud9.krate.platform.autoupdate.UpdateMode
 import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
+import dev.cl0ud9.krate.ui.components.UpdateModeLine
 import dev.cl0ud9.krate.ui.components.rememberAppIcon
+import dev.cl0ud9.krate.ui.components.rememberUpdateMode
 import dev.cl0ud9.krate.ui.components.systemNavBarClearance
 import dev.cl0ud9.krate.ui.home.PlayProtectReminder
 import dev.cl0ud9.krate.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.krate.ui.navigation.IconFrost
 import dev.cl0ud9.krate.ui.navigation.LocalLiquidGlass
+import dev.cl0ud9.krate.ui.navigation.LocalPageScrolled
 import dev.cl0ud9.krate.ui.navigation.PageIconSize
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.navigation.sharedDetailsIcon
@@ -305,72 +314,75 @@ private fun AppDetailsContent(
     val uninstalling = state.installStatus is InstallStatus.Uninstalling || awaitingUninstallConfirm
     // picking a version resizes the action above the list and the notes below it; the list stays under the finger
     val anchor = rememberScrollAnchor(scrollState)
+    val scrolled = remember(scrollState) { derivedStateOf { scrollState.isScrollInProgress || scrollState.value > 0 } }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .anchoredPage(anchor)
-                .padding(
-                    top = topContentPadding + DetailContentTopGap,
-                    start = 20.dp,
-                    end = 20.dp,
-                    bottom = 20.dp + systemNavBarClearance,
-                ),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        // everything above the version list, in one block the list keeps its place against
-        Column(modifier = Modifier.aboveAnchor(anchor), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            // name, version and installed status as one compact block
-            AppDetailsHeader(
-                app = app,
-                installedVersionName = state.installedVersionName,
-                uninstalling = uninstalling,
-                onUninstall = onUninstall,
-                moment = installMomentFor(state),
-            )
+    CompositionLocalProvider(LocalPageScrolled provides scrolled) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .anchoredPage(anchor)
+                    .padding(
+                        top = topContentPadding + DetailContentTopGap,
+                        start = 20.dp,
+                        end = 20.dp,
+                        bottom = 20.dp + systemNavBarClearance,
+                    ),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // everything above the version list, in one block the list keeps its place against
+            Column(modifier = Modifier.aboveAnchor(anchor), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // name, version and installed status as one compact block
+                AppDetailsHeader(
+                    app = app,
+                    installedVersionName = state.installedVersionName,
+                    uninstalling = uninstalling,
+                    onUninstall = onUninstall,
+                    moment = installMomentFor(state),
+                )
 
-            state.announcements.forEach { item ->
-                AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = onDismissAnnouncement)
+                state.announcements.forEach { item ->
+                    AnnouncementCard(item = item, onOpenApp = onNavigateToApp, onDismiss = onDismissAnnouncement)
+                }
+
+                // shown before the user ever reaches the Install button - a required dependency missing
+                // (e.g. a sign-in helper another app relies on) means the app installs but silently fails to open,
+                // so this is surfaced as early and as plainly as possible rather than only as a disabled
+                // button and small helper text further down the page
+                val unmetDependencies = state.dependencies.filter { !it.installed }
+                if (unmetDependencies.isNotEmpty()) {
+                    MissingDependencyWarning(unmetDependencies = unmetDependencies, onNavigateToApp = onNavigateToApp)
+                }
+
+                // the primary action moves right under the header instead of sitting below Release notes,
+                // which could push it off-screen for apps with long release notes - a detail page exists
+                // to get the user to this action, so it should not be the thing they have to scroll to find
+                val guarded = rememberBackupGuard(state, onInstall, onRetryAsCleanInstall)
+                DownloadSection(
+                    state = state,
+                    onDownload = onDownload,
+                    onInstall = guarded.install,
+                    onRetryAsCleanInstall = guarded.retryFromScratch,
+                    onCancelDownload = onCancelDownload,
+                    onBackToLatest = onBackToLatest,
+                )
+
+                // what it needs switched on, and its settings, right under the action once it's installed
+                InstalledCards(app = app, state = state, uninstalling = uninstalling)
+
+                // Play Protect was paused for this app: once it's in, ask for it back on right here
+                PlayProtectReminder(onlyFor = app.packageName)
+
+                // a find of the person's own, high enough up to be seen: the nudge to suggest it for everyone
+                if (app.isTracked) ShareFindCard(app)
+
+                // what the app is sits right under the action, before the finer controls further down
+                AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
             }
 
-            // shown before the user ever reaches the Install button - a required dependency missing
-            // (e.g. a sign-in helper another app relies on) means the app installs but silently fails to open,
-            // so this is surfaced as early and as plainly as possible rather than only as a disabled
-            // button and small helper text further down the page
-            val unmetDependencies = state.dependencies.filter { !it.installed }
-            if (unmetDependencies.isNotEmpty()) {
-                MissingDependencyWarning(unmetDependencies = unmetDependencies, onNavigateToApp = onNavigateToApp)
-            }
-
-            // the primary action moves right under the header instead of sitting below Release notes,
-            // which could push it off-screen for apps with long release notes - a detail page exists
-            // to get the user to this action, so it should not be the thing they have to scroll to find
-            val guarded = rememberBackupGuard(state, onInstall, onRetryAsCleanInstall)
-            DownloadSection(
-                state = state,
-                onDownload = onDownload,
-                onInstall = guarded.install,
-                onRetryAsCleanInstall = guarded.retryFromScratch,
-                onCancelDownload = onCancelDownload,
-                onBackToLatest = onBackToLatest,
-            )
-
-            // what it needs switched on, and its settings, right under the action once it's installed
-            InstalledCards(app = app, state = state, uninstalling = uninstalling)
-
-            // Play Protect was paused for this app: once it's in, ask for it back on right here
-            PlayProtectReminder(onlyFor = app.packageName)
-
-            // a find of the person's own, high enough up to be seen: the nudge to suggest it for everyone
-            if (app.isTracked) ShareFindCard(app)
-
-            // what the app is sits right under the action, before the finer controls further down
-            AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
+            NotesAndHistory(state = state, anchor = anchor, onSelectVersion = onSelectVersion)
         }
-
-        NotesAndHistory(state = state, anchor = anchor, onSelectVersion = onSelectVersion)
     }
 }
 
@@ -492,7 +504,7 @@ private fun AppDetailsHeader(
                     )
                 }
 
-                InstalledStatusRow(installedVersionName = installedVersionName)
+                InstalledStatusRow(app = app, installedVersionName = installedVersionName)
             }
         }
     }
@@ -523,8 +535,12 @@ private fun UninstallIconControl(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun InstalledStatusRow(installedVersionName: String?) {
+private fun InstalledStatusRow(
+    app: AppProfile,
+    installedVersionName: String?,
+) {
     val text = installedVersionName?.let { "Installed: version $it" } ?: "Not installed on this device"
     val tint =
         if (installedVersionName != null) {
@@ -533,10 +549,22 @@ private fun InstalledStatusRow(installedVersionName: String?) {
             MaterialTheme.colorScheme.onSurfaceVariant
         }
     val icon = if (installedVersionName != null) painterResource(R.drawable.ic_check_circle_rounded) else null
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+    val mode = rememberUpdateMode(app, installed = installedVersionName != null)
+    // how updates arrive sits on the same line, and drops under it when the text is large
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+            }
+            Text(text = text, style = MaterialTheme.typography.bodySmall, color = tint)
         }
-        Text(text = text, style = MaterialTheme.typography.bodySmall, color = tint)
+        AnimatedVisibility(visible = mode != null, enter = fadeIn() + expandHorizontally(), exit = fadeOut()) {
+            // the mode is null as the line fades out; it only has to hold something while it does
+            UpdateModeLine(mode ?: UpdateMode.BY_HAND)
+        }
     }
 }

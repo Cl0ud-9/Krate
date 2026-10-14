@@ -1,12 +1,17 @@
 package dev.cl0ud9.krate.ui.details
 
 import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,8 +20,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.cl0ud9.krate.domain.links.declaredHosts
 import dev.cl0ud9.krate.domain.links.wantedHosts
@@ -28,6 +35,7 @@ import dev.cl0ud9.krate.platform.backup.AutoLinks
 import dev.cl0ud9.krate.platform.links.OpenByDefault
 import dev.cl0ud9.krate.platform.setup.appInfoIntent
 import dev.cl0ud9.krate.ui.components.ActionSheet
+import dev.cl0ud9.krate.ui.theme.ShapeCache
 
 @Composable
 internal fun rememberLinkStanding(app: AppProfile): LinkStanding? {
@@ -50,9 +58,32 @@ internal fun rememberLinkStanding(app: AppProfile): LinkStanding? {
             } else {
                 declaredHosts(states.map { it.host }, { OpenByDefault.takenByAnother(context, it, app.packageName) })
             }
-        LinkStanding(wanted, states)
+        // only for what the catalog asks for: an address another app holds gets its owner let go. A tracked app's own
+        // addresses are left alone when another app has them
+        val owners = if (links != null) holders(context, wanted, app.packageName) else emptyMap()
+        LinkStanding(wanted, states, owners, owners.values.toSet().associateWith { labelOf(context, it) })
     }
 }
+
+// each address another app opens now, with that app
+private fun holders(
+    context: Context,
+    wanted: List<String>,
+    own: String,
+): Map<String, String> {
+    if (!OpenByDefault.supported) return emptyMap()
+    return wanted
+        .mapNotNull { host -> OpenByDefault.ownerOf(context, host)?.takeIf { it != own }?.let { host to it } }
+        .toMap()
+}
+
+private fun labelOf(
+    context: Context,
+    packageName: String,
+): String =
+    runCatching {
+        context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(packageName, 0)).toString()
+    }.getOrDefault(packageName)
 
 private fun isInstalled(
     context: Context,
@@ -107,32 +138,57 @@ internal fun OpenLinksSheet(
             FilledTonalButton(onClick = { startSafely(context, openPage(app), appInfoIntent(app.packageName)) }) {
                 Text("Open the page")
             }
+            // the other app's page too, for doing it by hand: its links have to be off before these can come here
+            standing.releases.forEach { owner ->
+                TextButton(onClick = { startSafely(context, OpenByDefault.intent(owner), appInfoIntent(owner)) }) {
+                    Text("Open ${standing.ownerNames[owner] ?: owner}'s page")
+                }
+            }
             if (running) StopButton()
             if (canDoIt(helperOn, standing, running)) {
                 Button(
-                    onClick = { AutoLinks.openLinks(app.packageName, standing.todo) },
+                    onClick = { AutoLinks.openLinks(app.packageName, standing.toTick, standing.releases) },
                 ) { Text("Do it for me") }
             }
         },
     ) {
         Text(text = introText(app), style = MaterialTheme.typography.bodyMedium)
-        standing.wanted.forEach { host -> LinkLine(host, on = host !in standing.todo) }
-        statusText(state, helperOn, standing)?.let {
+        standing.wanted.forEach { host ->
+            LinkLine(host, on = host !in standing.todo, heldBy = standing.ownerName(host))
+        }
+        releaseNote(app, standing)?.let { SheetNote(it) }
+        statusText(state, standing)?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text(
-            text =
-                "To switch back, open the same page and untick them, or pick another app for them there. Nothing " +
-                    "else on your phone changes.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // without the helper there's only the page to open; the helper is the thing that does this for them
+        if (needsHelper(helperOn, standing, running)) {
+            Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TurnOnAutoBackup(what = TURN_ON_LINKS)
+                }
+            }
+        }
+        SheetNote(
+            "To switch back, open the same page and untick them, or pick another app for them there. Nothing " +
+                "else on your phone changes.",
         )
     }
 }
+
+private const val TURN_ON_LINKS =
+    "Krate can switch these on for you: it opens Android's settings and ticks them. It needs Android's " +
+        "accessibility access, and only uses it while it does this."
+
+// the way to switch the helper on is shown where the button that needs it would be
+private fun needsHelper(
+    helperOn: Boolean,
+    standing: LinkStanding,
+    running: Boolean,
+): Boolean = !helperOn && OpenByDefault.supported && !running && standing.todo.isNotEmpty()
 
 private fun canDoIt(
     helperOn: Boolean,

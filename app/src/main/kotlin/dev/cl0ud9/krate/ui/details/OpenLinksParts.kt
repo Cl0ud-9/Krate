@@ -28,13 +28,19 @@ internal fun introText(app: AppProfile): String =
 internal fun LinkLine(
     host: String,
     on: Boolean,
+    heldBy: String? = null,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(text = if (on) "✓" else "•", color = MaterialTheme.colorScheme.primary)
         Column {
             Text(text = host, style = MaterialTheme.typography.bodyMedium)
             Text(
-                text = if (on) "Opens here already" else "Not switched on yet",
+                text =
+                    when {
+                        heldBy != null -> "Opens in $heldBy now"
+                        on -> "Opens here already"
+                        else -> "Not switched on yet"
+                    },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -42,9 +48,28 @@ internal fun LinkLine(
     }
 }
 
+@Composable
+internal fun SheetNote(text: String) {
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+// said before anything is done: an address another app holds only moves once that app's links are switched off, which
+// moves all of that app's links to the browser
+internal fun releaseNote(
+    app: AppProfile,
+    standing: LinkStanding,
+): String? {
+    val names = standing.releaseNames()
+    if (names.isEmpty() || !OpenByDefault.supported) return null
+    val who = names.joinToString(" and ")
+    return "$who opens some of these now, and Android lets that app keep them. To give them to ${app.displayName}, " +
+        "Krate switches off $who's own links in Android's settings first. All of its links then open in your " +
+        "browser instead. Switch them back on its \"Open by default\" page whenever you like. To do it yourself: " +
+        "open $who's page, switch off its links, then tick these on ${app.displayName}'s."
+}
+
 internal fun statusText(
     state: AutoBackupState?,
-    helperOn: Boolean,
     standing: LinkStanding,
 ): String? =
     when {
@@ -54,7 +79,6 @@ internal fun statusText(
             "Android didn't take them all. Open the page and tick the rest."
         state is AutoBackupState.Done -> "Done."
         !standing.readable && OpenByDefault.supported -> "Krate can't read this app's links on this phone."
-        !helperOn -> "Turn on Krate's helper (in Backups) and Krate can tick them for you."
         else -> null
     }
 

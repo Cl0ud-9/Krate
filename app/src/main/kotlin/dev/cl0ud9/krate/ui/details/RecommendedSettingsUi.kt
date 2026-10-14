@@ -162,7 +162,11 @@ internal fun RecommendedSheet(
                 byHand = !byHand
             }) { Text(if (byHand) "Hide the by-hand way" else "Prefer to paste them yourself?") }
         }
-        if (byHand) ByHandText(guide)
+        if (byHand) {
+            ByHandText(guide)
+            // with the helper in the footer the copy would have nowhere to be; without one, the footer has it
+            if (spec != null) ByHandButtons(app, recommended)
+        }
     }
 }
 

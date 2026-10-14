@@ -14,6 +14,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -48,6 +50,7 @@ import dev.cl0ud9.krate.domain.model.fromGitHub
 import dev.cl0ud9.krate.domain.model.isTracked
 import dev.cl0ud9.krate.domain.model.latestVersionName
 import dev.cl0ud9.krate.platform.appContainer
+import dev.cl0ud9.krate.platform.autoupdate.UpdateMode
 import dev.cl0ud9.krate.platform.work.AppWorkState
 import dev.cl0ud9.krate.ui.navigation.SharedIconOrigin
 import dev.cl0ud9.krate.ui.navigation.glassRim
@@ -128,19 +131,23 @@ private fun AppRowText(
 }
 
 // the badges under the line; installing or removing the app grows or folds the row smoothly rather than in one frame
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RowBadges(
     app: AppProfile,
     installed: Boolean,
 ) {
+    val automatic = rememberUpdateMode(app, installed) == UpdateMode.AUTOMATIC
     AnimatedVisibility(
         visible = installed || app.isTracked || app.supportStatus != SupportStatus.SUPPORTED,
         enter = fadeIn() + expandVertically(),
         exit = fadeOut() + shrinkVertically(),
     ) {
-        Row(
+        // wraps instead of running off the card when the text is large
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(top = 6.dp),
         ) {
             SupportStatusBadge(status = app.supportStatus)
@@ -149,6 +156,11 @@ private fun RowBadges(
                 enter = fadeIn() + expandHorizontally(),
                 exit = fadeOut() + shrinkHorizontally(),
             ) { InstalledBadge() }
+            AnimatedVisibility(
+                visible = automatic,
+                enter = fadeIn() + expandHorizontally(),
+                exit = fadeOut() + shrinkHorizontally(),
+            ) { AutoUpdateBadge() }
             if (app.isTracked) TrackedBadge(onGitHub = app.fromGitHub)
         }
     }

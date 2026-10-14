@@ -66,8 +66,9 @@ internal data class AutoBackupJob(
     // for a link: where to go, and the label of the button to tap once the app asks
     val link: String? = null,
     val confirm: String? = null,
-    // for OPEN_LINKS: the addresses to switch on
+    // for OPEN_LINKS: the addresses to switch on, and the apps holding addresses that have to let go of them first
     val hosts: List<String> = emptyList(),
+    val releases: List<String> = emptyList(),
     // the text to put back, for a restore; the recommended settings, for applying them
     val text: String? = null,
     // which set of recommended settings, so it's remembered as applied
@@ -180,7 +181,11 @@ object AutoLinks {
     fun openLinks(
         packageName: String,
         hosts: List<String>,
-    ): Boolean = AutoBackupRunner.start(AutoBackupJob(packageName, EMPTY_SPEC, BackupMode.OPEN_LINKS, hosts = hosts))
+        releases: List<String> = emptyList(),
+    ): Boolean =
+        AutoBackupRunner.start(
+            AutoBackupJob(packageName, EMPTY_SPEC, BackupMode.OPEN_LINKS, hosts = hosts, releases = releases),
+        )
 
     private val EMPTY_SPEC = AutoBackup(emptyList(), "", "")
 }

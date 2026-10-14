@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.platform.selfupdate.notePlayProtect
+import dev.cl0ud9.krate.platform.workers.UpdateNoticeClearing
 import dev.cl0ud9.krate.platform.workers.UpdateNotifier
 import dev.cl0ud9.krate.ui.components.AppListItem
 import dev.cl0ud9.krate.ui.components.EmptyState
@@ -36,6 +37,7 @@ import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
 import dev.cl0ud9.krate.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.krate.ui.navigation.glassSource
 import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
+import dev.cl0ud9.krate.ui.util.ClearNoticesOnResume
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
 import dev.cl0ud9.krate.ui.util.StaggeredAppear
 import dev.cl0ud9.krate.ui.util.krateViewModel
@@ -90,6 +92,8 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
     val updateAllState by viewModel.updateAllState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     RefreshOnResume(viewModel::refresh)
+    // these notifications all point here: with the screen in front they have nothing left to say
+    ClearNoticesOnResume(UpdateNoticeClearing::clearUpdateNotices)
 
     // Update All can take a while across several apps - if the user backgrounds the app partway
     // through, this is the one place a notification adds real value instead of just repeating

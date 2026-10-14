@@ -7,6 +7,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
@@ -73,6 +74,11 @@ private val OVERLAY_PACKAGES =
 
 private const val STOPPED = "Stopped when you left the app, so it may not have finished. Nothing else was touched."
 
+// how long another screen has to stay in front before it counts as the person having gone: phones draw their own
+// things over an app for a moment as it opens (a transition, a floating bubble, a permission question), and that must
+// not end a job that was working fine
+private const val AWAY_GRACE_MS = 1_500L
+
 // the person went somewhere else (home, another app, back to Krate) while the helper was working
 private class Interrupted : Exception()
 
@@ -103,6 +109,9 @@ class KrateBackupService : AccessibilityService() {
     private var reachedApp = false
     private var interrupted = false
 
+    // something else in front, and for how long
+    private val away = AwayTimer(AWAY_GRACE_MS)
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         when (event?.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> noteWindow(event.packageName?.toString())
@@ -112,7 +121,19 @@ class KrateBackupService : AccessibilityService() {
 
     private fun noteWindow(sender: String?) {
         if (sender == jobPackage) reachedApp = true
-        if (reachedApp && sender == packageName && jobPackage != null) interrupt()
+        if (reachedApp && sender == packageName && jobPackage != null) checkReturned()
+    }
+
+    // Krate's own window came up. A phone can report that in passing as the app opens, so it only ends the job when
+    // Krate is still in front a moment later
+    private fun checkReturned() {
+        scope.launch {
+            delay(AWAY_GRACE_MS)
+            if (current?.isActive == true && rootInActiveWindow?.packageName?.toString() == packageName) {
+                away.reset()
+                interrupt()
+            }
+        }
     }
 
     // a notification carries its own data; a short on-screen message carries none. Android draws an app's short
@@ -150,6 +171,7 @@ class KrateBackupService : AccessibilityService() {
     internal fun run(job: AutoBackupJob) {
         interrupted = false
         reachedApp = false
+        away.reset()
         current = scope.launch { runJob(job) }
     }
 
@@ -170,7 +192,7 @@ class KrateBackupService : AccessibilityService() {
 
     // how the job ended, whatever happened: done, or why not. An interruption is not an error; it's the person leaving
     private suspend fun outcomeOf(job: AutoBackupJob): AutoBackupState {
-        val stopped = AutoBackupState.Failed(job.packageName, job.mode, STOPPED)
+        val stopped = { AutoBackupState.Failed(job.packageName, job.mode, stoppedText()) }
         return try {
             listenTo(job.watched)
             jobPackage = job.watched
@@ -179,9 +201,9 @@ class KrateBackupService : AccessibilityService() {
             AutoBackupState.Failed(job.packageName, job.mode, "That took too long, so Krate stopped.")
         } catch (_: Interrupted) {
             interrupted = true
-            stopped
+            stopped()
         } catch (_: CancellationException) {
-            stopped
+            stopped()
         } catch (missing: StepNotFound) {
             AutoBackupState.Failed(job.packageName, job.mode, "Couldn't find \"${missing.step}\" in the app.")
         } catch (failure: IllegalStateException) {
@@ -206,22 +228,50 @@ class KrateBackupService : AccessibilityService() {
         )
     }
 
-    // Android's "Open by default" page for the app, the wanted addresses ticked in its "Add link" box, then Add. Only
-    // the
-    // addresses asked for are touched, and one the page doesn't list (already on, or not the app's) is simply skipped
+    // first, any app holding an address wanted here lets go of it; then Android's "Open by default" page for the app,
+    // the wanted addresses ticked in its "Add link" box, then Add. Only the addresses asked for are touched, and one
+    // the page doesn't list (already on, or not the app's) is simply skipped
     private suspend fun openLinks(job: AutoBackupJob): WalkResult {
-        if (job.hosts.isEmpty()) error("There were no links to switch on.")
-        val opened = runCatching { startActivity(OpenByDefault.intent(job.packageName)) }.isSuccess
-        if (!opened) error("This phone has no Open by default page Krate can reach.")
-        delay(LAUNCH_SETTLE_MS)
+        if (job.hosts.isEmpty() && job.releases.isEmpty()) error("There were no links to switch on.")
+        job.releases.forEach { owner -> releaseLinksOf(owner) }
+        if (job.hosts.isEmpty()) return WalkResult(changed = job.releases.size)
+        openOpenByDefault(job.packageName)
         tap(job.watched, UiTarget(text = "Add link"))
         delay(STEP_SETTLE_MS)
         val ticked = job.hosts.count { host -> tickHost(job.watched, host) }
         if (ticked == 0) error("Couldn't find those links on the page.")
         tap(job.watched, UiTarget(text = "Add"))
         delay(STEP_SETTLE_MS)
-        return WalkResult(changed = ticked)
+        return WalkResult(changed = ticked + job.releases.size)
     }
+
+    private suspend fun openOpenByDefault(packageName: String) {
+        val opened = runCatching { startActivity(OpenByDefault.intent(packageName)) }.isSuccess
+        if (!opened) error("This phone has no Open by default page Krate can reach.")
+        delay(LAUNCH_SETTLE_MS)
+    }
+
+    // an app that holds an address outranks one the person ticked it for, so its own links go to the browser first;
+    // that is all of that app's links, which the page says before anything is done. Left as it is when already off
+    private suspend fun releaseLinksOf(owner: String) {
+        openOpenByDefault(owner)
+        val page = waitFor(SETTINGS_PACKAGE) { root -> root.takeIf { it.linkSwitch() != null } }
+        val standing = page?.linkSwitch() ?: error("Couldn't find the switch for ${labelOf(owner)}'s links.")
+        if (standing !is LinkSwitch.On) return
+        val clickable = standing.turnOff.clickableSelfOrAncestor()
+        stillThere(SETTINGS_PACKAGE)
+        if (clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) != true) {
+            tapOnScreen(SETTINGS_PACKAGE, standing.turnOff)
+        }
+        // the switch takes a moment to slide over, so the page is looked at for a few seconds rather than once
+        val off =
+            waitFor(SETTINGS_PACKAGE, DIALOG_CHECK_MS) { root -> root.takeIf { it.linkSwitch() is LinkSwitch.Off } }
+        if (off == null) error("${labelOf(owner)}'s links wouldn't switch off. Turn them off on its page.")
+    }
+
+    private fun labelOf(packageName: String): String =
+        runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, 0)).toString() }
+            .getOrDefault(packageName)
 
     // the row whose label starts with the address (a note naming the app that has it now can follow it), tapped
     private fun tickHost(
@@ -384,12 +434,19 @@ class KrateBackupService : AccessibilityService() {
         if (clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) != true) tapOnScreen(packageName, found)
     }
 
-    // whether the person has left the app being worked in: another app, home, or Krate itself is in front. System
-    // questions over the app don't count
+    // whether the person has left the app being worked in: another app, home, or Krate itself has been in front for a
+    // moment. System questions over the app don't count, and neither does something passing over it
     private fun personLeft(watched: String): Boolean {
         val front = rootInActiveWindow?.packageName?.toString()
         // not before the helper has reached the app: Krate is in front until the app opens
-        return reachedApp && front != null && front != watched && front !in OVERLAY_PACKAGES
+        val elsewhere = reachedApp && front != null && front != watched && front !in OVERLAY_PACKAGES
+        return away.away(elsewhere, SystemClock.uptimeMillis(), front.takeIf { it != packageName })
+    }
+
+    // why the job stopped, naming what came in front when it wasn't Krate
+    private fun stoppedText(): String {
+        val other = labelOf(away.who ?: return STOPPED)
+        return "Stopped because $other came in front of the app, so it may not have finished. Nothing else was touched."
     }
 
     private fun stillThere(watched: String) {
@@ -404,7 +461,9 @@ class KrateBackupService : AccessibilityService() {
         watched: String,
         node: AccessibilityNodeInfo,
     ) {
-        stillThere(watched)
+        // strictly, with no grace: a tap is the one thing that must never land on someone else's screen
+        val front = rootInActiveWindow?.packageName?.toString()
+        if (front != null && front != watched && front !in OVERLAY_PACKAGES) throw Interrupted()
         tapAt(node)
     }
 
@@ -520,7 +579,7 @@ private fun AccessibilityNodeInfo.matchCount(target: UiTarget): Int =
 private fun AccessibilityNodeInfo.find(predicate: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? =
     findAll(predicate).firstOrNull()
 
-private fun AccessibilityNodeInfo.findAll(predicate: (AccessibilityNodeInfo) -> Boolean): List<AccessibilityNodeInfo> {
+internal fun AccessibilityNodeInfo.findAll(predicate: (AccessibilityNodeInfo) -> Boolean): List<AccessibilityNodeInfo> {
     val found = mutableListOf<AccessibilityNodeInfo>()
     val queue = ArrayDeque(listOf(this))
     while (queue.isNotEmpty()) {
@@ -531,7 +590,7 @@ private fun AccessibilityNodeInfo.findAll(predicate: (AccessibilityNodeInfo) -> 
     return found
 }
 
-private fun AccessibilityNodeInfo.clickableSelfOrAncestor(): AccessibilityNodeInfo? {
+internal fun AccessibilityNodeInfo.clickableSelfOrAncestor(): AccessibilityNodeInfo? {
     var node: AccessibilityNodeInfo? = this
     while (node != null && !node.isClickable) node = node.parent
     return node

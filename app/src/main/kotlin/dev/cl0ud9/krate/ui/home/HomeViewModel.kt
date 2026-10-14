@@ -169,8 +169,10 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             val status = runCatching { krateUpdateChecker.check() }.getOrNull()
-            if (status is KrateUpdateStatus.UpdateAvailable) {
+            if (status is KrateUpdateStatus.UpdateAvailable && whatsNewTracker.announcementDue(status.latestVersion)) {
                 mutableUpdateAnnouncement.value = status
+                // on screen now, so the notification about it has nothing left to say
+                whatsNewTracker.announcementShown(status.latestVersion)
             }
         }
     }
@@ -214,6 +216,7 @@ class HomeViewModel(
     }
 
     fun dismissUpdateAnnouncement() {
+        mutableUpdateAnnouncement.value?.let { whatsNewTracker.announcementDone(it.latestVersion) }
         mutableUpdateAnnouncement.value = null
     }
 

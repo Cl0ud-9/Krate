@@ -79,7 +79,7 @@ internal fun LinksInstallPrompt(
             TextButton(onClick = { handled = true }) { Text("Not now") }
             Button(onClick = {
                 if (helperOn) {
-                    AutoLinks.openLinks(app.packageName, standing.todo)
+                    AutoLinks.openLinks(app.packageName, standing.toTick, standing.releases)
                     handled = true
                 } else {
                     sheet = true
