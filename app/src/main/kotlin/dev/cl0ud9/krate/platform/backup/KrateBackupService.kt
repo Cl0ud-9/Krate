@@ -412,6 +412,10 @@ class KrateBackupService : AccessibilityService() {
             error("Couldn't paste into the backup box.")
         }
         delay(STEP_SETTLE_MS)
+        // the box has to hold what was pasted before it's imported: a field can accept the action and keep its old text
+        field.refresh()
+        val held = if (field.isShowingHintText) "" else field.text?.toString().orEmpty()
+        check(sameSettingsText(held, text)) { "The app's box didn't take the settings, so nothing was imported." }
         appMessage = null
         tap(job.packageName, UiTarget(text = job.spec.apply))
         var waited = 0L
@@ -621,3 +625,9 @@ internal fun AccessibilityNodeInfo.clickableSelfOrAncestor(): AccessibilityNodeI
     while (node != null && !node.isClickable) node = node.parent
     return node
 }
+
+// the same text apart from spacing, which an input box is free to change
+internal fun sameSettingsText(
+    held: String,
+    wanted: String,
+): Boolean = held.filterNot(Char::isWhitespace) == wanted.filterNot(Char::isWhitespace)
