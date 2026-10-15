@@ -74,6 +74,6 @@ private fun installPromptBody(
         }
     val more = summary.size - PREVIEW_PICKS
     val rest = if (more > 0) ", and $more more" else ""
-    return "${app.displayName} is in. Krate can set it up the way it likes it: $first$rest. Your own settings are " +
-        "saved first, so you can always go back."
+    return "${app.displayName} is in. Krate can set it up the way it likes it: $first$rest. Anything else goes back " +
+        "to its default, and your own settings are saved first, so you can always go back."
 }

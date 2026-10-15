@@ -45,6 +45,8 @@ sealed interface AutoBackupState {
         val nothingToSave: Boolean = false,
         // for recommended settings: how many of them changed something (none: they were already set that way)
         val changed: Int = 0,
+        // for recommended settings: how many of those were your own settings going back to their default
+        val reset: Int = 0,
         // what the app said on applying, when it said anything ("Imported 12 settings")
         val appSaid: String? = null,
     ) : AutoBackupState

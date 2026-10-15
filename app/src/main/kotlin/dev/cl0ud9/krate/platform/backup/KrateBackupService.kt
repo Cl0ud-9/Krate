@@ -62,6 +62,8 @@ private class WalkResult(
     val text: String? = null,
     // how many recommended settings changed something
     val changed: Int = 0,
+    // how many of the changes were your own settings going back to their default, as the picks don't mention them
+    val reset: Int = 0,
     // what the app said on importing, if anything
     val appSaid: String? = null,
 )
@@ -244,6 +246,7 @@ class KrateBackupService : AccessibilityService() {
             job.mode,
             nothingToSave = job.mode == BackupMode.SAVE && text.isNullOrBlank(),
             changed = walked.changed,
+            reset = walked.reset,
             appSaid = walked.appSaid,
         )
     }
@@ -385,19 +388,23 @@ class KrateBackupService : AccessibilityService() {
             error("Couldn't read the app's current settings, so nothing was changed.")
         }
         val changed = SettingsText.changes(ownSettings, pickedSettings)
+        val resets = SettingsText.resets(ownSettings, pickedSettings)
         KrateLog.event(
             "helper read",
             "box ${own.length} chars, ${ownSettings.size} settings; picks ${pickedSettings.size}; " +
-                "to change ${changed.size}",
+                "to change ${changed.size}, to reset ${resets.size}",
         )
-        if (changed.isEmpty()) {
+        if (changed.isEmpty() && resets.isEmpty()) {
             tap(job.packageName, UiTarget(text = job.spec.close))
             return WalkResult()
         }
         if (own.isNotBlank()) AppBackups.save(this, job.packageName, own)
         val braces = SettingsText.usesBraces(own, picks)
-        val merged = SettingsText.write(SettingsText.merge(ownSettings, pickedSettings), braces)
-        return WalkResult(changed = changed.size, appSaid = paste(job, field, merged))
+        // the app ends up with exactly the picks: what they don't mention is reset, and the copy kept above is the
+        // way back
+        val replaced = SettingsText.write(pickedSettings, braces)
+        val saidBack = paste(job, field, replaced)
+        return WalkResult(changed = changed.size + resets.size, reset = resets.size, appSaid = saidBack)
     }
 
     // puts the text in the box and applies it; what the app said back, failing if it turned the text down

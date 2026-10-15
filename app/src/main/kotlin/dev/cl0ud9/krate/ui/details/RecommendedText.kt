@@ -37,19 +37,27 @@ internal fun applyText(
         state is AutoBackupState.Running -> runningText(state.mode)
         state is AutoBackupState.Failed && state.mode == BackupMode.APPLY -> "${state.reason} Nothing else changed."
         state is AutoBackupState.Done && state.mode == BackupMode.RESTORE -> "Your own settings are back."
-        state is AutoBackupState.Done && state.mode == BackupMode.APPLY -> appliedText(state.changed, state.appSaid)
+        state is AutoBackupState.Done && state.mode == BackupMode.APPLY ->
+            appliedText(
+                state.changed,
+                state.reset,
+                state.appSaid,
+            )
         choice == RecommendedChoice.OUTDATED -> "Krate's picks have changed since you applied them."
         choice == RecommendedChoice.APPLIED -> "Applied. Apply again if you've changed some of them since."
-        else -> "Krate goes to the app's Import / Export screen, adds these to your settings and applies them."
+        else -> "Krate goes to the app's Import / Export screen and makes its settings exactly these."
     }
 
-// what changed, with the app's own word on it when it gave one ("Imported 15 settings")
+// what changed, with the app's own word on it when it gave one ("Imported 15 settings"), and how many were put back to
+// their default because the picks don't mention them
 private fun appliedText(
     changed: Int,
+    reset: Int,
     appSaid: String?,
 ): String {
-    if (changed == 0) return "Already set the way Krate recommends, so nothing needed changing."
+    if (changed == 0) return "The app already has exactly Krate's settings, so nothing needed changing."
     val confirmed = appSaid?.let { " The app confirmed it: \"${it.trimEnd('.')}\"." }.orEmpty()
-    return "Done: $changed ${if (changed == 1) "setting" else "settings"} changed.$confirmed Some show the next time " +
-        "you open the app. Undo puts back the settings you had."
+    val resetNote = if (reset > 0) " ($reset went back to their default.)" else ""
+    return "Done: $changed ${if (changed == 1) "setting" else "settings"} changed.$resetNote$confirmed Some show the " +
+        "next time you open the app. Undo puts back the settings you had."
 }

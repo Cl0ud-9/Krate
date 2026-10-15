@@ -82,4 +82,14 @@ class SettingsTextTest {
         assertEquals(guide(picks)!!.revision, guide(picks.replace(": ", ":"))!!.revision)
         assertNotEquals(guide(picks)!!.revision, guide(picks.replace("android_reel", "android_vr"))!!.revision)
     }
+
+    @Test
+    fun `settings the picks don't mention are the ones that reset`() {
+        val own = SettingsText.parse("\"a\": 1, \"b\": 2, \"c\": 3")!!
+        val picks = SettingsText.parse("\"a\": 1, \"d\": 4")!!
+
+        assertEquals(setOf("b", "c"), SettingsText.resets(own, picks))
+        assertEquals(setOf("d"), SettingsText.changes(own, picks))
+        assertEquals(emptySet<String>(), SettingsText.resets(picks, picks))
+    }
 }

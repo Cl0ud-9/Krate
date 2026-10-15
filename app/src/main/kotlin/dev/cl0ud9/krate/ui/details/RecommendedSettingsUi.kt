@@ -142,8 +142,8 @@ internal fun RecommendedSheet(
     ActionSheet(title = "Recommended settings", onDismiss = onDismiss, actions = actions) {
         Text(
             text =
-                "Krate's picks for ${app.displayName}, added to your settings. Anything else you've changed stays as " +
-                    "it is, and yours are saved first, so Undo can put them back.",
+                "Krate sets ${app.displayName} to exactly these. Anything you've changed that isn't on the list goes " +
+                    "back to its default, and yours are saved first, so Undo can put them back.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

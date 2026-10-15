@@ -26,6 +26,13 @@ internal object SettingsText {
         recommended: JsonObject,
     ): JsonObject = JsonObject(current + recommended)
 
+    // the settings set now that the recommended ones don't mention: applying makes the app match the recommended ones
+    // exactly, so each of these goes back to its default
+    fun resets(
+        current: JsonObject,
+        recommended: JsonObject,
+    ): Set<String> = current.keys - recommended.keys
+
     // the recommended settings that aren't already set that way
     fun changes(
         current: JsonObject,
