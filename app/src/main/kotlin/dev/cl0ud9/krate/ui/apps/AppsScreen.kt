@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
@@ -192,6 +193,8 @@ private fun AppsList(
             )
         }
 
+        if (filter.canSearch) item(key = "search") { AppSearchField(filter, Modifier.animateItem()) }
+
         if (filter.needs.isNotEmpty()) item(key = "need-chips") { NeedChips(filter, Modifier.animateItem()) }
 
         // until the header's "+" has been found: the two ways to get an app that isn't here
@@ -221,17 +224,37 @@ private fun AppsList(
                 )
             }
         }
+        appsListFooter(filter, shownApps.size, listShownAt, onAppClick)
+    }
+    if (adding) AddAppFlow(onOpenApp = onAppClick, onDone = { adding = false })
+}
+
+// what ends the list: a word when a search found nothing, and the one nudge about apps that aren't here
+private fun LazyListScope.appsListFooter(
+    filter: NeedFilter,
+    shownCount: Int,
+    listShownAt: Long,
+    onAppClick: (String) -> Unit,
+) {
+    if (shownCount == 0 && filter.query.isNotBlank()) {
+        item(key = "no-match") {
+            Text(
+                text =
+                    "Nothing matches \"${filter.query.trim()}\". Try another word, or use Add app to bring your own.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp).animateItem(),
+            )
+        }
+    }
+    // the top hint teaches the Add button first, then this card takes over, so only one of them is up at a time
+    if (KrateMemory.addHintDone) {
         item(key = "suggest") {
-            StaggeredAppear(
-                index = shownApps.size,
-                listShownAt = listShownAt,
-                modifier = Modifier.animateItem(),
-            ) {
+            StaggeredAppear(index = shownCount, listShownAt = listShownAt, modifier = Modifier.animateItem()) {
                 SuggestAppCard(onOpenApp = onAppClick)
             }
         }
     }
-    if (adding) AddAppFlow(onOpenApp = onAppClick, onDone = { adding = false })
 }
 
 // the catalog's count on one side, the refresh pill on the other - always visible, not tucked away

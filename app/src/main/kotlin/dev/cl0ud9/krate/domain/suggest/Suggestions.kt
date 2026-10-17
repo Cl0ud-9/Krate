@@ -103,5 +103,24 @@ fun appsForNeed(
         else -> apps.filter { need in it.needs }
     }
 
+// the apps whose name, package, one-line pitch or description holds every word typed; nothing typed leaves them all
+fun searchApps(
+    apps: List<AppProfile>,
+    query: String,
+): List<AppProfile> {
+    val words = query.lowercase().split(' ', '	').filter { it.isNotBlank() }
+    if (words.isEmpty()) return apps
+    return apps.filter { app ->
+        val text =
+            listOfNotNull(app.displayName, app.packageName, app.pitch, app.description, app.needs.joinToString(" "))
+                .joinToString(" ")
+                .lowercase()
+        words.all { it in text }
+    }
+}
+
 const val YOURS = "Added by you"
 const val MIN_APPS_FOR_CHIPS = 6
+
+// the box to search in only comes once the shelf is long enough that scrolling stops being quicker
+const val MIN_APPS_FOR_SEARCH = 10
