@@ -56,8 +56,10 @@ import dev.cl0ud9.krate.domain.model.AnnouncementItem
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.SupportStatus
+import dev.cl0ud9.krate.domain.suggest.starterApps
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateStatus
 import dev.cl0ud9.krate.platform.selfupdate.SelfUpdateState
+import dev.cl0ud9.krate.platform.suggest.SuggestionStore
 import dev.cl0ud9.krate.platform.workers.UpdateNoticeClearing
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
@@ -177,6 +179,13 @@ private fun HomeContent(
     val announcements by viewModel.announcements.collectAsStateWithLifecycle()
     val homeApps by viewModel.homeApps.collectAsStateWithLifecycle()
     val checking by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    // nothing from the shelf on the phone yet: a few good first apps, unless suggestions are turned off
+    val suggestions by SuggestionStore.memory.collectAsStateWithLifecycle()
+    val starters =
+        remember(homeApps, suggestions.enabled) {
+            val onPhone = homeApps.filter { it.installed }.mapTo(mutableSetOf()) { it.app.packageName }
+            if (onPhone.isEmpty() && suggestions.enabled) starterApps(homeApps.map { it.app }, onPhone) else emptyList()
+        }
     Column(
         modifier =
             Modifier
@@ -209,13 +218,15 @@ private fun HomeContent(
             StatsAndYourApps(
                 counts = Triple(catalogCount, installedCount, pendingUpdateCount),
                 installedApps = homeApps.filter { it.installed },
+                starters = starters,
                 onNavigateToApps = onNavigateToApps,
                 onNavigateToUpdates = onNavigateToUpdates,
                 onNavigateToApp = onNavigateToApp,
             )
 
             // one app worth a look; folds away when there's none, and brings no gap of its own
-            HomeSuggestion(viewModel = viewModel, onNavigateToApp = onNavigateToApp)
+            // not while the starters are up: they're the same kind of nudge, and it could name one of them
+            if (starters.isEmpty()) HomeSuggestion(viewModel = viewModel, onNavigateToApp = onNavigateToApp)
 
             HomeAppear(order = 3) {
                 Column {
@@ -426,9 +437,11 @@ private fun activityPresentation(action: ActivityAction): ActivityPresentation =
 
 // one block, so the gap above Your apps folds with it instead of snapping when the row comes or goes
 @Composable
+@Suppress("LongParameterList")
 private fun StatsAndYourApps(
     counts: Triple<Int, Int, Int>,
     installedApps: List<HomeApp>,
+    starters: List<AppProfile>,
     onNavigateToApps: () -> Unit,
     onNavigateToUpdates: () -> Unit,
     onNavigateToApp: (String) -> Unit,
@@ -438,6 +451,11 @@ private fun StatsAndYourApps(
         HomeAppear(order = 1) {
             StatTiles(counts = counts, onOpenApps = onNavigateToApps, onOpenUpdates = onNavigateToUpdates)
         }
+        StarterApps(
+            apps = starters,
+            onOpenApp = onNavigateToApp,
+            modifier = Modifier.padding(top = HOME_SECTION_GAP),
+        )
         AnimatedVisibility(
             visible = installedApps.isNotEmpty(),
             enter = fadeIn() + expandVertically(),

@@ -4,6 +4,7 @@ import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.SupportStatus
 import dev.cl0ud9.krate.domain.suggest.searchApps
+import dev.cl0ud9.krate.domain.suggest.starterApps
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -56,5 +57,38 @@ class SearchAppsTest {
     fun `every word has to be found, in any order`() {
         assertEquals(listOf("reader"), searchApps(apps, "offline manga").map { it.id })
         assertEquals(emptyList<String>(), searchApps(apps, "manga cleaner"))
+    }
+
+    private fun buildable(
+        id: String,
+        needs: List<String>,
+        pitch: String? = "A pitch",
+    ) = app(id, id, pitch, needs).copy(
+        artifacts =
+            listOf(
+                dev.cl0ud9.krate.domain.model
+                    .ArtifactInfo("1.0", "u", "s", "c", versionCode = 1),
+            ),
+    )
+
+    @Test
+    fun `starters are different needs first, and never installed or without a pitch`() {
+        val shelf =
+            listOf(
+                buildable("a", listOf("Music")),
+                buildable("b", listOf("Music")),
+                buildable("c", listOf("Storage")),
+                buildable("d", listOf("Reading")),
+                buildable("e", listOf("Games"), pitch = null),
+            )
+
+        assertEquals(listOf("a", "c", "d"), starterApps(shelf, emptySet()).map { it.id })
+        assertEquals(listOf("b", "c", "d"), starterApps(shelf, setOf("com.example.a")).map { it.id })
+    }
+
+    @Test
+    fun `fewer than three apps on offer gives fewer starters`() {
+        assertEquals(listOf("only"), starterApps(listOf(buildable("only", emptyList())), emptySet()).map { it.id })
+        assertEquals(emptyList<String>(), starterApps(emptyList(), emptySet()).map { it.id })
     }
 }

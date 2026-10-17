@@ -74,6 +74,25 @@ private fun AppProfile.canBeSuggested(
         (looked == null || nowMillis - looked >= LOOK_COOLDOWN_MS)
 }
 
+// the few apps to start with when nothing from the shelf is on the phone yet: ones that can be installed and have a
+// pitch, each for a different need where there is a choice, so three starters aren't three versions of one thing
+fun starterApps(
+    apps: List<AppProfile>,
+    installed: Set<String>,
+    limit: Int = STARTER_COUNT,
+): List<AppProfile> {
+    val candidates =
+        apps
+            .filter { it.pitch != null && !it.isTracked && it.enabled }
+            .filter { it.supportStatus == SupportStatus.SUPPORTED && it.latestArtifact != null }
+            .filter { it.packageName !in installed }
+            .sortedBy { it.id }
+    val firstOfEachNeed = candidates.distinctBy { it.needs.firstOrNull() ?: it.id }
+    return (firstOfEachNeed + candidates).distinct().take(limit)
+}
+
+const val STARTER_COUNT = 3
+
 private fun becauseOf(
     app: AppProfile,
     installed: Set<String>,
