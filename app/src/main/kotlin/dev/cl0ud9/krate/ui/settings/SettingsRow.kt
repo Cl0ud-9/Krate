@@ -1,5 +1,13 @@
 package dev.cl0ud9.krate.ui.settings
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.navigation.pressable
 
+private const val SUBTITLE_FADE_MS = 180
+private const val NOTE_FADE_MS = 240
 private val ROW_MIN_HEIGHT = 88.dp
 private val BADGE_SIZE = 56.dp
 private val BADGE_ICON_SIZE = 24.dp
@@ -71,7 +81,10 @@ internal fun SettingsRow(
 ) {
     val rowModifier = Modifier.fillMaxWidth().heightIn(min = ROW_MIN_HEIGHT)
     val content: @Composable () -> Unit = {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(
+            modifier = Modifier.animateContentSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Box(
                     modifier = Modifier.size(BADGE_SIZE).background(header.colors.badgeColor, CircleShape),
@@ -84,24 +97,10 @@ internal fun SettingsRow(
                         modifier = Modifier.size(BADGE_ICON_SIZE),
                     )
                 }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = header.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = header.subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                RowTexts(header, Modifier.weight(1f))
                 trailing?.invoke()
             }
-            if (expandedContent != null) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = expandedContent)
-            }
+            if (expandedContent != null) RowNote(expandedContent)
         }
     }
     // a separate onClick overload of Surface, not `enabled = onClick != null` on the clickable one -
@@ -122,6 +121,40 @@ internal fun SettingsRow(
             color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
             content()
+        }
+    }
+}
+
+// the title and its line; a changed line fades through and the row eases to its new height, rather than snapping
+@Composable
+private fun RowTexts(
+    header: SettingsRowHeader,
+    modifier: Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(text = header.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        AnimatedContent(
+            targetState = header.subtitle,
+            transitionSpec = { fadeIn(tween(SUBTITLE_FADE_MS)) togetherWith fadeOut(tween(SUBTITLE_FADE_MS)) },
+            label = "row-subtitle",
+        ) { line ->
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+// drops in under the row: the row grows to make room while this fades in
+@Composable
+private fun RowNote(content: @Composable ColumnScope.() -> Unit) {
+    val entered = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(visibleState = entered, enter = fadeIn(tween(NOTE_FADE_MS))) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
         }
     }
 }

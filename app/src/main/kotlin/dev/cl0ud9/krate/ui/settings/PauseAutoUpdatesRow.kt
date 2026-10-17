@@ -3,8 +3,8 @@ package dev.cl0ud9.krate.ui.settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +23,7 @@ import dev.cl0ud9.krate.ui.util.rememberClockUntil
 @Composable
 internal fun PauseAutoUpdatesRow(
     pausedUntil: Long,
+    available: Boolean,
     onPause: (PauseLength) -> Unit,
     onResume: () -> Unit,
     shape: Shape,
@@ -36,17 +37,20 @@ internal fun PauseAutoUpdatesRow(
                 icon = painterResource(R.drawable.ic_update_rounded),
                 title = if (paused) "Automatic updates are paused" else "Pause automatic updates",
                 subtitle =
-                    if (paused) {
-                        "Until ${pauseEndText(pausedUntil, now)}. New versions wait in Updates meanwhile."
-                    } else {
-                        "Hold them back for a day or a week, say while you're travelling."
+                    when {
+                        paused -> "Until ${pauseEndText(pausedUntil, now)}. New versions wait in Updates meanwhile."
+                        available -> "Hold them back for a day or a week, say while you're travelling."
+                        else -> "Turn on Automatic downloads and Install updates automatically to use this."
                     },
                 colors = SettingsTint.BLUE.colors(),
             ),
         shape = shape,
         trailing = {
             Box {
-                TextButton(onClick = { if (paused) onResume() else menu = true }) {
+                FilledTonalButton(
+                    onClick = { if (paused) onResume() else menu = true },
+                    enabled = paused || available,
+                ) {
                     Text(if (paused) "Resume" else "Pause")
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {

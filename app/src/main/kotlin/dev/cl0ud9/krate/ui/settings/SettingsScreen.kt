@@ -8,7 +8,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SettingsBackupRestore
@@ -229,14 +228,26 @@ internal fun StorageRow(
         header =
             SettingsRowHeader(
                 icon = painterResource(R.drawable.ic_delete_sweep_rounded),
-                title = "Storage",
-                subtitle = "Downloaded update files are deleted as soon as they're installed.",
+                title = "Download cache",
+                subtitle = "Update files are deleted as soon as they're installed. Clear any that are left.",
                 colors = SettingsTint.TEAL.colors(),
             ),
         shape = shape,
-    ) {
-        StorageRowContent(cacheClearedMessage = cacheClearedMessage, clearCacheState = clearCacheState)
-    }
+        trailing = {
+            FilledTonalButton(onClick = clearCacheState.onClick, enabled = clearCacheState.enabled) { Text("Clear") }
+        },
+        // the result drops in under the row once there is one
+        expandedContent =
+            cacheClearedMessage?.let { message ->
+                {
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            },
+    )
 }
 
 @Composable
@@ -245,26 +256,5 @@ internal fun rememberVersionName(): String {
     return remember {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
             .getOrNull() ?: "unknown"
-    }
-}
-
-@Composable
-private fun StorageRowContent(
-    cacheClearedMessage: String?,
-    clearCacheState: DebouncedButtonState,
-) {
-    FilledTonalButton(
-        onClick = clearCacheState.onClick,
-        enabled = clearCacheState.enabled,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text("Clear download cache")
-    }
-    if (cacheClearedMessage != null) {
-        Text(
-            text = cacheClearedMessage,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.tertiary,
-        )
     }
 }

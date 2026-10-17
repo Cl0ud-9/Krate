@@ -284,7 +284,7 @@ private fun AppDetailsContent(
     val anchor = rememberScrollAnchor(scrollState)
     val scrolled = remember(scrollState) { derivedStateOf { scrollState.isScrollInProgress || scrollState.value > 0 } }
 
-    CompositionLocalProvider(LocalPageScrolled provides scrolled) {
+    CompositionLocalProvider(LocalPageScrolled provides scrolled, LocalUninstallAction provides onUninstall) {
         Column(
             modifier =
                 Modifier
@@ -305,8 +305,6 @@ private fun AppDetailsContent(
                 AppDetailsHeader(
                     app = app,
                     installedVersionName = state.installedVersionName,
-                    uninstalling = uninstalling,
-                    onUninstall = onUninstall,
                     moment = installMomentFor(state),
                 )
 

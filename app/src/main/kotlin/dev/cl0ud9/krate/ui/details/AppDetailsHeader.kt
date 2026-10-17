@@ -1,11 +1,9 @@
 package dev.cl0ud9.krate.ui.details
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,25 +13,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -83,15 +69,12 @@ private fun AppIdentity(
     }
 }
 
-// who the app is, top to bottom: its icon and name with the page's one menu in the corner, what kind of build it is,
-// what it does, and a footer that says how it stands on this phone. The menu holds Uninstall, so removing an app is
-// two deliberate taps and the corner isn't a loose red icon
+// who the app is, top to bottom: its icon and name, what kind of build it is, what it does, and a footer that says how
+// it stands on this phone. Uninstall lives with the other actions in Get this app
 @Composable
 internal fun AppDetailsHeader(
     app: AppProfile,
     installedVersionName: String?,
-    uninstalling: Boolean,
-    onUninstall: () -> Unit,
     moment: InstallMoment,
 ) {
     Card(
@@ -109,15 +92,7 @@ internal fun AppDetailsHeader(
         Box {
             IconFrost(rememberAppIcon(app))
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.Top) {
-                    AppIdentity(app, moment, accent, modifier = Modifier.weight(1f))
-                    // fades and folds away once the app is gone, rather than leaving a jump in the row
-                    AnimatedVisibility(
-                        visible = installedVersionName != null,
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkHorizontally(),
-                    ) { AppMenuControl(app = app, uninstalling = uninstalling, onUninstall = onUninstall) }
-                }
+                AppIdentity(app, moment, accent, modifier = Modifier.fillMaxWidth())
                 HeaderBadges(app, accent)
                 BuildLine(app)
                 app.description?.let { description ->
@@ -127,14 +102,14 @@ internal fun AppDetailsHeader(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = FOOTER_DIVIDER_ALPHA))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = FOOTER_DIVIDER_ALPHA))
                 InstalledStatusRow(app = app, installedVersionName = installedVersionName)
             }
         }
     }
 }
 
-private const val FOOTER_DIVIDER_ALPHA = 0.5f
+private const val FOOTER_DIVIDER_ALPHA = 0.4f
 
 // only set for an app Krate builds itself: "Latest" above is the app's own version, and this is its build
 @Composable
@@ -146,49 +121,6 @@ private fun BuildLine(app: AppProfile) {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-}
-
-// the page's menu: a spinner while an uninstall is under way, otherwise the three dots with Uninstall inside
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun AppMenuControl(
-    app: AppProfile,
-    uninstalling: Boolean,
-    onUninstall: () -> Unit,
-) {
-    // one fixed slot, so trading the button for the spinner never nudges the name beside it
-    Crossfade(targetState = uninstalling, modifier = Modifier.size(40.dp), label = "app-menu") { busy ->
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(40.dp)) {
-            if (busy) {
-                LoadingIndicator(modifier = Modifier.size(22.dp))
-            } else {
-                var open by rememberSaveable { mutableStateOf(false) }
-                IconButton(onClick = { open = true }, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreVert,
-                        contentDescription = "More for ${app.displayName}",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Uninstall", color = MaterialTheme.colorScheme.error) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Outlined.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                            )
-                        },
-                        onClick = {
-                            open = false
-                            onUninstall()
-                        },
-                    )
-                }
-            }
-        }
-    }
 }
 
 // how the app stands on this phone: that it's there, and how its updates arrive. The two sit apart when there's

@@ -305,6 +305,7 @@ private fun InstalledNotUpToDateActions(
         Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
             Text(downloadLabelFor(state))
         }
+        UninstallButton()
     }
 }
 
@@ -333,10 +334,14 @@ private fun UpToDateActions(
             ) {
                 Text(label)
             }
+            UninstallButton()
         }
     } else {
-        Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-            Text(label)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                Text(label)
+            }
+            UninstallButton()
         }
     }
 }

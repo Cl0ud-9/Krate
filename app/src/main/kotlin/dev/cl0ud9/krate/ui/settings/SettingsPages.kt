@@ -31,7 +31,8 @@ import dev.cl0ud9.krate.ui.components.systemNavBarClearance
 import dev.cl0ud9.krate.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.krate.ui.util.rememberDebouncedButtonState
 
-private const val DOWNLOADS_ROWS = 3
+// Automatic downloads and Use mobile data, which every phone has; the rest need Android 12
+private const val UPDATE_ROWS = 2
 
 // a little past the end of a pause, so the run finds it over
 private const val PAUSE_RUN_SLACK_MS = 60_000L
@@ -109,13 +110,14 @@ fun DownloadsStoragePage(
     val pausedUntil by viewModel.autoUpdatePausedUntil.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // the pause only means something while automatic updates are on
-    val showPause = autoUpdatesSupported && automaticDownloads && autoInstall
-    val rows = DOWNLOADS_ROWS + (if (autoUpdatesSupported) 1 else 0) + (if (showPause) 1 else 0)
+    val pauseAvailable = automaticDownloads && autoInstall
+    val updateRows = UPDATE_ROWS + (if (autoUpdatesSupported) 2 else 0)
     SettingsPage(scrollState, topContentPadding) {
+        SettingsSectionLabel("Automatic updates", first = true)
         AutomaticDownloadsRow(
             checked = automaticDownloads,
             onCheckedChange = viewModel::setAutomaticDownloads,
-            shape = settingsGroupShape(0, rows),
+            shape = settingsGroupShape(0, updateRows),
             onMobileData = automaticDownloads && onMobileData,
             autoInstall = autoUpdatesSupported && automaticDownloads && autoInstall,
         )
@@ -123,19 +125,18 @@ fun DownloadsStoragePage(
             checked = onMobileData,
             available = automaticDownloads,
             onCheckedChange = viewModel::setDownloadOnMobileData,
-            shape = settingsGroupShape(1, rows),
+            shape = settingsGroupShape(1, updateRows),
         )
         if (autoUpdatesSupported) {
             AutoInstallRow(
                 checked = autoInstall,
                 available = automaticDownloads,
                 onCheckedChange = viewModel::setAutoInstallUpdates,
-                shape = settingsGroupShape(2, rows),
+                shape = settingsGroupShape(updateRows - 2, updateRows),
             )
-        }
-        if (showPause) {
             PauseAutoUpdatesRow(
                 pausedUntil = pausedUntil,
+                available = pauseAvailable,
                 onPause = { length ->
                     val until = pausedUntil(System.currentTimeMillis(), length)
                     viewModel.setAutoUpdatePausedUntil(until)
@@ -146,13 +147,14 @@ fun DownloadsStoragePage(
                     viewModel.setAutoUpdatePausedUntil(0L)
                     AutoUpdateWorker.enqueue(context)
                 },
-                shape = settingsGroupShape(rows - 2, rows),
+                shape = settingsGroupShape(updateRows - 1, updateRows),
             )
         }
+        SettingsSectionLabel("Storage")
         StorageRow(
             cacheClearedMessage = cacheClearedMessage,
             clearCacheState = clearCacheState,
-            shape = settingsGroupShape(rows - 1, rows),
+            shape = settingsGroupShape(0, 1),
         )
     }
 }

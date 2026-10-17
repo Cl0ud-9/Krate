@@ -1,5 +1,6 @@
 package dev.cl0ud9.krate.ui.onboarding
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -36,6 +37,9 @@ import dev.cl0ud9.krate.ui.theme.rememberHeroGradient
 // how long the preview takes to morph between a pill and a full-width bar; the page's own button folds with it
 internal const val PREVIEW_MORPH_MS = 400
 
+// how long the preview takes to dissolve between solid and glass
+private const val GLASS_FADE_MS = 450
+
 // widths of the pretend content lines in the bar preview
 private val PLACEHOLDER_LINES = listOf(1f, 0.6f, 0.85f, 0.7f, 1f, 0.5f)
 
@@ -50,6 +54,18 @@ private val ACCENT_LINES = setOf(3, 5)
 // over pretend content that runs on under the bar
 @Composable
 internal fun NavBarPreview(
+    pill: Boolean,
+    radius: Int,
+    glass: Boolean,
+) {
+    // flipping glass dissolves one look into the other rather than snapping; each look keeps its own backdrop
+    Crossfade(targetState = glass, animationSpec = tween(GLASS_FADE_MS), label = "preview-glass") { shown ->
+        PreviewScreen(pill = pill, radius = radius, glass = shown)
+    }
+}
+
+@Composable
+private fun PreviewScreen(
     pill: Boolean,
     radius: Int,
     glass: Boolean,
