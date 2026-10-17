@@ -38,6 +38,7 @@ import dev.cl0ud9.krate.platform.rollback.RollbackStore
 import dev.cl0ud9.krate.platform.selfupdate.KrateSelfUpdateInstaller
 import dev.cl0ud9.krate.platform.selfupdate.KrateUpdateChecker
 import dev.cl0ud9.krate.platform.selfupdate.WhatsNewTracker
+import dev.cl0ud9.krate.platform.setup.SetupTransfer
 import dev.cl0ud9.krate.platform.tracked.TrackedAppInspector
 import dev.cl0ud9.krate.platform.work.AppWork
 import dev.cl0ud9.krate.security.apk.PackageManagerApkArchiveReader
@@ -108,6 +109,7 @@ class AppContainer(
     val activityLogRepository: ActivityLogRepository = DataStoreActivityLogRepository(context.applicationContext)
     val krateBaselineStore: KrateBaselineStore = DataStoreKrateBaselineStore(context.applicationContext)
     val autoUpdateStore: AutoUpdateStore = DataStoreAutoUpdateStore(context.applicationContext)
+    val setupTransfer = SetupTransfer(trackedAppsRepository, settingsRepository, autoUpdateStore, catalogRepository)
     internal val autoUpdateStanding = AutoUpdateStanding(settingsRepository, autoUpdateStore)
 
     // downloads, installs and uninstalls, kept going whether or not the app's page stays open

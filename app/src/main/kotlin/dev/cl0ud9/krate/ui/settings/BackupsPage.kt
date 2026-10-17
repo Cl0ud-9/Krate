@@ -108,6 +108,8 @@ fun BackupsPage(
             val installed = remember(app.packageName, changes) { reader.installedVersion(app.packageName) != null }
             BackupAppRow(app, installed, on, settingsGroupShape(index, supported.size))
         }
+        SettingsSectionLabel("Krate itself")
+        SetupTransferSection()
     }
 }
 
