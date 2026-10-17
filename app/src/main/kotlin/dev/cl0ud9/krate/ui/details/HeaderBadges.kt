@@ -1,7 +1,8 @@
 package dev.cl0ud9.krate.ui.details
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,12 +17,18 @@ import dev.cl0ud9.krate.ui.components.SupportStatusBadge
 import dev.cl0ud9.krate.ui.components.TrackedBadge
 
 // tracked or not, beta or not, and the newest version, on one line under the name
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun HeaderBadges(
     app: AppProfile,
     accent: Color?,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    // wraps rather than crowding when the text is large
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
         if (app.isTracked) TrackedBadge(tone = accent ?: MaterialTheme.colorScheme.primary, onGitHub = app.fromGitHub)
         SupportStatusBadge(status = app.supportStatus)
         Text(
