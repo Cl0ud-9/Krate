@@ -32,14 +32,17 @@ import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.domain.repository.buildKey
 import dev.cl0ud9.krate.platform.autoupdate.AUTO_UPDATE_DELAY_MILLIS
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
+import dev.cl0ud9.krate.platform.autoupdate.isPausedAt
 import dev.cl0ud9.krate.platform.autoupdate.krateOwnsUpdates
 import dev.cl0ud9.krate.platform.autoupdate.otherStoreName
+import dev.cl0ud9.krate.platform.autoupdate.pauseEndText
 import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import dev.cl0ud9.krate.ui.components.KrateSwitch
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.krateViewModel
+import dev.cl0ud9.krate.ui.util.rememberClockUntil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -56,6 +59,8 @@ private const val STOP_TIMEOUT_MS = 5000L
 internal data class AutoUpdateChoice(
     val manual: Boolean,
     val skippedBuild: String?,
+    // when a pause on automatic updates ends; 0 for none
+    val pausedUntil: Long = 0L,
 )
 
 class AutoUpdateCardViewModel(
@@ -68,8 +73,9 @@ class AutoUpdateCardViewModel(
             settingsRepository.observeAutoInstallUpdates(),
             settingsRepository.observeAutomaticDownloads(),
             autoUpdateStore.observeChoices(),
-        ) { autoInstall, downloads, choices ->
-            AutoUpdateChoice(appId in choices.manual, choices.skipped[appId])
+            settingsRepository.observeAutoUpdatePausedUntil(),
+        ) { autoInstall, downloads, choices, pausedUntil ->
+            AutoUpdateChoice(appId in choices.manual, choices.skipped[appId], pausedUntil)
                 .takeIf { autoUpdatesSupported && autoInstall && downloads }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
@@ -89,24 +95,10 @@ internal fun AutoUpdateCard(state: AppDetailsUiState) {
     val viewModel = krateViewModel { AutoUpdateCardViewModel(it.settingsRepository, it.autoUpdateStore, state.app.id) }
     val choice by viewModel.choice.collectAsStateWithLifecycle()
     val current = choice ?: return
+    // a pause ends by itself: the card is worked out again the moment it does
+    val now = rememberClockUntil(current.pausedUntil)
     val context = LocalContext.current
-    // Krate becomes the installer of record once it installs or updates the app itself
-    // re-read whenever any app is installed, replaced or removed, so a reinstall shows its new owner at once
-    val changes = PackageChanges.version.intValue
-    val ownership by produceState<UpdateOwnership?>(
-        null,
-        state.installed,
-        state.downloadStatus::class,
-        changes,
-    ) {
-        value =
-            withContext(Dispatchers.IO) {
-                UpdateOwnership(
-                    krateOwns = krateOwnsUpdates(context, state.app.packageName),
-                    otherStore = otherStoreName(context, state.app.packageName),
-                )
-            }
-    }
+    val ownership = rememberOwnership(state)
     val owned = ownership ?: return
     val owns = owned.krateOwns
     // the switch is the user's say for this app; whether Krate can act on it right now is the line below it
@@ -132,7 +124,7 @@ internal fun AutoUpdateCard(state: AppDetailsUiState) {
                     enabled = allowed,
                 )
             }
-            AutoUpdateStatus(autoUpdateLine(state, owned, current, pending))
+            AutoUpdateStatus(autoUpdateLine(state, owned, current, pending, now))
             if (willUpdate && pending != null) {
                 val skipped = current.skippedBuild == pending.buildKey
                 TextButton(
@@ -144,6 +136,24 @@ internal fun AutoUpdateCard(state: AppDetailsUiState) {
             }
         }
     }
+}
+
+// whether Krate may update the app by itself: Krate becomes the installer of record once it installs or updates the app
+// itself, read again whenever any app is installed, replaced or removed so a reinstall shows its new owner at once
+@Composable
+private fun rememberOwnership(state: AppDetailsUiState): UpdateOwnership? {
+    val context = LocalContext.current
+    val changes = PackageChanges.version.intValue
+    val ownership by produceState<UpdateOwnership?>(null, state.installed, state.downloadStatus::class, changes) {
+        value =
+            withContext(Dispatchers.IO) {
+                UpdateOwnership(
+                    krateOwns = krateOwnsUpdates(context, state.app.packageName),
+                    otherStore = otherStoreName(context, state.app.packageName),
+                )
+            }
+    }
+    return ownership
 }
 
 // what's happening with this app's updates, as a headline and one line of detail on an inset panel
@@ -190,7 +200,9 @@ private fun autoUpdateLine(
     ownership: UpdateOwnership,
     choice: AutoUpdateChoice,
     pending: ArtifactInfo?,
-): AutoUpdateLine = whyByHand(state, ownership, choice) ?: pendingLine(state.app.displayName, choice, pending)
+    nowMillis: Long,
+): AutoUpdateLine =
+    whyByHand(state, ownership, choice) ?: pendingLine(state.app.displayName, choice, pending, nowMillis)
 
 // the reasons an app can't update by itself at all, or null when it can
 private fun whyByHand(
@@ -244,11 +256,18 @@ private fun pendingLine(
     name: String,
     choice: AutoUpdateChoice,
     pending: ArtifactInfo?,
+    nowMillis: Long,
 ): AutoUpdateLine {
     val info = R.drawable.ic_info_rounded
     val clock = R.drawable.ic_update_rounded
     val dueAt = pending?.publishedAtMillis?.plus(AUTO_UPDATE_DELAY_MILLIS)
     return when {
+        isPausedAt(choice.pausedUntil, nowMillis) ->
+            AutoUpdateLine(
+                clock,
+                "Paused until ${pauseEndText(choice.pausedUntil)}",
+                "New versions of $name wait in Updates until then, or until you resume in Settings.",
+            )
         pending == null ->
             AutoUpdateLine(
                 R.drawable.ic_check_circle_rounded,

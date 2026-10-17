@@ -17,9 +17,11 @@ import kotlinx.coroutines.flow.stateIn
 internal data class AutoUpdateGlobal(
     val on: Boolean,
     val manual: Set<String>,
+    // when a pause ends; 0 for none. A pause that has passed is the same as none
+    val pausedUntil: Long = 0L,
 )
 
-internal enum class UpdateMode { AUTOMATIC, BY_HAND }
+internal enum class UpdateMode { AUTOMATIC, PAUSED, BY_HAND }
 
 // how an installed app gets its updates, or null when there's nothing to say: automatic updates are off or not possible
 // on this phone, or the app isn't installed. The same rule the app's own card follows
@@ -28,11 +30,16 @@ internal fun updateMode(
     app: AppProfile,
     installed: Boolean,
     krateOwns: Boolean,
+    nowMillis: Long = System.currentTimeMillis(),
 ): UpdateMode? {
     if (!global.on || !installed) return null
     val automatic =
         app.id !in global.manual && app.installationMode != InstallationMode.CLEAN_INSTALL && krateOwns
-    return if (automatic) UpdateMode.AUTOMATIC else UpdateMode.BY_HAND
+    return when {
+        !automatic -> UpdateMode.BY_HAND
+        isPausedAt(global.pausedUntil, nowMillis) -> UpdateMode.PAUSED
+        else -> UpdateMode.AUTOMATIC
+    }
 }
 
 // one shared reading of the settings behind it, so every row and page that shows the mark agrees without each
@@ -46,8 +53,9 @@ internal class AutoUpdateStanding(
             settings.observeAutoInstallUpdates(),
             settings.observeAutomaticDownloads(),
             store.observeChoices(),
-        ) { autoInstall, downloads, choices ->
-            AutoUpdateGlobal(autoUpdatesSupported && autoInstall && downloads, choices.manual)
+            settings.observeAutoUpdatePausedUntil(),
+        ) { autoInstall, downloads, choices, pausedUntil ->
+            AutoUpdateGlobal(autoUpdatesSupported && autoInstall && downloads, choices.manual, pausedUntil)
         }.stateIn(
             CoroutineScope(SupervisorJob() + Dispatchers.Default),
             SharingStarted.Eagerly,

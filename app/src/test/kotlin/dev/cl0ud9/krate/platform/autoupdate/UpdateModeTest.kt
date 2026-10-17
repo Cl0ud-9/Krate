@@ -53,6 +53,27 @@ class UpdateModeTest {
         assertEquals(UpdateMode.AUTOMATIC, updateMode(others, app(), installed = true, krateOwns = true))
     }
 
+    @Test
+    fun `a pause shows paused for an app that would update itself, until it ends`() {
+        val paused = on.copy(pausedUntil = 5_000L)
+
+        assertEquals(
+            UpdateMode.PAUSED,
+            updateMode(paused, app(), installed = true, krateOwns = true, nowMillis = 4_999L),
+        )
+        assertEquals(
+            UpdateMode.AUTOMATIC,
+            updateMode(paused, app(), installed = true, krateOwns = true, nowMillis = 5_000L),
+        )
+    }
+
+    @Test
+    fun `a pause says nothing about an app that updates by hand anyway`() {
+        val paused = on.copy(pausedUntil = 5_000L)
+
+        assertEquals(UpdateMode.BY_HAND, updateMode(paused, app(), installed = true, krateOwns = false, nowMillis = 1L))
+    }
+
     private fun app(mode: InstallationMode = InstallationMode.UPDATE) =
         AppProfile(
             id = "reader",

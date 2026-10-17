@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.cl0ud9.krate.domain.model.LaunchTab
@@ -61,6 +62,13 @@ class DataStoreSettingsRepository(
 
     override suspend fun setAutoInstallUpdates(enabled: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[AUTO_INSTALL_UPDATES] = enabled }
+    }
+
+    override fun observeAutoUpdatePausedUntil(): Flow<Long> =
+        context.settingsDataStore.data.map { prefs -> prefs[AUTO_UPDATE_PAUSED_UNTIL] ?: 0L }
+
+    override suspend fun setAutoUpdatePausedUntil(untilMillis: Long) {
+        context.settingsDataStore.edit { prefs -> prefs[AUTO_UPDATE_PAUSED_UNTIL] = untilMillis }
     }
 
     override fun observeAutoInstallChosen(): Flow<Boolean> =
@@ -166,6 +174,7 @@ class DataStoreSettingsRepository(
         val AUTOMATIC_DOWNLOADS = booleanPreferencesKey("automatic_downloads")
         val DOWNLOAD_ON_MOBILE_DATA = booleanPreferencesKey("download_on_mobile_data")
         val AUTO_INSTALL_UPDATES = booleanPreferencesKey("auto_install_updates")
+        val AUTO_UPDATE_PAUSED_UNTIL = longPreferencesKey("auto_update_paused_until")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val NAV_BAR_STYLE = stringPreferencesKey("nav_bar_style")

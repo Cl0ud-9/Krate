@@ -26,6 +26,7 @@ import dev.cl0ud9.krate.platform.autoupdate.UpdateMode
 import dev.cl0ud9.krate.platform.autoupdate.krateOwnsUpdates
 import dev.cl0ud9.krate.platform.autoupdate.updateMode
 import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
+import dev.cl0ud9.krate.ui.util.rememberClockUntil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -49,7 +50,11 @@ internal fun rememberUpdateMode(
     val owns by produceState(false, app.packageName, installed, visits, changes) {
         value = installed && withContext(Dispatchers.IO) { krateOwnsUpdates(context, app.packageName) }
     }
-    return updateMode(global, app, installed, owns)
+    // a pause ends by itself: the mark is worked out again the moment it does, with the screen open
+    val now = rememberClockUntil(global.pausedUntil)
+    return remember(global, app.id, app.installationMode, installed, owns, now) {
+        updateMode(global, app, installed, owns, now)
+    }
 }
 
 // the small mark on an app's row when Krate keeps it up to date by itself
@@ -75,6 +80,12 @@ internal fun AutoUpdateBadge() {
 internal fun UpdateModeLine(mode: UpdateMode) {
     val automatic = mode == UpdateMode.AUTOMATIC
     val tint = if (automatic) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    val words =
+        when (mode) {
+            UpdateMode.AUTOMATIC -> "Updates automatically"
+            UpdateMode.PAUSED -> "Auto-updates paused"
+            UpdateMode.BY_HAND -> "Updates by hand"
+        }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(
             painter = painterResource(R.drawable.ic_update_rounded),
@@ -83,7 +94,7 @@ internal fun UpdateModeLine(mode: UpdateMode) {
             modifier = Modifier.size(16.dp),
         )
         Text(
-            text = if (automatic) "Updates automatically" else "Updates by hand",
+            text = words,
             style = MaterialTheme.typography.bodySmall,
             color = tint,
         )

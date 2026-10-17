@@ -27,6 +27,11 @@ interface SettingsRepository {
 
     suspend fun setAutoInstallUpdates(enabled: Boolean)
 
+    // when a pause on automatic updates ends, in epoch millis; 0 when there is none. Past is the same as none
+    fun observeAutoUpdatePausedUntil(): Flow<Long>
+
+    suspend fun setAutoUpdatePausedUntil(untilMillis: Long)
+
     // false until the user has chosen either way: an upgrade from before the switch existed hasn't
     fun observeAutoInstallChosen(): Flow<Boolean>
 

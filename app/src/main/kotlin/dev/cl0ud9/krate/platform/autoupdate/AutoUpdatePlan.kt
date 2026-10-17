@@ -15,7 +15,8 @@ internal suspend fun autoUpdatesOn(context: Context): Boolean {
     val settings = context.appContainer().settingsRepository
     return autoUpdatesSupported &&
         settings.observeAutoInstallUpdates().first() &&
-        settings.observeAutomaticDownloads().first()
+        settings.observeAutomaticDownloads().first() &&
+        !isPausedAt(settings.observeAutoUpdatePausedUntil().first(), System.currentTimeMillis())
 }
 
 internal suspend fun autoUpdatePolicy(

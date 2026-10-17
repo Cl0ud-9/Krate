@@ -74,6 +74,9 @@ class SettingsViewModel(
     val autoInstallUpdates: StateFlow<Boolean> =
         settingsRepository.observeAutoInstallUpdates().stateInPage(saved?.autoInstallUpdates ?: false)
 
+    val autoUpdatePausedUntil: StateFlow<Long> =
+        settingsRepository.observeAutoUpdatePausedUntil().stateInPage(0L)
+
     val themeMode: StateFlow<ThemeMode> =
         settingsRepository.observeThemeMode().stateInPage(saved?.themeMode ?: ThemeMode.SYSTEM)
 
@@ -180,6 +183,10 @@ class SettingsViewModel(
 
     fun setAutomaticDownloads(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setAutomaticDownloads(enabled) }
+    }
+
+    fun setAutoUpdatePausedUntil(untilMillis: Long) {
+        viewModelScope.launch { settingsRepository.setAutoUpdatePausedUntil(untilMillis) }
     }
 
     fun setAutoInstallUpdates(enabled: Boolean) {

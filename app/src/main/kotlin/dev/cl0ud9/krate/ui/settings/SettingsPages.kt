@@ -17,18 +17,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.platform.autoupdate.AutoUpdateWorker
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
+import dev.cl0ud9.krate.platform.autoupdate.pausedUntil
 import dev.cl0ud9.krate.ui.components.systemNavBarClearance
 import dev.cl0ud9.krate.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.krate.ui.util.rememberDebouncedButtonState
 
 private const val DOWNLOADS_ROWS = 3
+
+// a little past the end of a pause, so the run finds it over
+private const val PAUSE_RUN_SLACK_MS = 60_000L
 
 // the pages behind Settings' category rows - each holds one topic's controls, so the Settings list
 // itself stays a short, scannable index rather than every control stacked on one long page
@@ -100,7 +106,11 @@ fun DownloadsStoragePage(
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     // idempotent in the ViewModel too - the debounce stops a double tap reaching it at all
     val clearCacheState = rememberDebouncedButtonState(onClick = viewModel::clearCache)
-    val rows = if (autoUpdatesSupported) DOWNLOADS_ROWS + 1 else DOWNLOADS_ROWS
+    val pausedUntil by viewModel.autoUpdatePausedUntil.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    // the pause only means something while automatic updates are on
+    val showPause = autoUpdatesSupported && automaticDownloads && autoInstall
+    val rows = DOWNLOADS_ROWS + (if (autoUpdatesSupported) 1 else 0) + (if (showPause) 1 else 0)
     SettingsPage(scrollState, topContentPadding) {
         AutomaticDownloadsRow(
             checked = automaticDownloads,
@@ -121,6 +131,22 @@ fun DownloadsStoragePage(
                 available = automaticDownloads,
                 onCheckedChange = viewModel::setAutoInstallUpdates,
                 shape = settingsGroupShape(2, rows),
+            )
+        }
+        if (showPause) {
+            PauseAutoUpdatesRow(
+                pausedUntil = pausedUntil,
+                onPause = { length ->
+                    val until = pausedUntil(System.currentTimeMillis(), length)
+                    viewModel.setAutoUpdatePausedUntil(until)
+                    // a run booked for the moment it ends, so due updates go on then rather than at the next check
+                    AutoUpdateWorker.enqueueAt(context, until - System.currentTimeMillis() + PAUSE_RUN_SLACK_MS)
+                },
+                onResume = {
+                    viewModel.setAutoUpdatePausedUntil(0L)
+                    AutoUpdateWorker.enqueue(context)
+                },
+                shape = settingsGroupShape(rows - 2, rows),
             )
         }
         StorageRow(
