@@ -339,19 +339,35 @@ private fun AppDetailsContent(
                 // what it needs switched on, and its settings, right under the action once it's installed
                 InstalledCards(app = app, state = state, uninstalling = uninstalling)
 
-                // Play Protect was paused for this app: once it's in, ask for it back on right here
-                PlayProtectReminder(onlyFor = app.packageName)
-
-                // a find of the person's own, high enough up to be seen: the nudge to suggest it for everyone
-                if (app.isTracked) ShareFindCard(app)
-
-                // what the app is sits right under the action, before the finer controls further down
-                AppInfoSection(app = app, dependencies = state.dependencies, onNavigateToApp = onNavigateToApp)
+                AfterTheAction(state = state, onNavigateToApp = onNavigateToApp)
             }
 
             NotesAndHistory(state = state, anchor = anchor, onSelectVersion = onSelectVersion)
         }
     }
+}
+
+// what sits under the action: Play Protect's reminder if it was paused for this app, a nudge for an app the
+// person found themselves, and what the app is
+@Composable
+private fun AfterTheAction(
+    state: AppDetailsUiState,
+    onNavigateToApp: (String) -> Unit,
+) {
+    val app = state.app
+    // Play Protect was paused for this app: once it's in, ask for it back on right here
+    PlayProtectReminder(onlyFor = app.packageName)
+
+    // a find of the person's own, high enough up to be seen: the nudge to suggest it for everyone
+    if (app.isTracked) ShareFindCard(app)
+
+    // what the app is sits right under the action, before the finer controls further down
+    AppInfoSection(
+        app = app,
+        dependencies = state.dependencies,
+        onNavigateToApp = onNavigateToApp,
+        installedSigner = state.installed?.signerSha256,
+    )
 }
 
 // every build to pick from, then the picked build's notes below it: a pick only ever changes what's under the list,

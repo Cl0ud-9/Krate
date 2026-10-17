@@ -64,6 +64,8 @@ internal fun AppInfoSection(
     dependencies: List<DependencyInfo>,
     onNavigateToApp: (String) -> Unit,
     modifier: Modifier = Modifier,
+    // the fingerprint of whoever signed the copy on the phone, once something is installed
+    installedSigner: String? = null,
 ) {
     val source = sourceOf(app)
     Card(
@@ -85,7 +87,7 @@ internal fun AppInfoSection(
                 Divider()
             }
             if (source != null) {
-                PackedFromRow(source, tracked = app.isTracked)
+                PackedFromRow(source, tracked = app.isTracked, signer = installedSigner)
                 Divider()
             }
             InfoRow(icon = rememberVectorPainter(Icons.Filled.Build), title = "How updates land") {
@@ -208,6 +210,7 @@ private fun AsksFor(steps: List<SetupStep>) {
 private fun PackedFromRow(
     source: PackedFrom,
     tracked: Boolean,
+    signer: String?,
 ) {
     val link = MaterialTheme.colorScheme.primary
     val text =
@@ -241,6 +244,7 @@ private fun PackedFromRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        SignerLine(signer)
     }
 }
 
