@@ -49,6 +49,7 @@ import dev.cl0ud9.krate.domain.model.AppGuide
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.SetupKind
 import dev.cl0ud9.krate.domain.model.SetupStep
+import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import dev.cl0ud9.krate.platform.setup.RESTRICTED_SETTINGS_HELP
 import dev.cl0ud9.krate.platform.setup.SetupMarks
 import dev.cl0ud9.krate.platform.setup.StepState
@@ -77,11 +78,8 @@ internal fun SetupCard(
 ) {
     val context = LocalContext.current
     val marks = remember(context) { SetupMarks(context) }
-    var checks by remember { mutableIntStateOf(0) }
-    LifecycleResumeEffect(Unit) {
-        checks++
-        onPauseOrDispose { }
-    }
+    var manualTicks by remember { mutableIntStateOf(0) }
+    val checks = rememberPackageChecks() + manualTicks
     // what Android reports for each step; the ones it won't say are ticked by hand (manual)
     // only the steps this installed version can actually do
     val steps = remember(checks, guide) { guide.setup.filter { stepAvailable(context, app.packageName, it) } }
@@ -100,7 +98,7 @@ internal fun SetupCard(
         }
     val onMark: (SetupStep, Boolean) -> Unit = { step, done ->
         marks.mark(app.packageName, step.kind, done)
-        checks++
+        manualTicks++
     }
     Card(
         modifier = Modifier.fillMaxWidth().glassRim(ShapeCache.rounded16),
@@ -346,4 +344,16 @@ internal fun RestrictedHelp(
             }
         }
     }
+}
+
+// bumps on every return to Krate and whenever any app is installed, replaced or removed (a reinstall puts the steps
+// back to how Android says they stand), so what's read from Android is read again
+@Composable
+private fun rememberPackageChecks(): Int {
+    var resumes by remember { mutableIntStateOf(0) }
+    LifecycleResumeEffect(Unit) {
+        resumes++
+        onPauseOrDispose { }
+    }
+    return resumes + PackageChanges.version.intValue
 }

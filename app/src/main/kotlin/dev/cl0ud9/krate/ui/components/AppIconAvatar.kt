@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import dev.cl0ud9.krate.domain.model.AppProfile
+import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -103,10 +104,12 @@ internal fun rememberAppIcon(app: AppProfile): ImageBitmap? {
     val catalogIconPng = app.iconPng
     val context = LocalContext.current
     val cacheKey = packageName + ":" + catalogIconPng.hashCode()
+    // read again when any app is installed, replaced or removed, so an updated app shows its icon at once
+    val changes = PackageChanges.version.intValue
     // the last icon seen shows at once, so a list scrolled back or a screen returned to never flashes letters first;
     // it's still reloaded, so an app updated in the meantime shows its new icon
     val icon by
-        produceState(initialValue = AppIconCache.get(cacheKey), packageName, catalogIconPng) {
+        produceState(initialValue = AppIconCache.get(cacheKey), packageName, catalogIconPng, changes) {
             val loaded =
                 withContext(Dispatchers.IO) {
                     val installed =

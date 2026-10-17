@@ -55,6 +55,7 @@ import dev.cl0ud9.krate.platform.backup.AppBackups
 import dev.cl0ud9.krate.platform.backup.AutoBackupRunner
 import dev.cl0ud9.krate.platform.backup.AutoBackupState
 import dev.cl0ud9.krate.platform.backup.SavedBackup
+import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import dev.cl0ud9.krate.platform.setup.RESTRICTED_SETTINGS_HELP
 import dev.cl0ud9.krate.platform.setup.appInfoIntent
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
@@ -103,7 +104,8 @@ fun BackupsPage(
         }
         supported.forEachIndexed { index, app ->
             val reader = container.installedPackageReader
-            val installed = remember(app.packageName) { reader.installedVersion(app.packageName) != null }
+            val changes = PackageChanges.version.intValue
+            val installed = remember(app.packageName, changes) { reader.installedVersion(app.packageName) != null }
             BackupAppRow(app, installed, on, settingsGroupShape(index, supported.size))
         }
     }

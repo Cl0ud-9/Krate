@@ -33,6 +33,7 @@ import dev.cl0ud9.krate.platform.backup.AutoBackupRunner
 import dev.cl0ud9.krate.platform.backup.AutoBackupState
 import dev.cl0ud9.krate.platform.backup.AutoLinks
 import dev.cl0ud9.krate.platform.links.OpenByDefault
+import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import dev.cl0ud9.krate.platform.setup.appInfoIntent
 import dev.cl0ud9.krate.ui.components.ActionSheet
 import dev.cl0ud9.krate.ui.theme.ShapeCache
@@ -48,7 +49,8 @@ internal fun rememberLinkStanding(app: AppProfile): LinkStanding? {
         onPauseOrDispose { }
     }
     val run = autoBackupStateFor(app.packageName)
-    return remember(checks, run, app.packageName) {
+    val changes = PackageChanges.version.intValue
+    return remember(checks, run, app.packageName, changes) {
         val states = OpenByDefault.states(context, app.packageName).orEmpty()
         val declared = states.mapTo(mutableSetOf()) { it.host.lowercase() }
         val wanted =

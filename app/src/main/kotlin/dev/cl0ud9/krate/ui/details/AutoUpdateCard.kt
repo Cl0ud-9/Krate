@@ -34,6 +34,7 @@ import dev.cl0ud9.krate.platform.autoupdate.AUTO_UPDATE_DELAY_MILLIS
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
 import dev.cl0ud9.krate.platform.autoupdate.krateOwnsUpdates
 import dev.cl0ud9.krate.platform.autoupdate.otherStoreName
+import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import dev.cl0ud9.krate.ui.components.KrateSwitch
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.navigation.glassRim
@@ -90,10 +91,13 @@ internal fun AutoUpdateCard(state: AppDetailsUiState) {
     val current = choice ?: return
     val context = LocalContext.current
     // Krate becomes the installer of record once it installs or updates the app itself
+    // re-read whenever any app is installed, replaced or removed, so a reinstall shows its new owner at once
+    val changes = PackageChanges.version.intValue
     val ownership by produceState<UpdateOwnership?>(
         null,
         state.installed,
         state.downloadStatus::class,
+        changes,
     ) {
         value =
             withContext(Dispatchers.IO) {

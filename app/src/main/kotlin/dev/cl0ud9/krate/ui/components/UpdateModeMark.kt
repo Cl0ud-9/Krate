@@ -25,6 +25,7 @@ import dev.cl0ud9.krate.platform.appContainer
 import dev.cl0ud9.krate.platform.autoupdate.UpdateMode
 import dev.cl0ud9.krate.platform.autoupdate.krateOwnsUpdates
 import dev.cl0ud9.krate.platform.autoupdate.updateMode
+import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -43,7 +44,9 @@ internal fun rememberUpdateMode(
         onPauseOrDispose { }
     }
     // Android's record of who installed it, read off the main thread; until it's read, nothing is claimed
-    val owns by produceState(false, app.packageName, installed, visits) {
+    // also whenever any app is installed, replaced or removed: a reinstall through Krate changes who installed it
+    val changes = PackageChanges.version.intValue
+    val owns by produceState(false, app.packageName, installed, visits, changes) {
         value = installed && withContext(Dispatchers.IO) { krateOwnsUpdates(context, app.packageName) }
     }
     return updateMode(global, app, installed, owns)
