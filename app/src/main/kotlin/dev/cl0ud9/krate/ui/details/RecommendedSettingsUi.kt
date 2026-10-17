@@ -156,6 +156,7 @@ internal fun RecommendedSheet(
                 ) {
                     PanelText(if (helperOn) applyText(state, choice) else HELPER_OFF_TEXT)
                     if (!helperOn && restrictedHelp) RestrictedHelpText(context)
+                    if (helperOn) SendHelperReport(app, state)
                 }
             }
             TextButton(onClick = {

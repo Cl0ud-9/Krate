@@ -166,6 +166,7 @@ internal fun OpenLinksSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        SendHelperReport(app, state)
         // without the helper there's only the page to open; the helper is the thing that does this for them
         if (needsHelper(helperOn, standing, running)) {
             Surface(shape = ShapeCache.rounded16, color = MaterialTheme.colorScheme.secondaryContainer) {

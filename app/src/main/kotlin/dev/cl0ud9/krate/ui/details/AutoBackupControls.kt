@@ -80,6 +80,7 @@ internal fun AutoBackupPanel(
                 return@Column
             }
             PanelText(panelText(state, saved?.savedAtMillis))
+            SendHelperReport(app, state)
             if (state is AutoBackupState.Running) {
                 ButtonRow { StopButton() }
             } else {
