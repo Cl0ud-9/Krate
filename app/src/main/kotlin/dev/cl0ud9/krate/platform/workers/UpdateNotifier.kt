@@ -292,6 +292,20 @@ internal fun shouldPostPendingNotice(
         else -> showing
     }
 
+// the person is looking at these on the Updates screen, so a later check that finds the same ones still waiting
+// shouldn't announce them as news: that is how an update found while Krate was closed, then seen on opening it,
+// would otherwise be raised a second time once they leave
+internal fun noteUpdatesSeen(
+    context: Context,
+    apps: List<AppProfile>,
+) {
+    if (apps.isEmpty()) return
+    val prefs = context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+    val signature = pendingUpdatesSignature(apps)
+    if (prefs.getString(KEY_PENDING_SIGNATURE, null) == signature) return
+    rememberPending(prefs, signature, downloaded = false)
+}
+
 private fun rememberPending(
     prefs: SharedPreferences,
     signature: String,

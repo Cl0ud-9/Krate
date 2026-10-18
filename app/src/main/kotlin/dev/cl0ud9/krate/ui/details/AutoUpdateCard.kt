@@ -3,7 +3,9 @@ package dev.cl0ud9.krate.ui.details
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Card
@@ -38,7 +40,9 @@ import dev.cl0ud9.krate.platform.autoupdate.otherStoreName
 import dev.cl0ud9.krate.platform.autoupdate.pauseEndText
 import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import dev.cl0ud9.krate.ui.components.KrateSwitch
+import dev.cl0ud9.krate.ui.components.RevealValue
 import dev.cl0ud9.krate.ui.components.SectionHeader
+import dev.cl0ud9.krate.ui.components.Swap
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.krateViewModel
@@ -111,7 +115,7 @@ internal fun AutoUpdateCard(state: AppDetailsUiState) {
         shape = ShapeCache.rounded16,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SectionHeader(
                     title = "Update automatically",
@@ -124,13 +128,19 @@ internal fun AutoUpdateCard(state: AppDetailsUiState) {
                     enabled = allowed,
                 )
             }
-            AutoUpdateStatus(autoUpdateLine(state, owned, current, pending, now))
-            if (willUpdate && pending != null) {
-                val skipped = current.skippedBuild == pending.buildKey
-                TextButton(
-                    onClick = { viewModel.skip(if (skipped) null else pending.buildKey) },
-                    modifier = Modifier.align(Alignment.End),
-                ) {
+            Spacer(modifier = Modifier.height(10.dp))
+            // the line follows the switch and the clock: it fades through to the new one and the card eases to fit
+            Swap(target = autoUpdateLine(state, owned, current, pending, now), label = "auto-update-line") {
+                AutoUpdateStatus(it)
+            }
+            // the skip offer comes and goes with a pending update, folding in and out under the line
+            RevealValue(
+                pending?.takeIf { willUpdate },
+                gap = 10.dp,
+                modifier = Modifier.align(Alignment.End),
+            ) { update ->
+                val skipped = current.skippedBuild == update.buildKey
+                TextButton(onClick = { viewModel.skip(if (skipped) null else update.buildKey) }) {
                     Text(if (skipped) "Don't skip" else "Skip this version")
                 }
             }

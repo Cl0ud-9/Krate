@@ -39,6 +39,7 @@ import dev.cl0ud9.krate.domain.repository.effectiveBaseline
 import dev.cl0ud9.krate.domain.repository.forTrack
 import dev.cl0ud9.krate.domain.repository.isNewerThan
 import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
+import dev.cl0ud9.krate.ui.components.AfterArrival
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
 import dev.cl0ud9.krate.ui.components.systemNavBarClearance
 import dev.cl0ud9.krate.ui.home.PlayProtectReminder
@@ -284,7 +285,7 @@ private fun AppDetailsContent(
     val anchor = rememberScrollAnchor(scrollState)
     val scrolled = remember(scrollState) { derivedStateOf { scrollState.isScrollInProgress || scrollState.value > 0 } }
 
-    CompositionLocalProvider(LocalPageScrolled provides scrolled, LocalUninstallAction provides onUninstall) {
+    CompositionLocalProvider(LocalPageScrolled provides scrolled) {
         Column(
             modifier =
                 Modifier
@@ -305,6 +306,12 @@ private fun AppDetailsContent(
                 AppDetailsHeader(
                     app = app,
                     installedVersionName = state.installedVersionName,
+                    uninstall =
+                        UninstallState(
+                            running = uninstalling,
+                            locked = installBusy(state),
+                            onClick = onUninstall,
+                        ),
                     moment = installMomentFor(state),
                 )
 
@@ -360,12 +367,14 @@ private fun AfterTheAction(
     if (app.isTracked) ShareFindCard(app)
 
     // what the app is sits right under the action, before the finer controls further down
-    AppInfoSection(
-        app = app,
-        dependencies = state.dependencies,
-        onNavigateToApp = onNavigateToApp,
-        installedSigner = state.installed?.signerSha256,
-    )
+    AfterArrival {
+        AppInfoSection(
+            app = app,
+            dependencies = state.dependencies,
+            onNavigateToApp = onNavigateToApp,
+            installedSigner = state.installed?.signerSha256,
+        )
+    }
 }
 
 // every build to pick from, then the picked build's notes below it: a pick only ever changes what's under the list,
@@ -377,27 +386,31 @@ private fun NotesAndHistory(
     onSelectVersion: (ArtifactInfo) -> Unit,
 ) {
     // a broken newest build can be worked around right away by picking an earlier one here
-    VersionHistorySection(
-        app = state.app,
-        // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
-        installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
-        selectedArtifact = state.selectedArtifact,
-        olderThanInstalledListed = state.app.artifacts.any { isOlderThanInstalled(state.installed, it) },
-        onSelectVersion = { artifact ->
-            anchor.hold()
-            onSelectVersion(artifact)
-        },
-    )
-    ReleaseNotesSection(
-        app = state.app,
-        builds =
-            releaseNotesBuilds(
-                state.trackApp,
-                state.selectedArtifact,
-                state.effectiveBaseline?.takeIf {
-                    state.installed !=
-                        null
-                },
-            ),
-    )
+    AfterArrival(step = 1) {
+        VersionHistorySection(
+            app = state.app,
+            // a version changed outside Krate isn't any listed build, so nothing gets the Installed tag then
+            installedBuild = state.effectiveBaseline?.takeIf { state.installed != null && !state.isDiverged },
+            selectedArtifact = state.selectedArtifact,
+            olderThanInstalledListed = state.app.artifacts.any { isOlderThanInstalled(state.installed, it) },
+            onSelectVersion = { artifact ->
+                anchor.hold()
+                onSelectVersion(artifact)
+            },
+        )
+    }
+    AfterArrival(step = 2) {
+        ReleaseNotesSection(
+            app = state.app,
+            builds =
+                releaseNotesBuilds(
+                    state.trackApp,
+                    state.selectedArtifact,
+                    state.effectiveBaseline?.takeIf {
+                        state.installed !=
+                            null
+                    },
+                ),
+        )
+    }
 }

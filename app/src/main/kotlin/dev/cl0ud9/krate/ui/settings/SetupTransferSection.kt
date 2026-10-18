@@ -4,9 +4,10 @@ import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SettingsBackupRestore
@@ -39,6 +40,8 @@ import dev.cl0ud9.krate.platform.setup.SetupPreview
 import dev.cl0ud9.krate.ui.components.ButtonRow
 import dev.cl0ud9.krate.ui.components.KrateDialog
 import dev.cl0ud9.krate.ui.components.KrateDialogHeader
+import dev.cl0ud9.krate.ui.components.RevealValue
+import dev.cl0ud9.krate.ui.components.Swap
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import kotlinx.coroutines.CoroutineScope
@@ -106,8 +109,9 @@ private fun SetupCard(
         shape = ShapeCache.rounded16,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(text = "Krate's own setup", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text =
                     "Save the apps you track, the ones you keep on manual updates and how Krate looks to a file, " +
@@ -116,9 +120,17 @@ private fun SetupCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            message?.let {
-                Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            // the result drops in under the words, and a new one replaces it in place
+            RevealValue(message, gap = 12.dp) {
+                Swap(target = it, label = "setup-message") { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
+            Spacer(modifier = Modifier.height(12.dp))
             ButtonRow {
                 FilledTonalButton(onClick = onLoad) { Text("Load a setup") }
                 Button(onClick = onSave) { Text("Save to a file") }

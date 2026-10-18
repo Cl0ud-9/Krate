@@ -233,6 +233,10 @@ class AppWork(
                         change(
                             app.id,
                         ) { it.copy(install = InstallStatus.Idle, finished = Finished(++serial, uninstalled = true)) }
+                    } else if (status is InstallStatus.Failed && status.userCancelled) {
+                        // saying no is the person's own choice: back to the buttons as they were, with nothing
+                        // left on the page that reads as an install gone wrong
+                        setInstall(app.id, InstallStatus.Idle)
                     } else {
                         setInstall(app.id, status)
                     }

@@ -1,13 +1,9 @@
 package dev.cl0ud9.krate.ui.settings
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +22,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,11 +34,12 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.krate.ui.components.Reveal
+import dev.cl0ud9.krate.ui.components.swapTransition
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.navigation.pressable
 
-private const val SUBTITLE_FADE_MS = 180
-private const val NOTE_FADE_MS = 240
+private const val BADGE_BLEND_MS = 300
 private val ROW_MIN_HEIGHT = 88.dp
 private val BADGE_SIZE = 56.dp
 private val BADGE_ICON_SIZE = 24.dp
@@ -81,26 +81,15 @@ internal fun SettingsRow(
 ) {
     val rowModifier = Modifier.fillMaxWidth().heightIn(min = ROW_MIN_HEIGHT)
     val content: @Composable () -> Unit = {
-        Column(
-            modifier = Modifier.animateContentSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
+        // no size animation here: every part that changes height (a line, a note) eases on the one shared curve, so the
+        // row grows in a single motion rather than in steps
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(
-                    modifier = Modifier.size(BADGE_SIZE).background(header.colors.badgeColor, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        header.icon,
-                        contentDescription = null,
-                        tint = header.colors.contentColor,
-                        modifier = Modifier.size(BADGE_ICON_SIZE),
-                    )
-                }
+                RowBadge(header)
                 RowTexts(header, Modifier.weight(1f))
                 trailing?.invoke()
             }
-            if (expandedContent != null) RowNote(expandedContent)
+            RowNote(expandedContent)
         }
     }
     // a separate onClick overload of Surface, not `enabled = onClick != null` on the clickable one -
@@ -125,6 +114,21 @@ internal fun SettingsRow(
     }
 }
 
+// the round badge: when a row's look changes (its colour, its icon) the badge blends to the new one
+@Composable
+private fun RowBadge(header: SettingsRowHeader) {
+    val badge by animateColorAsState(header.colors.badgeColor, tween(BADGE_BLEND_MS), label = "row-badge")
+    val glyph by animateColorAsState(header.colors.contentColor, tween(BADGE_BLEND_MS), label = "row-glyph")
+    Box(
+        modifier = Modifier.size(BADGE_SIZE).background(badge, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Crossfade(targetState = header.icon, animationSpec = tween(BADGE_BLEND_MS), label = "row-icon") { icon ->
+            Icon(icon, contentDescription = null, tint = glyph, modifier = Modifier.size(BADGE_ICON_SIZE))
+        }
+    }
+}
+
 // the title and its line; a changed line fades through and the row eases to its new height, rather than snapping
 @Composable
 private fun RowTexts(
@@ -132,10 +136,16 @@ private fun RowTexts(
     modifier: Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(text = header.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        AnimatedContent(
+            targetState = header.title,
+            transitionSpec = swapTransition(),
+            label = "row-title",
+        ) { title ->
+            Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        }
         AnimatedContent(
             targetState = header.subtitle,
-            transitionSpec = { fadeIn(tween(SUBTITLE_FADE_MS)) togetherWith fadeOut(tween(SUBTITLE_FADE_MS)) },
+            transitionSpec = swapTransition(),
             label = "row-subtitle",
         ) { line ->
             Text(
@@ -147,14 +157,15 @@ private fun RowTexts(
     }
 }
 
-// drops in under the row: the row grows to make room while this fades in
+// drops in under the row and folds away again, keeping the last note it had while it folds
 @Composable
-private fun RowNote(content: @Composable ColumnScope.() -> Unit) {
-    val entered = remember { MutableTransitionState(false).apply { targetState = true } }
-    AnimatedVisibility(visibleState = entered, enter = fadeIn(tween(NOTE_FADE_MS))) {
+private fun RowNote(content: (@Composable ColumnScope.() -> Unit)?) {
+    var last by remember { mutableStateOf(content) }
+    if (content != null) last = content
+    Reveal(visible = content != null, gap = 14.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { last?.invoke(this) }
         }
     }
 }

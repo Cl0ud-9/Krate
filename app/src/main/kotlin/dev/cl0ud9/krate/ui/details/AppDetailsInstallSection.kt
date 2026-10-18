@@ -114,8 +114,7 @@ private fun InstallStatusContent(
 
         is InstallStatus.Failed -> {
             FailedInstallSection(
-                fromScratch = state.installsFromScratch,
-                installed = state.installed != null,
+                state = state,
                 failure = installStatus,
                 onInstall = onInstall,
                 onRetryAsCleanInstall = onRetryAsCleanInstall,
@@ -173,12 +172,13 @@ private fun waitingForUserMessage(step: WaitingForUserStep): String =
 // that already uninstalled first (an always-clean-install app, or a rollback) has nothing further to fall back to
 @Composable
 private fun FailedInstallSection(
-    fromScratch: Boolean,
-    installed: Boolean,
+    state: AppDetailsUiState,
     failure: InstallStatus.Failed,
     onInstall: () -> Unit,
     onRetryAsCleanInstall: () -> Unit,
 ) {
+    val fromScratch = state.installsFromScratch
+    val installed = state.installed != null
     val reasonText = if (failure.rolledBack) "${failure.reason} The previous version was restored." else failure.reason
     // saying no in the system dialog isn't a mishap, so a cancel gets no headline
     val text =
@@ -189,6 +189,8 @@ private fun FailedInstallSection(
         }
     FailureStatusRow(failure = failure, text = text)
     if (installed && failure.mayBeAppLock) HelperText(APP_LOCK_HINT)
+    // a failed update leaves the old copy in place, so it can still be opened
+    OpenWhenInstalled(state)
     // a reinstall from scratch would uninstall the app first and then be stopped all the same; the way past Play
     // Protect is the only useful step
     val showGuide = LocalPlayProtectGuide.current
@@ -285,6 +287,8 @@ private fun ReadyToInstallContent(
         text = rememberKrateLeadIn(Moment.DOWNLOADED, "Downloaded and checked, ready to install."),
     )
     NewPermissionsNote(state)
+    // an update that's downloaded and waiting leaves the installed app where it was
+    OpenWhenInstalled(state)
     Button(
         onClick = onInstall,
         enabled = unmetDependencies.isEmpty(),

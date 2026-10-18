@@ -35,7 +35,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -390,8 +389,7 @@ internal fun AnimatedContentScope.TabScreen(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .graphicsLayer { alpha = depth.dimAlpha.value }
-                        .background(Color.Black),
+                        .dimmedBy(depth.dimAlpha),
             )
         }
     }
@@ -455,8 +453,7 @@ internal fun AnimatedContentScope.DetailScreen(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .graphicsLayer { alpha = depth.dimAlpha.value }
-                        .background(Color.Black),
+                        .dimmedBy(depth.dimAlpha),
             )
         }
     }

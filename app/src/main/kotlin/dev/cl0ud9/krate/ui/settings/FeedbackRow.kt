@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.ui.components.BusyButtonContent
+import dev.cl0ud9.krate.ui.components.Swap
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.MAX_ISSUE_URL_LENGTH
 import dev.cl0ud9.krate.ui.util.githubNewIssueUrl
@@ -140,19 +141,22 @@ private fun FeedbackRowContent(
     )
 
     val report = state.diagnosticReport
-    if (report == null) {
-        FilledTonalButton(
-            onClick = { if (!state.generatingReport) onGenerateReport() },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            BusyButtonContent(
-                busy = state.generatingReport,
-                text = "Attach a diagnostic report",
-                busyText = "Generating...",
-            )
+    // the button turns into the report once it's made, the page easing to the room it takes
+    Swap(target = report, label = "diagnostic-report") { shown ->
+        if (shown == null) {
+            FilledTonalButton(
+                onClick = { if (!state.generatingReport) onGenerateReport() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                BusyButtonContent(
+                    busy = state.generatingReport,
+                    text = "Attach a diagnostic report",
+                    busyText = "Generating...",
+                )
+            }
+        } else {
+            DiagnosticReportPreview(report = shown)
         }
-    } else {
-        DiagnosticReportPreview(report = report)
     }
 
     // sent through the share sheet (email, WhatsApp, ...) - most people don't have a GitHub

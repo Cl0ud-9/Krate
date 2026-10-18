@@ -40,6 +40,8 @@ internal fun RollbackContent(
         UninstallingStatus(installStatus = state.installStatus)
     } else {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            // the copy that's on the phone stays reachable while another build is picked
+            OpenWhenInstalled(state)
             Button(onClick = onDownload, enabled = state.selectedArtifact != null, modifier = Modifier.fillMaxWidth()) {
                 Text(pickedVersionLabel(state))
             }

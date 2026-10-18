@@ -6,6 +6,7 @@ import dev.cl0ud9.krate.domain.model.DownloadStatus
 import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.SupportStatus
+import dev.cl0ud9.krate.domain.model.WaitingForUserStep
 import dev.cl0ud9.krate.domain.repository.Baseline
 import dev.cl0ud9.krate.domain.repository.forTrack
 import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
@@ -122,6 +123,25 @@ class AppDetailsUiStateTest {
         assertEquals("https://github.com/owner/repo/releases/tag/v1.0", public.releasePageUrl())
         assertNull(public.copy(requiresAuth = true).releasePageUrl())
         assertNull(public.copy(downloadUrl = "https://example.com/app.apk").releasePageUrl())
+    }
+
+    @Test
+    fun `uninstall is held back while an update downloads or installs, and free again after`() {
+        val idle = state(app, installed = v229, selected = v230)
+
+        assertFalse(installBusy(idle))
+        assertTrue(installBusy(idle.copy(downloadStatus = DownloadStatus.Downloading(10L, 100L))))
+        assertTrue(installBusy(idle.copy(downloadStatus = DownloadStatus.Verifying)))
+        assertTrue(installBusy(idle.copy(installStatus = InstallStatus.Installing)))
+        assertTrue(installBusy(idle.copy(installStatus = InstallStatus.RollingBack)))
+        assertTrue(
+            installBusy(idle.copy(installStatus = InstallStatus.WaitingForUser(WaitingForUserStep.INSTALL_CONFIRM))),
+        )
+        // the uninstall's own steps, and a failure, don't hold the button back from a second try
+        assertFalse(
+            installBusy(idle.copy(installStatus = InstallStatus.WaitingForUser(WaitingForUserStep.UNINSTALL_CONFIRM))),
+        )
+        assertFalse(installBusy(idle.copy(installStatus = InstallStatus.Failed("no"))))
     }
 
     private fun build(

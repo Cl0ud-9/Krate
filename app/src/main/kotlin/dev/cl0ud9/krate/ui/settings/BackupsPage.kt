@@ -62,6 +62,8 @@ import dev.cl0ud9.krate.ui.components.AppIconAvatar
 import dev.cl0ud9.krate.ui.components.KrateDialog
 import dev.cl0ud9.krate.ui.components.KrateDialogHeader
 import dev.cl0ud9.krate.ui.components.KrateSwitch
+import dev.cl0ud9.krate.ui.components.Reveal
+import dev.cl0ud9.krate.ui.components.Swap
 import dev.cl0ud9.krate.ui.details.autoBackupStateFor
 import dev.cl0ud9.krate.ui.details.relativeTime
 import dev.cl0ud9.krate.ui.details.rememberAutoBackupOn
@@ -147,15 +149,18 @@ private fun RestrictedHelpRow() {
     var open by rememberSaveable { mutableStateOf(false) }
     Column(modifier = Modifier.padding(horizontal = 4.dp)) {
         TextButton(onClick = { open = !open }) { Text(if (open) "Hide help" else "Switch greyed out?") }
-        if (open) {
-            Text(
-                text = RESTRICTED_SETTINGS_HELP,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
-            TextButton(onClick = { startSafely(context, appInfoIntent(context.packageName), null) }) {
-                Text("Open Krate's App info")
+        // unfolds under the button, and folds away again, rather than appearing in a frame
+        Reveal(visible = open) {
+            Column {
+                Text(
+                    text = RESTRICTED_SETTINGS_HELP,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                TextButton(onClick = { startSafely(context, appInfoIntent(context.packageName), null) }) {
+                    Text("Open Krate's App info")
+                }
             }
         }
     }
@@ -189,11 +194,14 @@ private fun BackupAppRow(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
-                Text(
-                    text = backupStatus(state, saved, installed, on),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // saving, saved, restoring: the line fades through each rather than flipping
+                Swap(target = backupStatus(state, saved, installed, on), label = "backup-status") { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             val spec = app.guide?.autoBackup?.takeIf { on && installed }
             val idle = state !is AutoBackupState.Running

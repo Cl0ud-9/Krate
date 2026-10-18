@@ -1,5 +1,7 @@
 package dev.cl0ud9.krate.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -17,8 +19,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.InviteStatus
+import dev.cl0ud9.krate.ui.components.Swap
 import dev.cl0ud9.krate.ui.util.steadyHeight
 import dev.cl0ud9.krate.voice.Moment
 import dev.cl0ud9.krate.voice.rememberKrateLeadIn
@@ -100,13 +104,31 @@ private fun GitHubAccessRowContent(
     onSaveToken: (String) -> Unit,
     onClearToken: () -> Unit,
 ) {
-    if (hasToken) {
-        InviteStatusLine(inviteStatus)
-        OutlinedButton(onClick = onClearToken, modifier = Modifier.fillMaxWidth()) {
-            Text("Remove saved token")
+    // saving a token turns the field into the status, and removing it turns it back, rather than swapping in a frame
+    Swap(target = hasToken, label = "token-state") { saved ->
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (saved) {
+                SavedTokenContent(inviteStatus, onClearToken)
+            } else {
+                TokenInputContent(onSaveToken)
+            }
         }
-        return
     }
+}
+
+@Composable
+private fun SavedTokenContent(
+    inviteStatus: InviteStatus,
+    onClearToken: () -> Unit,
+) {
+    Swap(target = inviteStatus, label = "invite-status") { InviteStatusLine(it) }
+    OutlinedButton(onClick = onClearToken, modifier = Modifier.fillMaxWidth()) {
+        Text("Remove saved token")
+    }
+}
+
+@Composable
+private fun TokenInputContent(onSaveToken: (String) -> Unit) {
     var tokenInput by remember { mutableStateOf("") }
     // what the token is and where it goes, in plain words for someone who was simply sent one
     Text(

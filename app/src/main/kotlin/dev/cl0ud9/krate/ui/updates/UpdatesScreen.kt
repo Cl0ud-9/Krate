@@ -29,6 +29,7 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.platform.selfupdate.notePlayProtect
 import dev.cl0ud9.krate.platform.workers.UpdateNoticeClearing
 import dev.cl0ud9.krate.platform.workers.UpdateNotifier
+import dev.cl0ud9.krate.platform.workers.noteUpdatesSeen
 import dev.cl0ud9.krate.ui.components.AppListItem
 import dev.cl0ud9.krate.ui.components.EmptyState
 import dev.cl0ud9.krate.ui.components.KrateMessage
@@ -99,6 +100,9 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
     // through, this is the one place a notification adds real value instead of just repeating
     // feedback already visible on screen (see UpdateNotifier.notifyUpdateAllResult)
     val context = LocalContext.current
+    // what's listed here has been seen, so the background check doesn't announce it again after they leave
+    val listed = (uiState as? UpdatesUiState.Content)?.apps
+    LaunchedEffect(listed) { listed?.let { noteUpdatesSeen(context, it) } }
     LaunchedEffect(updateAllState) {
         val finished = updateAllState as? UpdateAllUiState.Done ?: return@LaunchedEffect
         val succeeded = finished.outcomes.count { it.succeeded }

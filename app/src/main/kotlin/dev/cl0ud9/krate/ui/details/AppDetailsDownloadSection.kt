@@ -140,6 +140,8 @@ private fun DownloadStatusContent(
             val fraction = downloadFraction(status.bytesDownloaded, status.totalBytes)
             KrateLinearProgress(progress = fraction)
             ProgressCaption(downloadingLabel(status.bytesDownloaded, status.totalBytes, fraction ?: 0f))
+            // the installed copy is still there and still works while its update comes down
+            OpenWhenInstalled(state)
             // a 170 MB download shouldn't be a commitment - the partial file is kept, so starting
             // again later resumes it
             OutlinedButton(onClick = onCancelDownload, modifier = Modifier.fillMaxWidth()) {
@@ -171,14 +173,12 @@ private fun DownloadStatusContent(
             // already-installed app is perfectly fine - isUpToDate here is the same check IdleContent
             // uses, just also applied to the Failed branch, so the app stays reachable while the
             // retry option sits alongside it instead of replacing it
-            if (state.isUpToDate) {
-                OpenAppButton(app = state.app)
-            }
+            OpenWhenInstalled(state, secondary = !state.isUpToDate)
             Button(
                 onClick = onDownload,
                 modifier = Modifier.fillMaxWidth(),
                 colors =
-                    if (state.isUpToDate) {
+                    if (state.installedVersionName != null) {
                         ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -305,7 +305,6 @@ private fun InstalledNotUpToDateActions(
         Button(onClick = onDownload, enabled = selected != null, modifier = Modifier.fillMaxWidth()) {
             Text(downloadLabelFor(state))
         }
-        UninstallButton()
     }
 }
 
@@ -334,16 +333,24 @@ private fun UpToDateActions(
             ) {
                 Text(label)
             }
-            UninstallButton()
         }
     } else {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-                Text(label)
-            }
-            UninstallButton()
+        Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+            Text(label)
         }
     }
+}
+
+// Open for an app that's on the phone, in every step that isn't an install or an uninstall under way: the copy that's
+// there keeps working while its update downloads, waits to be installed, or fails, so the way into it never disappears.
+// Filled when it's the page's main action, tonal when an update or retry is
+@Composable
+internal fun OpenWhenInstalled(
+    state: AppDetailsUiState,
+    secondary: Boolean = true,
+) {
+    if (state.installedVersionName == null) return
+    OpenAppButton(app = state.app, secondary = secondary)
 }
 
 // shared by UpToDateActions and the Failed branch above, plus InstallStatus.Success in

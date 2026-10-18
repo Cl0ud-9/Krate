@@ -16,7 +16,9 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
@@ -165,3 +167,8 @@ private fun depthEffectModifier(
         }
     }
 }
+
+// the wash over a screen that's receding. Drawn as a colour with its own alpha rather than as a layer faded to that
+// alpha: a faded layer makes the GPU render the whole screen aside and blend it back every frame of the push, which is
+// by far the dearest thing in it. The alpha is read while drawing, so a tick of the animation only redraws this
+fun Modifier.dimmedBy(alpha: State<Float>): Modifier = drawBehind { drawRect(Color.Black, alpha = alpha.value) }
