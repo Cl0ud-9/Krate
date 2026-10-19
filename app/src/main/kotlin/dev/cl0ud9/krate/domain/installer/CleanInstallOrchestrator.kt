@@ -34,6 +34,9 @@ class CleanInstallOrchestrator(
             val uninstallError = uninstallFailure
             // passed on whole, so a cancel still reads as one and an app lock still gets its hint
             if (uninstallError != null) {
+                // saying no leaves the app exactly where it was, so the copy taken for the rollback has no job to do
+                // (it can be over 100 MB); any other failure keeps it, as the app's state is then less certain
+                if (uninstallError.userCancelled) rollbackStore.discard(app.packageName)
                 emit(uninstallError)
                 return@flow
             }

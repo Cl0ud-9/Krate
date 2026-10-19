@@ -79,6 +79,21 @@ class CleanInstallOrchestratorTest {
         }
 
     @Test
+    fun `a cancelled uninstall drops the rollback copy, a failed one keeps it`() =
+        runBlocking {
+            fun run(failure: InstallStatus.Failed): FakeRollbackStore {
+                val engine =
+                    FakeInstallationEngine(uninstallResult = flowOf(failure), installResults = mutableListOf())
+                val store = FakeRollbackStore(captureResult = true, rollbackFile = rollbackApk)
+                runBlocking { CleanInstallOrchestrator(engine, store).cleanInstall(app, newApk).toList() }
+                return store
+            }
+
+            assertEquals(1, run(InstallStatus.Failed("Uninstall cancelled.", userCancelled = true)).discarded)
+            assertEquals(0, run(InstallStatus.Failed("uninstall blocked")).discarded)
+        }
+
+    @Test
     fun `install failure restores the preserved apk and reports rolledBack true`() =
         runBlocking {
             val engine =
