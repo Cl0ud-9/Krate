@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import dev.cl0ud9.krate.platform.AppContainer
 import dev.cl0ud9.krate.platform.LauncherIcon
 import dev.cl0ud9.krate.platform.diagnostics.KrateLog
+import dev.cl0ud9.krate.platform.lifecycle.ActivityFocus
 import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import dev.cl0ud9.krate.platform.suggest.SuggestionStore
 import dev.cl0ud9.krate.platform.workers.ManifestCheckWorker
@@ -36,6 +37,7 @@ class KrateApplication : Application() {
         AndroidComposeUiFlags.isOutOfFrameSchedulerForTextInputEventsEnabled = false
         KrateLog.init(this)
         PackageChanges.register(this)
+        ActivityFocus.register(this)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             KrateLog.crash(thread.name, error)

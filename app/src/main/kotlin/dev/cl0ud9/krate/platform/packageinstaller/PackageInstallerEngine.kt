@@ -3,13 +3,11 @@ package dev.cl0ud9.krate.platform.packageinstaller
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ProcessLifecycleOwner
 import dev.cl0ud9.krate.domain.installer.InstallationEngine
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.WaitingForUserStep
-import kotlinx.coroutines.Dispatchers
+import dev.cl0ud9.krate.platform.lifecycle.ActivityFocus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
@@ -19,10 +17,13 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
-private const val PROMPT_SETTLE_MS = 3_000L
+private const val PROMPT_SETTLE_MS = 1_500L
+
+// how long Krate may stay in front after an uninstall prompt was asked for before it's taken the prompt never showed
+private const val PROMPT_APPEAR_MS = 6_000L
 
 // drives an android PackageInstaller session for install/update and uninstall, section 15, 16, 17,
 // 42.12 of the spec - the clean-install sequence (uninstall then install, with rollback) lives one
@@ -103,16 +104,14 @@ class PackageInstallerEngine(
         }
     }
 
-    // the uninstall dialog sits over Krate, which stops being the one in front (it stays visible behind the see-through
-    // dialog, so it isn't "stopped"), and closing the dialog brings it back to the front. If the app is still on the
-    // phone a moment after that, nobody confirmed it, so the wait ends as a cancel rather than hanging on a spinner
+    // the dialog sits over Krate, which stops being the one in front, and closing it brings Krate back. If the app is
+    // still on the phone a moment after that, nobody confirmed it, so the wait ends as a cancel rather than hanging on
+    // a spinner. Screen focus is read per screen, so a dialog cancelled the instant it opens is still seen: and if
+    // Krate never lost the front at all, the dialog never came up (or is long gone), which ends the wait the same way
     private suspend fun ProducerScope<InstallStatus>.endWaitWhenPromptClosed(packageName: String) {
-        withContext(Dispatchers.Main) {
-            val states = ProcessLifecycleOwner.get().lifecycle.currentStateFlow
-            val onScreen = { state: Lifecycle.State -> state.isAtLeast(Lifecycle.State.RESUMED) }
-            if (onScreen(states.value)) states.first { !onScreen(it) }
-            states.first { onScreen(it) }
-        }
+        val focus = ActivityFocus.inFront
+        if (focus.value) withTimeoutOrNull(PROMPT_APPEAR_MS) { focus.first { !it } }
+        focus.first { it }
         // a confirmed uninstall reports within a moment of the dialog closing, so give that time to arrive first
         delay(PROMPT_SETTLE_MS)
         if (isStillInstalled(packageName)) {
