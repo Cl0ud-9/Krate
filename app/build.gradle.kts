@@ -27,8 +27,8 @@ android {
         applicationId = "dev.cl0ud9.krate"
         minSdk = 30
         targetSdk = 37
-        versionCode = 39
-        versionName = "0.6.3"
+        versionCode = 40
+        versionName = "0.6.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
