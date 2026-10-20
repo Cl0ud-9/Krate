@@ -45,6 +45,7 @@ import dev.cl0ud9.krate.domain.model.WaitingForUserStep
 import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.platform.autoupdate.UpdateMode
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
+import dev.cl0ud9.krate.ui.components.BesideOrBelow
 import dev.cl0ud9.krate.ui.components.UpdateModeLine
 import dev.cl0ud9.krate.ui.components.rememberAppIcon
 import dev.cl0ud9.krate.ui.components.rememberUpdateMode
@@ -109,15 +110,18 @@ internal fun AppDetailsHeader(
         Box {
             IconFrost(rememberAppIcon(app))
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.Top) {
-                    AppIdentity(app, moment, accent, modifier = Modifier.weight(1f))
-                    // fades and folds away once the app is gone, rather than leaving a jump in the row
-                    AnimatedVisibility(
-                        visible = installedVersionName != null,
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkHorizontally(),
-                    ) { UninstallControl(uninstall) }
-                }
+                // Uninstall sits at the corner, or under the name when big text leaves the name no room beside it
+                BesideOrBelow(
+                    main = { AppIdentity(app, moment, accent, modifier = Modifier.fillMaxWidth()) },
+                    side = {
+                        // fades and folds away once the app is gone, rather than leaving a jump in the row
+                        AnimatedVisibility(
+                            visible = installedVersionName != null,
+                            enter = fadeIn() + expandHorizontally(),
+                            exit = fadeOut() + shrinkHorizontally(),
+                        ) { UninstallControl(uninstall) }
+                    },
+                )
                 HeaderBadges(app, accent)
                 BuildLine(app)
                 app.description?.let { description ->

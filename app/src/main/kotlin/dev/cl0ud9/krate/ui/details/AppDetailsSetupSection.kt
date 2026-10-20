@@ -57,6 +57,7 @@ import dev.cl0ud9.krate.platform.setup.appInfoIntent
 import dev.cl0ud9.krate.platform.setup.restrictedSettingsApply
 import dev.cl0ud9.krate.platform.setup.stepAvailable
 import dev.cl0ud9.krate.platform.setup.stepState
+import dev.cl0ud9.krate.ui.components.BesideOrBelow
 import dev.cl0ud9.krate.ui.components.ButtonRow
 import dev.cl0ud9.krate.ui.components.SectionHeader
 import dev.cl0ud9.krate.ui.navigation.glassRim
@@ -235,7 +236,8 @@ private fun StepList(
     }
 }
 
-// a step still to do: its number (a tick box when Krate can't check it), what and why, and the button for it
+// a step still to do: its number (a tick box when Krate can't check it), what and why, and the button for it; the
+// button drops under the words when a big text size leaves them no room beside it
 @Composable
 private fun PendingStepRow(
     app: AppProfile,
@@ -244,54 +246,76 @@ private fun PendingStepRow(
 ) {
     val context = LocalContext.current
     val step = row.step
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        val badge = Modifier.size(BADGE)
-        val colors = MaterialTheme.colorScheme
-        Surface(
-            modifier =
-                if (row.manual) {
-                    badge
-                        .clip(
-                            CircleShape,
-                        ).clickable(role = Role.Checkbox) { onMark(step, true) }
-                } else {
-                    badge
-                },
-            shape = CircleShape,
-            color = if (row.manual) colors.surfaceContainerHighest else colors.secondaryContainer,
-            border =
-                if (row.manual) {
-                    BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline)
-                } else {
-                    null
-                },
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "${row.number}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    fontWeight = FontWeight.SemiBold,
-                )
+    BesideOrBelow(
+        centered = true,
+        main = {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                StepNumber(row, onMark)
+                StepWords(step, Modifier.weight(1f))
             }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = step.title, style = MaterialTheme.typography.titleSmall)
-            val parts = listOfNotNull("Optional".takeIf { step.optional }, step.detail)
-            val line = parts.filter { it.isNotBlank() }.joinToString(". ")
-            if (line.isNotBlank()) {
-                Text(
-                    text = line,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        },
+        side = {
+            FilledTonalButton(
+                onClick = { openStep(context, app, step) },
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+            ) {
+                Text(actionLabel(step.kind))
             }
+        },
+    )
+}
+
+// the step's number, or a tick box when Krate can't check it and it's marked by hand
+@Composable
+private fun StepNumber(
+    row: StepRow,
+    onMark: (SetupStep, Boolean) -> Unit,
+) {
+    val badge = Modifier.size(BADGE)
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier =
+            if (row.manual) {
+                badge.clip(CircleShape).clickable(role = Role.Checkbox) {
+                    onMark(row.step, true)
+                }
+            } else {
+                badge
+            },
+        shape = CircleShape,
+        color = if (row.manual) colors.surfaceContainerHighest else colors.secondaryContainer,
+        border = if (row.manual) BorderStroke(1.5.dp, colors.outline) else null,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = "${row.number}",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.onSecondaryContainer,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
-        FilledTonalButton(
-            onClick = { openStep(context, app, step) },
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-        ) {
-            Text(actionLabel(step.kind))
+    }
+}
+
+// what the step is and why
+@Composable
+private fun StepWords(
+    step: SetupStep,
+    modifier: Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(text = step.title, style = MaterialTheme.typography.titleSmall)
+        val line =
+            listOfNotNull(
+                "Optional".takeIf { step.optional },
+                step.detail,
+            ).filter { it.isNotBlank() }.joinToString(". ")
+        if (line.isNotBlank()) {
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

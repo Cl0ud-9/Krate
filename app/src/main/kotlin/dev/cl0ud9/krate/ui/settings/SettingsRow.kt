@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -42,6 +43,8 @@ import dev.cl0ud9.krate.ui.navigation.pressable
 private const val BADGE_BLEND_MS = 300
 private val ROW_MIN_HEIGHT = 88.dp
 private val BADGE_SIZE = 56.dp
+private val BADGE_SIZE_BIG_TEXT = 40.dp
+private const val BIG_TEXT_SCALE = 1.6f
 private val BADGE_ICON_SIZE = 24.dp
 private val GROUP_OUTER_RADIUS = 24.dp
 private val GROUP_INNER_RADIUS = 4.dp
@@ -83,8 +86,13 @@ internal fun SettingsRow(
     val content: @Composable () -> Unit = {
         // no size animation here: every part that changes height (a line, a note) eases on the one shared curve, so the
         // row grows in a single motion rather than in steps
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        // at the biggest text sizes the badge and gaps give the words the room instead of squeezing them
+        val bigText = LocalDensity.current.fontScale >= BIG_TEXT_SCALE
+        Column(modifier = Modifier.padding(if (bigText) 12.dp else 16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (bigText) 10.dp else 16.dp),
+            ) {
                 RowBadge(header)
                 RowTexts(header, Modifier.weight(1f))
                 trailing?.invoke()
@@ -120,7 +128,17 @@ private fun RowBadge(header: SettingsRowHeader) {
     val badge by animateColorAsState(header.colors.badgeColor, tween(BADGE_BLEND_MS), label = "row-badge")
     val glyph by animateColorAsState(header.colors.contentColor, tween(BADGE_BLEND_MS), label = "row-glyph")
     Box(
-        modifier = Modifier.size(BADGE_SIZE).background(badge, CircleShape),
+        modifier =
+            Modifier
+                .size(
+                    if (LocalDensity.current.fontScale >=
+                        BIG_TEXT_SCALE
+                    ) {
+                        BADGE_SIZE_BIG_TEXT
+                    } else {
+                        BADGE_SIZE
+                    },
+                ).background(badge, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Crossfade(targetState = header.icon, animationSpec = tween(BADGE_BLEND_MS), label = "row-icon") { icon ->

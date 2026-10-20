@@ -39,7 +39,7 @@ private const val VALUE_ROLL_MS = 320
 private const val LABEL_ALPHA = 0.72f
 
 // the smallest a label shrinks to before it fits a narrow tile at a big font
-private val MIN_LABEL_SIZE = 10.sp
+private val MIN_LABEL_SIZE = 6.sp
 
 // label: sentence case, no trailing colon. value: large semibold figure, crossfades when it changes.
 // onClick is optional - not every stat this tile shows has somewhere useful to navigate to. Fixed

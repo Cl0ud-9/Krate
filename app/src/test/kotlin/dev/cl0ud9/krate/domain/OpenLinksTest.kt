@@ -4,6 +4,7 @@ import dev.cl0ud9.krate.domain.links.LinkState
 import dev.cl0ud9.krate.domain.links.OpenLinks
 import dev.cl0ud9.krate.domain.links.declaredHosts
 import dev.cl0ud9.krate.domain.links.missing
+import dev.cl0ud9.krate.domain.links.stillOff
 import dev.cl0ud9.krate.domain.links.wantedHosts
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -63,5 +64,14 @@ class OpenLinksTest {
         val many = (1..20).map { "host$it.example.com" }
 
         assertEquals(6, declaredHosts(many, takenByAnother = { false }).size)
+    }
+
+    @Test
+    fun `only the addresses Android still has off are left to switch on`() {
+        val states = listOf(LinkState("a.example", on = true), LinkState("b.example", on = false))
+
+        assertEquals(listOf("b.example", "c.example"), stillOff(listOf("A.example", "b.example", "c.example"), states))
+        assertEquals(emptyList<String>(), stillOff(listOf("a.example"), states))
+        assertEquals(listOf("a.example"), stillOff(listOf("a.example"), null))
     }
 }

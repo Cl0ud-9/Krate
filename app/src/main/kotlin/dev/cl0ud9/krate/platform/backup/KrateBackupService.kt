@@ -13,6 +13,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import dev.cl0ud9.krate.KrateActivity
+import dev.cl0ud9.krate.domain.links.stillOff
 import dev.cl0ud9.krate.domain.model.UiTarget
 import dev.cl0ud9.krate.domain.settings.SettingsText
 import dev.cl0ud9.krate.platform.diagnostics.KrateLog
@@ -37,6 +38,10 @@ private const val FIND_TIMEOUT_MS = 6_000L
 private const val SCROLL_AFTER_MS = 1_500L
 private const val MAX_SCROLLS = 6
 private const val MAX_BACKS = 8
+
+// what phones call the button that adds an address on Open by default; the last is the one named if none is found
+private val ADD_LINK_WORDINGS = listOf("Add links", "Add a link", "Add link")
+private const val SCREEN_WORDS_LOGGED = 40
 
 // looks for an active window before deciding there isn't one
 private const val ACTIVE_LOOKS = 5
@@ -227,7 +232,8 @@ class KrateBackupService : AccessibilityService() {
         } catch (_: CancellationException) {
             stopped()
         } catch (missing: StepNotFound) {
-            AutoBackupState.Failed(job.packageName, job.mode, "Couldn't find \"${missing.step}\" in the app.")
+            val where = if (job.mode == BackupMode.OPEN_LINKS) "on Android's Open by default page" else "in the app"
+            AutoBackupState.Failed(job.packageName, job.mode, "Couldn't find \"${missing.step}\" $where.")
         } catch (failure: IllegalStateException) {
             AutoBackupState.Failed(job.packageName, job.mode, failure.message ?: "Something got in the way.")
         }
@@ -257,16 +263,58 @@ class KrateBackupService : AccessibilityService() {
     private suspend fun openLinks(job: AutoBackupJob): WalkResult {
         if (job.hosts.isEmpty() && job.releases.isEmpty()) error("There were no links to switch on.")
         job.releases.forEach { owner -> releaseLinksOf(owner) }
-        if (job.hosts.isEmpty()) return WalkResult(changed = job.releases.size)
+        // what Android already has on needs nothing: asked again after a run that did go through, the page has no
+        // "Add link" left to offer, and that is a job done, not a step missing
+        val wanted = stillOff(job.hosts, OpenByDefault.states(this, job.packageName))
+        val added = if (wanted.isEmpty()) 0 else addLinks(job, wanted)
+        return WalkResult(changed = added + job.releases.size)
+    }
+
+    // the page for the app, the wanted addresses ticked in its "Add link" box, then Add; how many were ticked
+    private suspend fun addLinks(
+        job: AutoBackupJob,
+        wanted: List<String>,
+    ): Int {
         openOpenByDefault(job.packageName)
-        tap(job.watched, UiTarget(text = "Add link"))
+        try {
+            tapAny(job.watched, ADD_LINK_WORDINGS)
+        } catch (missing: StepNotFound) {
+            // the page may have nothing to add because it's all on by now; otherwise say what the page did show, in
+            // the log, so a phone that words it differently can be taught
+            if (stillOff(wanted, OpenByDefault.states(this, job.packageName)).isEmpty()) return 0
+            KrateLog.event("helper page", "Open by default shows: ${screenWords(job.watched)}")
+            throw missing
+        }
         delay(STEP_SETTLE_MS)
-        val ticked = job.hosts.count { host -> tickHost(job.watched, host) }
+        val ticked = wanted.count { host -> tickHost(job.watched, host) }
         if (ticked == 0) error("Couldn't find those links on the page.")
         tap(job.watched, UiTarget(text = "Add"))
         delay(STEP_SETTLE_MS)
-        return WalkResult(changed = ticked + job.releases.size)
+        return ticked
     }
+
+    // the first of several wordings a phone may give one button, tapped; the one named in the message if none is there
+    private suspend fun tapAny(
+        packageName: String,
+        wordings: List<String>,
+    ) {
+        for (word in wordings.dropLast(1)) {
+            val found = waitFor(packageName, DIALOG_CHECK_MS) { root -> root.match(UiTarget(text = word)) }
+            if (found != null) {
+                tap(packageName, UiTarget(text = word))
+                return
+            }
+        }
+        tap(packageName, UiTarget(text = wordings.last()))
+    }
+
+    // the words on the app's screen, for the log when a step can't be found: what the phone calls things
+    private fun screenWords(packageName: String): String =
+        appWindows(packageName)
+            .flatMap { root -> root.findAll { !it.text.isNullOrBlank() }.map { it.text.toString().trim() } }
+            .distinct()
+            .take(SCREEN_WORDS_LOGGED)
+            .joinToString(" | ")
 
     private suspend fun openOpenByDefault(packageName: String) {
         val opened = runCatching { startActivity(OpenByDefault.intent(packageName)) }.isSuccess

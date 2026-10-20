@@ -24,10 +24,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ProvideTextStyle
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -173,6 +173,8 @@ private fun BoxScope.NavItemPill(selected: Boolean) {
     }
 }
 
+private val NAV_LABEL_MIN_SIZE = 9.sp
+
 // always shown - color/weight just animate with selection, like the icon does
 @Composable
 private fun NavItemLabel(
@@ -181,15 +183,18 @@ private fun NavItemLabel(
     selected: Boolean,
 ) {
     Box(modifier = Modifier.padding(top = 4.dp)) {
-        ProvideTextStyle(
-            value =
-                MaterialTheme.typography.labelMedium.copy(
-                    color = textColor,
-                    fontSize = 13.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                ),
-        ) {
-            Text(label)
-        }
+        val style =
+            MaterialTheme.typography.labelMedium.copy(
+                color = textColor,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        // one line that shrinks to the room a tab has, so a big text size never breaks a name like Updates in two
+        BasicText(
+            text = label,
+            style = style,
+            maxLines = 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = NAV_LABEL_MIN_SIZE, maxFontSize = style.fontSize),
+        )
     }
 }

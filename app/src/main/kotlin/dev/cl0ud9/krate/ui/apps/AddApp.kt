@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,6 +58,8 @@ private sealed interface AddStep {
     ) : AddStep
 }
 
+private const val ICON_ONLY_FONT_SCALE = 1.6f
+
 // the Apps tab's "+": the two ways to get an app that isn't here, one tap from anywhere on the tab
 @Composable
 fun AddAppAction(onOpenApp: (String) -> Unit) {
@@ -76,9 +79,17 @@ fun AddAppAction(onOpenApp: (String) -> Unit) {
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             ),
     ) {
-        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(6.dp))
-        Text("Add app", style = MaterialTheme.typography.labelLarge)
+        // at the biggest text sizes the word would squeeze the tab's title to nothing, so the plus stands alone
+        val wordFits = LocalDensity.current.fontScale < ICON_ONLY_FONT_SCALE
+        Icon(
+            Icons.Rounded.Add,
+            contentDescription = if (wordFits) null else "Add app",
+            modifier = Modifier.size(20.dp),
+        )
+        if (wordFits) {
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Add app", style = MaterialTheme.typography.labelLarge)
+        }
     }
     if (adding) AddAppFlow(onOpenApp = onOpenApp, onDone = { adding = false })
 }

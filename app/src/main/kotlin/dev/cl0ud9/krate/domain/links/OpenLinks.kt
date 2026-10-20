@@ -48,3 +48,13 @@ fun declaredHosts(
         .take(limit)
 
 const val MAX_TRACKED_HOSTS = 6
+
+// of the addresses wanted, the ones Android says are still off for the app. Null states (the phone can't say) keep
+// every address, so nothing is skipped on a guess; one the app doesn't declare stays in too, as the page decides that
+fun stillOff(
+    wanted: List<String>,
+    states: List<LinkState>?,
+): List<String> {
+    val on = states.orEmpty().filter { it.on }.mapTo(mutableSetOf()) { it.host.lowercase() }
+    return if (states == null) wanted else wanted.filterNot { it.lowercase() in on }
+}

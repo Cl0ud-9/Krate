@@ -19,9 +19,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import com.kyant.backdrop.backdrops.LayerBackdrop
@@ -60,6 +62,7 @@ private val HeaderMinHeight = 64.dp
 // how far the header's glass reaches past the screen's sides and top, and its corners, so its bent edges stay off
 // screen except along the bottom
 private val GlassBleed = 40.dp
+private val MIN_TITLE_SIZE = 12.sp
 private val BleedShape = RoundedCornerShape(32.dp)
 private val HeaderMaxHeight = 128.dp
 
@@ -291,14 +294,21 @@ private fun BoxScope.HeaderTitle(
                 .padding(start = startPadding, end = 24.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        Text(
+        // a long title at a big text size shrinks to fit its line rather than being cut off
+        val style =
+            MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        BasicText(
             text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = style,
             maxLines = 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = MIN_TITLE_SIZE, maxFontSize = style.fontSize),
+            // the title is drawn larger than it's laid out while the header is open, so it's fitted to the line's
+            // width divided by that, and the enlarged title ends at the edge instead of past it
             modifier =
-                Modifier.graphicsLayer {
+                Modifier.fillMaxWidth(1f / maxOf(scale, 1f)).graphicsLayer {
                     scaleX = scale
                     scaleY = scale
                     transformOrigin = TitleTransformOrigin
