@@ -6,9 +6,15 @@ import android.content.Context
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -16,6 +22,8 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
+import dev.cl0ud9.krate.ui.components.Reveal
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 
 private const val SHOWN_BYTES = 8
@@ -35,25 +43,36 @@ internal fun fingerprintFull(hex: String): String =
         .chunked(2)
         .joinToString(":")
 
-// who signed the copy on this phone, said once something is installed; a tap copies the whole fingerprint, for anyone
-// who wants to compare it with the developer's own
+// who signed the copy on this phone, folded away until asked for: it's a long string of hex that most people never
+// need, and a screenshot of the page shouldn't carry it by default. Opened, it shows the start of the fingerprint, and
+// a tap on that copies the whole of it, for anyone who wants to compare it with the developer's own
 @Composable
 internal fun SignerLine(signerHex: String?) {
     val shown = fingerprintStart(signerHex) ?: return
     val full = fingerprintFull(signerHex.orEmpty())
     val context = LocalContext.current
-    val text =
-        buildAnnotatedString {
-            append("The copy on your phone is signed with ")
-            withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) { append(shown) }
-            append(". Tap to copy it all.")
+    var open by rememberSaveable { mutableStateOf(false) }
+    Column {
+        Text(
+            text = if (open) "Hide signing details" else "Show signing details",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clip(ShapeCache.rounded12).clickable { open = !open }.padding(vertical = 4.dp),
+        )
+        Reveal(visible = open) {
+            Text(
+                text =
+                    buildAnnotatedString {
+                        append("This copy is signed with ")
+                        withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) { append(shown) }
+                        append(". Tap to copy it all.")
+                    },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clip(ShapeCache.rounded12).clickable { context.copyFingerprint(full) },
+            )
         }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.clip(ShapeCache.rounded12).clickable { context.copyFingerprint(full) },
-    )
+    }
 }
 
 private fun Context.copyFingerprint(full: String) {
