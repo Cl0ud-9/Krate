@@ -77,6 +77,9 @@ private const val MIN_SIGHT = 0.9f
 internal object IconFlight {
     var panelTop = 0f
     val sight = mutableMapOf<String, Float>()
+
+    // icons that have started flying into a page, counted for the test that no icon flies in twice
+    var arrivals = 0
 }
 
 // a flying icon passes under a tab's header like the list does, instead of over it: it rises out from under the header
@@ -200,10 +203,31 @@ internal fun Modifier.sharedDetailsIcon(app: AppProfile): Modifier {
         BackFlight.armed = armed
         onDispose { if (BackFlight.armed === armed) BackFlight.armed = null }
     }
+    val flight = remember(key) { ArrivalFlight() }
     return onGloballyPositioned { coordinates -> armed.from = coordinates }
         .graphicsLayer { alpha = if (BackFlight.flying?.key == key) 0f else 1f }
         // only while the page is arriving, and only until it's touched: at rest there is nothing for the icon to fly to
-        .sharedIconFor(key) { trip?.entering?.value == true && scrolled?.value != true }
+        .sharedIconFor(
+            key,
+        ) { flight.linked(entering = trip?.entering?.value == true, touched = scrolled?.value == true) }
+}
+
+// the page's icon flying in: while the page arrives, and never again once a touch has ended it. A swipe down at the
+// top doesn't scroll, so letting go looks untouched again and would start a second flight from the list row
+internal class ArrivalFlight {
+    private var ended = false
+    private var flying = false
+
+    fun linked(
+        entering: Boolean,
+        touched: Boolean,
+    ): Boolean {
+        if (touched) ended = true
+        val now = entering && !ended
+        if (now && !flying) IconFlight.arrivals++
+        flying = now
+        return now
+    }
 }
 
 // a shared element only on the way in: [linked] is false for a trip back, which BackFlight flies instead
