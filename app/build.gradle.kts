@@ -124,9 +124,17 @@ tasks.matching { it.name == "assembleRelease" }.configureEach {
     }
 }
 
+// the benchmark and profile builds the baselineprofile plugin adds install beside the real Krate, never over it,
+// and need no release key
+val measuringBuildTypes = setOf("benchmarkRelease", "nonMinifiedRelease")
+
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(bundleLicenses, BundleLicensesTask::outputDir)
+        if (variant.buildType in measuringBuildTypes) {
+            variant.applicationId.set("dev.cl0ud9.krate.bench")
+            variant.signingConfig.setConfig(android.signingConfigs.getByName("debug"))
+        }
     }
 }
 

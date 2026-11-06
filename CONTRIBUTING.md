@@ -44,7 +44,8 @@ needed by the maintainer; see [SETUP.md](SETUP.md).
    ./gradlew ktlintCheck detekt lint testDebugUnitTest
    ```
 
-   `./gradlew ktlintFormat` fixes most formatting problems for you.
+   `./gradlew ktlintFormat` fixes most formatting problems for you. CI also runs the UI tests on an emulator; to run
+   them yourself, start an emulator and run `./gradlew connectedDebugAndroidTest`.
 4. Add or update unit tests for any logic you change (version comparison, catalog parsing, install routing and so on
    all have tests under `app/src/test`).
 5. Try the change on a real device or emulator, in light and dark theme. For anything visual, check gesture and
