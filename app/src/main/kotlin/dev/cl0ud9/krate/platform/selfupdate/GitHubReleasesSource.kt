@@ -37,7 +37,7 @@ internal class GitHubReleasesSource(
     ): String {
         val cached = cacheFile.takeIf { it.exists() }?.readText()
         val fresh = !revalidate && cached != null && System.currentTimeMillis() - lastFetchMillis < FRESH_FOR_MS
-        return if (fresh && cached != null) cached else fetchReleasesBody(cached, allowStale)
+        return if (fresh) cached else fetchReleasesBody(cached, allowStale)
     }
 
     // offline, What's new shows the last list Krate fetched; an update check reports the failure instead
@@ -93,7 +93,7 @@ internal class GitHubReleasesSource(
             }.build()
 
     private fun storeReleases(response: Response): String {
-        val body = response.body?.string() ?: fail("GitHub sent an empty reply. Try again.")
+        val body = response.body.string()
         runCatching {
             cacheFile.writeText(body)
             response.header("ETag")?.let(etagFile::writeText) ?: etagFile.delete()

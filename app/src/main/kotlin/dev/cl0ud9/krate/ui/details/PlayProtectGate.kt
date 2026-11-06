@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -51,7 +52,7 @@ internal fun rememberPlayProtectGate(
         remember(app.packageName, changes, state.installStatus) { PlayProtectFlags.isFlagged(context, app.packageName) }
     val pausedForIt = remember(app.packageName, changes) { PlayProtect.pausedForPackage(context) == app.packageName }
     val blocked = (state.installStatus as? InstallStatus.Failed)?.takeIf { it.blockedByPlayProtect }
-    var shownFor by rememberSaveable { mutableStateOf(0) }
+    var shownFor by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(blocked) {
         val key = blocked?.let { System.identityHashCode(it) } ?: return@LaunchedEffect
         if (shownFor != key) {

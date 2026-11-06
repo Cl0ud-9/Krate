@@ -12,7 +12,7 @@ class ShareTargetActivity : Activity() {
         val text = intent?.getStringExtra(Intent.EXTRA_TEXT)
         if (intent?.action == Intent.ACTION_SEND && !text.isNullOrBlank()) {
             startActivity(
-                Intent(this, KrateActivity::class.java)
+                internalEntryIntent(this)
                     // CLEAR_TOP with SINGLE_TOP hands it to the running screen even when Krate's task is already open
                     .addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or

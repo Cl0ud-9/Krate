@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.platform.autoupdate
 
 import android.content.Context
+import androidx.core.content.edit
 
 private const val LEDGER_PREFS = "auto_update_ledger"
 private const val SEPARATOR = '\u001f'
@@ -49,9 +50,9 @@ internal class AutoUpdateLedger(
         appId: String,
         buildKey: String,
         nowMillis: Long,
-    ) = prefs.edit().putString("flight:$appId", "$buildKey$SEPARATOR$nowMillis").apply()
+    ) = prefs.edit { putString("flight:$appId", "$buildKey$SEPARATOR$nowMillis") }
 
-    fun landed(appId: String) = prefs.edit().remove("flight:$appId").apply()
+    fun landed(appId: String) = prefs.edit { remove("flight:$appId") }
 
     // when Krate first found this build due, noted the first time it asks
     fun dueSince(
@@ -61,7 +62,7 @@ internal class AutoUpdateLedger(
     ): Long {
         val entry = entry("due:$appId")
         val noted = entry.getOrNull(1)?.toLongOrNull()?.takeIf { entry.firstOrNull() == buildKey }
-        if (noted == null) prefs.edit().putString("due:$appId", "$buildKey$SEPARATOR$nowMillis").apply()
+        if (noted == null) prefs.edit { putString("due:$appId", "$buildKey$SEPARATOR$nowMillis") }
         return noted ?: nowMillis
     }
 
@@ -71,5 +72,5 @@ internal class AutoUpdateLedger(
         appId: String,
         buildKey: String,
         count: Int,
-    ) = prefs.edit().putString("tries:$appId", "$buildKey$SEPARATOR$count").apply()
+    ) = prefs.edit { putString("tries:$appId", "$buildKey$SEPARATOR$count") }
 }

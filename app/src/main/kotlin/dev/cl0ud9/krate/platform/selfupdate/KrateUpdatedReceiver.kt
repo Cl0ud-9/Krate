@@ -3,6 +3,7 @@ package dev.cl0ud9.krate.platform.selfupdate
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import androidx.core.content.edit
 import dev.cl0ud9.krate.platform.workers.UpdateNotifier
 
 private const val PREFS = "self_update"
@@ -22,7 +23,7 @@ class KrateUpdatedReceiver : BroadcastReceiver() {
         selfUpdateApk(context).delete()
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(KEY_PENDING, false)) return
-        prefs.edit().remove(KEY_PENDING).apply()
+        prefs.edit { remove(KEY_PENDING) }
         val version =
             runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
         UpdateNotifier.notifyKrateUpdated(context, version)
@@ -36,9 +37,7 @@ class KrateUpdatedReceiver : BroadcastReceiver() {
         fun markSelfUpdatePending(context: Context) {
             context
                 .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(KEY_PENDING, true)
-                .commit()
+                .edit(commit = true) { putBoolean(KEY_PENDING, true) }
         }
     }
 }

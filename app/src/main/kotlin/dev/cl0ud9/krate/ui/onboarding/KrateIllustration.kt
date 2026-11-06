@@ -2,6 +2,7 @@
 
 package dev.cl0ud9.krate.ui.onboarding
 
+import android.annotation.SuppressLint
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -158,6 +159,8 @@ private fun BoxScope.Tile(
     }
 }
 
+// where the crate sits in its box: only the box can place it, so it can't extend a Modifier passed in
+@SuppressLint("ModifierFactoryExtensionFunction")
 private fun BoxScope.crateArea(): Modifier =
     Modifier.align(Alignment.BottomCenter).padding(bottom = CRATE_BOTTOM).size(CRATE_WIDTH, CRATE_HEIGHT)
 

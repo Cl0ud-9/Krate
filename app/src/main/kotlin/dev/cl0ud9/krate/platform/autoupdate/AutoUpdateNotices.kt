@@ -2,6 +2,7 @@ package dev.cl0ud9.krate.platform.autoupdate
 
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.edit
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.platform.workers.AUTO_UPDATE_NEEDS_YOU_NOTIFICATION_ID
 import dev.cl0ud9.krate.platform.workers.KrateNotification
@@ -109,7 +110,7 @@ internal object AutoUpdateNotices {
                 emptyList()
             }
         val names = (shown - appName) + appName
-        prefs.edit().putString("names:$id", names.joinToString(NAME_SEPARATOR.toString())).apply()
+        prefs.edit { putString("names:$id", names.joinToString(NAME_SEPARATOR.toString())) }
         return names
     }
 }

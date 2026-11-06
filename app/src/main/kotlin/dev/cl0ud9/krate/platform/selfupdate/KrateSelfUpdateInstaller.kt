@@ -92,7 +92,7 @@ class KrateSelfUpdateInstaller(
             if (!response.isSuccessful) {
                 throw UserFacingIOException(friendlyHttpError(response.code))
             }
-            val body = response.body ?: throw UserFacingIOException("The update download was empty. Try again.")
+            val body = response.body
             val total = body.contentLength().takeIf { it > 0 }
             if (total == null) emit(SelfUpdateState.Downloading(null))
             destination.outputStream().use { out ->

@@ -2,6 +2,7 @@ package dev.cl0ud9.krate
 
 import android.app.Activity
 import android.app.UiModeManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -64,12 +65,21 @@ const val EXTRA_SHARED_TEXT = "shared_text"
 // a download notification's Install button: open that app's page and install the ready download straight away
 const val EXTRA_INSTALL_APP_ID = "install_app_id"
 
+// the manifest's private alias of KrateActivity, and everything only it may carry
+private const val INTERNAL_ENTRY = "dev.cl0ud9.krate.InternalEntry"
+private val INTERNAL_EXTRAS =
+    listOf(EXTRA_TARGET_ROUTE, EXTRA_APP_ID, EXTRA_NOTIFICATION_ID, EXTRA_SHARED_TEXT, EXTRA_INSTALL_APP_ID)
+
+// how Krate's own notifications and share sheet open Krate
+fun internalEntryIntent(context: Context): Intent =
+    Intent().setComponent(ComponentName(context.packageName, INTERNAL_ENTRY))
+
 class KrateActivity : ComponentActivity() {
     private val pendingRoute = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
+        handleIntent(intent, alreadyRunning = false)
         enableEdgeToEdge()
         lifecycleScope.launch {
             appContainer().settingsRepository.observeThemeMode().distinctUntilChanged().collect {
@@ -113,7 +123,7 @@ class KrateActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleIntent(intent)
+        handleIntent(intent, alreadyRunning = true)
     }
 
     // clears the extras off the Intent itself, not just this function's local read of them -
@@ -125,7 +135,12 @@ class KrateActivity : ComponentActivity() {
     // them here, a single notification tap would force every later cold start back to that same
     // deep-linked route permanently, with no way to actually reach Home again from the bottom nav
     // that redirect keeps winning against
-    private fun handleIntent(intent: Intent?) {
+    private fun handleIntent(
+        intent: Intent?,
+        alreadyRunning: Boolean,
+    ) {
+        // other apps have to be able to launch this screen, but only Krate itself gets to give it orders
+        if (intent?.component?.className != INTERNAL_ENTRY) INTERNAL_EXTRAS.forEach { intent?.removeExtra(it) }
         // Android only dismisses a notification on a tap of its body, not of its button, so Krate does it itself;
         // any int is a real id (a download's is based on its app's hash, often negative), so presence is the test
         if (intent?.hasExtra(EXTRA_NOTIFICATION_ID) == true) {
@@ -156,8 +171,9 @@ class KrateActivity : ComponentActivity() {
             // a tap while Krate is already on screen keeps the normal push animation
             val fromOutside = !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
             if (fromOutside) ArrivalFromOutside.arm()
-            // already running: switch right now, before the window draws, so it opens straight onto the target
-            if (!(fromOutside && LiveNavigation.open(route))) pendingRoute.value = route
+            // already running: switch right now, before the window draws, so it opens straight onto the target. A new
+            // window has no navigation of its own yet, and any that's set belongs to one on its way out
+            if (!(alreadyRunning && fromOutside && LiveNavigation.open(route))) pendingRoute.value = route
             intent?.removeExtra(EXTRA_TARGET_ROUTE)
             intent?.removeExtra(EXTRA_APP_ID)
         }
@@ -176,10 +192,9 @@ private fun Context.applyLaunchNightMode(mode: ThemeMode) {
     getSystemService(UiModeManager::class.java).setApplicationNightMode(nightMode)
 }
 
-// "is_benchmark" intent extra, set only by the :baselineprofile module's own generator - never
-// present on a real launch, so this is a no-op for every actual user. Lets baseline profile
-// generation reach the real navigation flows directly instead of needing to drive onboarding first
+// set by the :baselineprofile generator to skip onboarding; a shipped build ignores it, whoever sends it
 private const val BENCHMARK_EXTRA = "is_benchmark"
+private const val SHIPPED_BUILD_TYPE = "release"
 
 // gates the Apps catalog behind first-run onboarding, amendment 44.4 of the spec - null while the
 // DataStore read is still in flight, so a returning user is never shown a flash of onboarding they
@@ -191,7 +206,10 @@ private fun AppRoot(
 ) {
     val context = LocalContext.current
     val isBenchmarkMode =
-        remember { (context as? Activity)?.intent?.getBooleanExtra(BENCHMARK_EXTRA, false) == true }
+        remember {
+            BuildConfig.BUILD_TYPE != SHIPPED_BUILD_TYPE &&
+                (context as? Activity)?.intent?.getBooleanExtra(BENCHMARK_EXTRA, false) == true
+        }
     val settingsRepository = remember { context.appContainer().settingsRepository }
     val onboardingCompleted: Boolean? by
         settingsRepository.observeOnboardingCompleted().collectAsStateWithLifecycle(

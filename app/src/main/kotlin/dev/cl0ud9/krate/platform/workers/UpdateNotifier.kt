@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.platform.workers
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -12,13 +13,14 @@ import android.graphics.Bitmap
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import dev.cl0ud9.krate.EXTRA_NOTIFICATION_ID
 import dev.cl0ud9.krate.EXTRA_TARGET_ROUTE
-import dev.cl0ud9.krate.KrateActivity
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.AppProfile
+import dev.cl0ud9.krate.internalEntryIntent
 import dev.cl0ud9.krate.platform.autoupdate.AutoUpdateNotices
 import dev.cl0ud9.krate.platform.notifications.NotificationIcons
 import dev.cl0ud9.krate.platform.notifications.krateContent
@@ -117,10 +119,10 @@ object UpdateNotifier {
     // would point at updates that no longer exist, and the next real one should alert again
     fun clearPendingUpdates(context: Context) {
         state(context)
-            .edit()
-            .remove(KEY_PENDING_SIGNATURE)
-            .remove(KEY_PENDING_READY)
-            .apply()
+            .edit {
+                remove(KEY_PENDING_SIGNATURE)
+                remove(KEY_PENDING_READY)
+            }
         NotificationManagerCompat.from(context).cancel(PENDING_UPDATES_NOTIFICATION_ID)
     }
 
@@ -134,7 +136,7 @@ object UpdateNotifier {
         if (prefs.getString(KEY_KRATE_VERSION, null) == version) return
         // with Krate open, Home's own dialog says it, and says it better
         if (appInForeground()) return
-        prefs.edit().putString(KEY_KRATE_VERSION, version).apply()
+        prefs.edit { putString(KEY_KRATE_VERSION, version) }
         notify(
             context,
             KRATE_UPDATE_NOTIFICATION_ID,
@@ -225,6 +227,8 @@ object UpdateNotifier {
     ): Boolean =
         context.getSystemService(NotificationManager::class.java)?.activeNotifications?.any { it.id == id } == true
 
+    // InlinedApi: ContextCompat answers for the notification permission on Android versions older than it
+    @SuppressLint("InlinedApi")
     internal fun notify(
         context: Context,
         id: Int,
@@ -241,7 +245,7 @@ object UpdateNotifier {
             PendingIntent.getActivity(
                 context,
                 id,
-                Intent(context, KrateActivity::class.java).apply {
+                internalEntryIntent(context).apply {
                     flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra(EXTRA_TARGET_ROUTE, message.targetRoute)
                     putExtra(EXTRA_NOTIFICATION_ID, id)
@@ -312,10 +316,10 @@ private fun rememberPending(
     downloaded: Boolean,
 ) {
     prefs
-        .edit()
-        .putString(KEY_PENDING_SIGNATURE, signature)
-        .putBoolean(KEY_PENDING_READY, downloaded)
-        .apply()
+        .edit {
+            putString(KEY_PENDING_SIGNATURE, signature)
+            putBoolean(KEY_PENDING_READY, downloaded)
+        }
 }
 
 private fun appInForeground(): Boolean =

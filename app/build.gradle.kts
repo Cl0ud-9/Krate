@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.zip.GZIPOutputStream
 
 plugins {
     // no org.jetbrains.kotlin.android: AGP 9+ has built-in Kotlin support, that plugin is incompatible now
@@ -63,6 +64,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -102,6 +104,25 @@ val bundleLicenses =
             rootProject.file("licenses/protobuf-BSD-3-Clause.txt"),
         )
     }
+
+// a shipped build's crash reports are unreadable without its map, so each one is kept, named by the id a report shows
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    val mapping = layout.buildDirectory.file("outputs/mapping/release/mapping.txt")
+    val kept = rootProject.layout.projectDirectory.dir("release-mappings")
+    val version = android.defaultConfig.versionName
+    doLast {
+        val source = mapping.get().asFile
+        val id =
+            source.useLines { lines ->
+                lines.firstOrNull { it.startsWith("# pg_map_id:") }?.substringAfterLast(' ')?.take(12) ?: "unknown"
+            }
+        val target = kept.file("krate-$version-$id.txt.gz").asFile
+        target.parentFile.mkdirs()
+        GZIPOutputStream(target.outputStream()).use { out ->
+            source.inputStream().use { it.copyTo(out) }
+        }
+    }
+}
 
 androidComponents {
     onVariants { variant ->

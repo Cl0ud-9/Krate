@@ -166,7 +166,7 @@ class TrackedAppInspector(
                     "GitHub didn't send the file (error ${response.code}). Try again.",
                 )
             }
-            val body = response.body ?: throw IOException("GitHub sent an empty file. Try again.")
+            val body = response.body
             val total = body.contentLength().takeIf { it > 0 } ?: asset.sizeBytes.takeIf { it > 0 }
             emit(Inspection.Downloading(0L, total))
             file.outputStream().use { out -> body.byteStream().use { input -> copy(input, out, total) } }

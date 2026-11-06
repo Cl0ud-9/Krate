@@ -1,16 +1,18 @@
 package dev.cl0ud9.krate.platform.setup
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.AppOpsManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import dev.cl0ud9.krate.domain.model.SetupKind
 import dev.cl0ud9.krate.domain.model.SetupStep
 
@@ -96,11 +98,13 @@ private fun appOpState(
 
 // the system screen for the step, opened on the app itself wherever Android supports that; null for a step done in
 // the app (the caller opens the app instead)
+// BatteryLife: that request is against Play's policy for most apps; Krate isn't on Play
+@SuppressLint("BatteryLife")
 fun stepIntent(
     packageName: String,
     step: SetupStep,
 ): Intent? {
-    val app = Uri.parse("package:$packageName")
+    val app = "package:$packageName".toUri()
     return when (step.kind) {
         SetupKind.ACCESSIBILITY -> accessibilityIntent(step.service)
         SetupKind.NOTIFICATION_ACCESS -> notificationAccessIntent(step.service)
@@ -139,7 +143,7 @@ private fun notificationAccessIntent(service: String?): Intent {
 // a fresh page: Android only adds that menu entry after a switch was blocked, and an App info page left open from
 // before shows its old menu without it
 fun appInfoIntent(packageName: String): Intent =
-    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri())
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
 
 // a screen to fall back to when the exact one isn't there on this phone
@@ -174,11 +178,9 @@ class SetupMarks(
         done: Boolean,
     ) {
         val installedAt = installedAt(packageName) ?: return
-        prefs
-            .edit()
-            .apply {
-                if (done) putLong(key(packageName, kind), installedAt) else remove(key(packageName, kind))
-            }.apply()
+        prefs.edit {
+            if (done) putLong(key(packageName, kind), installedAt) else remove(key(packageName, kind))
+        }
     }
 
     private fun installedAt(packageName: String): Long? =

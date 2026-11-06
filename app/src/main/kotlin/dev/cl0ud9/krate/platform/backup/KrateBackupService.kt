@@ -2,16 +2,17 @@ package dev.cl0ud9.krate.platform.backup
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Path
 import android.graphics.Rect
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
+import androidx.core.net.toUri
 import dev.cl0ud9.krate.KrateActivity
 import dev.cl0ud9.krate.domain.links.stillOff
 import dev.cl0ud9.krate.domain.model.UiTarget
@@ -121,6 +122,8 @@ class KrateBackupService : AccessibilityService() {
     // something else in front, and for how long
     private val away = AwayTimer(AWAY_GRACE_MS)
 
+    // the service only subscribes to these two event types (xml/backup_service.xml)
+    @SuppressLint("SwitchIntDef")
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         when (event?.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> noteWindow(event.packageName?.toString())
@@ -370,7 +373,7 @@ class KrateBackupService : AccessibilityService() {
     private suspend fun confirmLink(job: AutoBackupJob): WalkResult {
         val link = job.link ?: error("There was no link to open.")
         val confirm = job.confirm ?: error("There was nothing to tap.")
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link)).setPackage(job.packageName)
+        val intent = Intent(Intent.ACTION_VIEW, link.toUri()).setPackage(job.packageName)
         if (!runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) {
             error("This version of the app can't take that link. Update it first.")
         }

@@ -2,6 +2,7 @@ package dev.cl0ud9.krate.platform.workers
 
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.edit
 
 // taking update notifications down once what they announced is in front of the person: they stay in the shade
 // otherwise, and a tap on a notice that has nothing left to say is a tap that seems to do nothing
@@ -35,9 +36,7 @@ object UpdateNoticeClearing {
             .getSharedPreferences(
                 STATE_PREFS,
                 Context.MODE_PRIVATE,
-            ).edit()
-            .putString(KEY_KRATE_VERSION, version)
-            .apply()
+            ).edit { putString(KEY_KRATE_VERSION, version) }
         NotificationManagerCompat.from(context).cancel(KRATE_UPDATE_NOTIFICATION_ID)
     }
 }

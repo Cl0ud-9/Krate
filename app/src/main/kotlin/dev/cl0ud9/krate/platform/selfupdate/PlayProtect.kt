@@ -3,6 +3,7 @@ package dev.cl0ud9.krate.platform.selfupdate
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.core.content.edit
 import androidx.core.content.pm.PackageInfoCompat
 
 // Google's Play Protect settings, where "Scan apps with Play Protect" is switched off and on
@@ -51,11 +52,11 @@ object PlayProtect {
     // the user went to pause scanning for Krate's update
     fun notePaused(context: Context) {
         prefs(context)
-            .edit()
-            .clear()
-            .putLong(KEY_PAUSED_FROM_VERSION, versionCode(context))
-            .putLong(KEY_PAUSED_AT, System.currentTimeMillis())
-            .apply()
+            .edit {
+                clear()
+                putLong(KEY_PAUSED_FROM_VERSION, versionCode(context))
+                putLong(KEY_PAUSED_AT, System.currentTimeMillis())
+            }
         changes.intValue++
     }
 
@@ -66,12 +67,12 @@ object PlayProtect {
         packageName: String,
     ) {
         prefs(context)
-            .edit()
-            .clear()
-            .putString(KEY_PAUSED_FOR_APP, appName)
-            .putString(KEY_PAUSED_FOR_PACKAGE, packageName)
-            .putLong(KEY_PAUSED_AT, System.currentTimeMillis())
-            .apply()
+            .edit {
+                clear()
+                putString(KEY_PAUSED_FOR_APP, appName)
+                putString(KEY_PAUSED_FOR_PACKAGE, packageName)
+                putLong(KEY_PAUSED_AT, System.currentTimeMillis())
+            }
         changes.intValue++
     }
 
@@ -84,7 +85,7 @@ object PlayProtect {
         if (prefs.getString(KEY_PAUSED_FOR_PACKAGE, null) ==
             packageName
         ) {
-            prefs.edit().putBoolean(KEY_APP_INSTALLED, true).apply()
+            prefs.edit { putBoolean(KEY_APP_INSTALLED, true) }
         }
     }
 
@@ -94,7 +95,7 @@ object PlayProtect {
     fun pausedForPackage(context: Context): String? = prefs(context).getString(KEY_PAUSED_FOR_PACKAGE, null)
 
     fun clearReminder(context: Context) {
-        prefs(context).edit().clear().apply()
+        prefs(context).edit { clear() }
         changes.intValue++
     }
 
@@ -130,7 +131,7 @@ object PlayProtectFlags {
         context: Context,
         packageName: String,
     ) {
-        flags(context).edit().putLong(packageName, System.currentTimeMillis()).apply()
+        flags(context).edit { putLong(packageName, System.currentTimeMillis()) }
         PlayProtect.changes.intValue++
     }
 
@@ -145,7 +146,7 @@ object PlayProtectFlags {
         packageName: String,
     ) {
         if (!isFlagged(context, packageName)) return
-        flags(context).edit().remove(packageName).apply()
+        flags(context).edit { remove(packageName) }
         PlayProtect.changes.intValue++
     }
 

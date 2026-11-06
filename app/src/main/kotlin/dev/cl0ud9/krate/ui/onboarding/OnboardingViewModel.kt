@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
@@ -30,21 +31,21 @@ class OnboardingViewModel(
 
     fun goToStep(step: Int) {
         stepIndex = step
-        prefs.edit().putInt(KEY_STEP, step).apply()
+        prefs.edit { putInt(KEY_STEP, step) }
     }
 
     // Krate starts dark, the recommended look, once per setup - a later choice on the theme step is left alone
     fun applyDarkOnce(apply: () -> Unit) {
         if (prefs.getBoolean(KEY_DARK_APPLIED, false)) return
         apply()
-        prefs.edit().putBoolean(KEY_DARK_APPLIED, true).apply()
+        prefs.edit { putBoolean(KEY_DARK_APPLIED, true) }
     }
 
     // saved first, and seen through even if this screen goes away meanwhile; the progress is only dropped after
     fun completeOnboarding() {
         viewModelScope.launch {
             withContext(NonCancellable) { settingsRepository.setOnboardingCompleted() }
-            prefs.edit().clear().apply()
+            prefs.edit { clear() }
         }
     }
 }

@@ -1,5 +1,6 @@
 package dev.cl0ud9.krate.ui.settings
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
@@ -77,7 +78,7 @@ internal fun SettingSwitchRow(
     checked: Boolean,
     shape: Shape,
     onCheckedChange: (Boolean) -> Unit,
-    switchModifier: Modifier = Modifier,
+    @SuppressLint("ModifierParameter") switchModifier: Modifier = Modifier,
 ) {
     SettingRowFrame(
         item = item,

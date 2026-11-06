@@ -25,12 +25,15 @@
     <application
         android:name=".KrateApplication"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:theme="@style/Theme.Krate"
         android:supportsRtl="true"
-        android:enableOnBackInvokedCallback="true">
+        android:enableOnBackInvokedCallback="true"
+        tools:ignore="DataExtractionRules"
+        tools:targetApi="33">
 
         <!-- INFO lets App info's Open button and installers start Krate while its icon is hidden -->
         <activity
@@ -60,6 +63,12 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- Krate's own way in, for its notifications and share sheet: other apps can't use it, so what arrives here can be trusted -->
+        <activity-alias
+            android:name=".InternalEntry"
+            android:exported="false"
+            android:targetActivity=".KrateActivity" />
 
         <!-- the launcher icon, off here so hiding leaves no stand-in icon; Krate turns it on (see LauncherIcon) -->
         <activity-alias

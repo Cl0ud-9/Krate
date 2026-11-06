@@ -1,5 +1,7 @@
 package dev.cl0ud9.krate.ui.navigation
 
+import android.annotation.SuppressLint
+import android.util.Log
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -57,6 +59,9 @@ import dev.cl0ud9.krate.ui.util.LocalScrollClaim
 import dev.cl0ud9.krate.ui.util.ScrollClaim
 import dev.cl0ud9.krate.ui.util.isShortScreen
 import dev.cl0ud9.krate.ui.util.resetsScrollClaim
+import kotlinx.coroutines.flow.first
+
+private const val TAG = "KrateNav"
 
 internal const val APPEARANCE_ROUTE = "settings/appearance"
 
@@ -96,6 +101,7 @@ private fun ApplyDefaultLaunchTabOnce(
         applied = true
         val route = tab.toRoute()
         if (route != KrateDestination.HOME.route) {
+            navController.currentBackStackEntryFlow.first()
             navController.navigate(route) {
                 popUpTo(KrateDestination.HOME.route) { inclusive = true }
                 launchSingleTop = true
@@ -115,6 +121,8 @@ private fun ApplyPendingRoute(
 ) {
     LaunchedEffect(pendingRoute) {
         val route = pendingRoute ?: return@LaunchedEffect
+        // on a cold start this can run before the screens have composed and given navigation its graph
+        navController.currentBackStackEntryFlow.first()
         navController.navigateFromOutside(route)
         onRouteHandled()
     }
@@ -258,6 +266,8 @@ private fun TrackLiveNavigation(
 // the running nav controller, so a notification tap can switch screens before Krate's window draws again; that way
 // the system's expand-from-notification animation grows into the target screen itself instead of an empty window
 internal object LiveNavigation {
+    // set only while its nav host is on screen and cleared as it leaves, so it can't outlive the screen
+    @SuppressLint("StaticFieldLeak")
     @Volatile
     var controller: NavHostController? = null
 
@@ -275,7 +285,12 @@ internal object LiveNavigation {
 internal fun NavHostController.navigateFromOutside(route: String) {
     when {
         KrateBottomNavDestinations.any { it.route == route } -> navigateToTab(route)
-        currentBackStackEntry?.let(::currentRouteOf) != route -> navigate(route)
+        // a route this version doesn't have (an old notification, say) leaves you where you are
+        currentBackStackEntry?.let(::currentRouteOf) != route ->
+            runCatching { navigate(route) }.onFailure { problem ->
+                Log.w(TAG, "couldn't open $route", problem)
+                ArrivalFromOutside.disarm()
+            }
     }
 }
 
@@ -340,6 +355,21 @@ private fun KrateNavGraph(
                             ExitTransition.None
                         } else {
                             tabExitTransition(initialState.destination.route, targetState.destination.route)
+                        }
+                    },
+                    // a back swipe plays the same animation as the back button; left unset, it shrinks the page to 70%
+                    predictivePopEnterTransition = {
+                        when {
+                            ArrivalFromOutside.active -> EnterTransition.None
+                            !targetState.isTab() -> detailsPopEnterTransition()
+                            else -> tabEnterTransition(initialState.destination.route, targetState.destination.route)
+                        }
+                    },
+                    predictivePopExitTransition = {
+                        when {
+                            ArrivalFromOutside.active -> ExitTransition.None
+                            !initialState.isTab() -> detailsPopExitTransition()
+                            else -> tabExitTransition(initialState.destination.route, targetState.destination.route)
                         }
                     },
                 ) {

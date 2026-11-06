@@ -8,6 +8,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
+import androidx.core.graphics.get
+import androidx.core.graphics.scale
 import kotlin.math.max
 
 // how small the icon is read at, how its colours are grouped, and the least colour an icon needs to have one at all
@@ -36,7 +38,7 @@ fun rememberIconAccent(
 private fun vividColour(icon: ImageBitmap): Color? {
     val source = icon.asAndroidBitmap()
     val readable = if (source.config == Bitmap.Config.HARDWARE) source.copy(Bitmap.Config.ARGB_8888, false) else source
-    val small = Bitmap.createScaledBitmap(readable, SAMPLE, SAMPLE, true)
+    val small = readable.scale(SAMPLE, SAMPLE)
     val weight = FloatArray(HUE_BUCKETS)
     val reds = FloatArray(HUE_BUCKETS)
     val greens = FloatArray(HUE_BUCKETS)
@@ -44,7 +46,7 @@ private fun vividColour(icon: ImageBitmap): Color? {
     val hsv = FloatArray(HSL_PARTS)
     for (y in 0 until SAMPLE) {
         for (x in 0 until SAMPLE) {
-            val pixel = small.getPixel(x, y)
+            val pixel = small[x, y]
             if (android.graphics.Color.alpha(pixel) < OPAQUE) continue
             android.graphics.Color.colorToHSV(pixel, hsv)
             // saturated and bright counts most; greys, black and white hardly at all

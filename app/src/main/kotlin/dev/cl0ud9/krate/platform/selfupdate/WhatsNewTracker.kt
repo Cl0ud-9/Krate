@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.platform.selfupdate
 
 import android.content.Context
+import androidx.core.content.edit
 import dev.cl0ud9.krate.platform.workers.UpdateNoticeClearing
 
 private const val PREFS = "whats_new"
@@ -22,7 +23,7 @@ class WhatsNewTracker(
         val current = currentVersion
         val lastSeen = prefs.getString(KEY_LAST_SEEN, null)
         if (current == null || lastSeen == current) return null
-        prefs.edit().putString(KEY_LAST_SEEN, current).apply()
+        prefs.edit { putString(KEY_LAST_SEEN, current) }
         // nothing stored yet but installed over an older version: an update from before this was tracked
         return current.takeIf { lastSeen != null || installedOverOlderVersion() }
     }
@@ -38,7 +39,7 @@ class WhatsNewTracker(
 
     // the dialog has had its say: no repeat for this version
     fun announcementDone(version: String) {
-        prefs.edit().putString(KEY_ANNOUNCED, version).apply()
+        prefs.edit { putString(KEY_ANNOUNCED, version) }
     }
 
     private fun installedOverOlderVersion(): Boolean =

@@ -40,6 +40,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.ui.components.KrateSheet
 import dev.cl0ud9.krate.ui.navigation.glassRim
@@ -255,7 +256,7 @@ private class Suggestion(
 
     fun openIssue(context: Context) {
         val url = githubNewIssueUrl(title = "App suggestion: $name", body = body)
-        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
     }
 }
 

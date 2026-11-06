@@ -113,7 +113,7 @@ class PrivateCatalogSource(
                     .header("Accept", accept)
                     .build()
             httpClient.newCall(request).execute().use { response ->
-                HttpResult(response.code, if (response.isSuccessful) response.body?.bytes() else null)
+                HttpResult(response.code, if (response.isSuccessful) response.body.bytes() else null)
             }
         }.getOrElse { HttpResult(0, null) }
 

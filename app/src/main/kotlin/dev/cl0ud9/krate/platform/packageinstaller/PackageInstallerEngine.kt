@@ -8,6 +8,7 @@ import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.WaitingForUserStep
 import dev.cl0ud9.krate.platform.lifecycle.ActivityFocus
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
@@ -38,51 +39,52 @@ class PackageInstallerEngine(
         callbackFlow {
             send(InstallStatus.Installing)
             val requestKey = "install:${app.packageName}"
-            val started = runCatching { createAndCommitSession(app, apkFile, requestKey) }
-            if (started.isFailure) {
-                // plain words, never the internal file path an exception message carries
-                val reason =
-                    if (started.exceptionOrNull() is java.io.IOException) {
-                        "Couldn't read the downloaded file. Download it again and try once more."
-                    } else {
-                        "Couldn't start the install. Try again."
-                    }
-                send(InstallStatus.Failed(reason))
-                close()
-                return@callbackFlow
+            awaitResult(requestKey, WaitingForUserStep.INSTALL_CONFIRM) {
+                val started = runCatching { createAndCommitSession(app, apkFile, requestKey) }
+                if (started.isFailure) {
+                    // plain words, never the internal file path an exception message carries
+                    val reason =
+                        if (started.exceptionOrNull() is java.io.IOException) {
+                            "Couldn't read the downloaded file. Download it again and try once more."
+                        } else {
+                            "Couldn't start the install. Try again."
+                        }
+                    send(InstallStatus.Failed(reason))
+                    close()
+                }
             }
-            awaitResult(requestKey, WaitingForUserStep.INSTALL_CONFIRM)
         }
 
     override fun uninstall(packageName: String): Flow<InstallStatus> =
         callbackFlow {
             val requestKey = "uninstall:$packageName"
-            val started =
-                runCatching {
-                    context.packageManager.packageInstaller
-                        .uninstall(packageName, pendingIntentFor(requestKey).intentSender)
+            awaitResult(requestKey, WaitingForUserStep.UNINSTALL_CONFIRM, packageName) {
+                val started =
+                    runCatching {
+                        context.packageManager.packageInstaller
+                            .uninstall(packageName, pendingIntentFor(requestKey).intentSender)
+                    }
+                if (started.isFailure) {
+                    val reason = started.exceptionOrNull()?.message ?: "unknown error"
+                    send(InstallStatus.Failed("Couldn't start the uninstall: $reason"))
+                    close()
                 }
-            if (started.isFailure) {
-                val reason = started.exceptionOrNull()?.message ?: "unknown error"
-                send(InstallStatus.Failed("Couldn't start the uninstall: $reason"))
-                close()
-                return@callbackFlow
             }
-            awaitResult(requestKey, WaitingForUserStep.UNINSTALL_CONFIRM, packageName)
         }
 
-    // collects broadcast results for the given request key onto this producer until a terminal state arrives -
-    // callbackFlow requires awaitClose to be the block's last suspending call, so this must stay suspend.
-    // [uninstalling] is the package an uninstall is for: Android reports nothing when someone says no to its
-    // confirmation, so for one the wait also ends when the dialog has plainly been closed
+    // starts listening for this request's results, only then [begin]s it so even an instant answer is heard, and stays
+    // until a terminal state arrives - callbackFlow requires awaitClose to be the block's last suspending call, so this
+    // must stay suspend. [uninstalling] is the package an uninstall is for: Android reports nothing when someone says
+    // no to its confirmation, so for one the wait also ends when the dialog has plainly been closed
     private suspend fun ProducerScope<InstallStatus>.awaitResult(
         requestKey: String,
         waitingForUserStep: WaitingForUserStep,
         uninstalling: String? = null,
+        begin: suspend () -> Unit,
     ) {
         var closedWatch: Job? = null
         val job =
-            launch {
+            launch(start = CoroutineStart.UNDISPATCHED) {
                 InstallResultBus.events
                     .filter { it.requestKey == requestKey }
                     .collect { event ->
@@ -98,6 +100,7 @@ class PackageInstallerEngine(
                         }
                     }
             }
+        begin()
         awaitClose {
             closedWatch?.cancel()
             job.cancel()
@@ -132,13 +135,17 @@ class PackageInstallerEngine(
     ) {
         val packageInstaller = context.packageManager.packageInstaller
         val sessionId = packageInstaller.createSession(krateSessionParams(app.packageName, apkFile))
-        packageInstaller.openSession(sessionId).use { session ->
-            session.openWrite("apk", 0, apkFile.length()).use { out ->
-                apkFile.inputStream().use { it.copyTo(out) }
-                session.fsync(out)
+        // a session that couldn't be finished is given up on, or its half-written copy sits on the phone for days
+        runCatching {
+            packageInstaller.openSession(sessionId).use { session ->
+                session.openWrite("apk", 0, apkFile.length()).use { out ->
+                    apkFile.inputStream().use { it.copyTo(out) }
+                    session.fsync(out)
+                }
+                session.commit(pendingIntentFor(requestKey).intentSender)
             }
-            session.commit(pendingIntentFor(requestKey).intentSender)
-        }
+        }.onFailure { runCatching { packageInstaller.abandonSession(sessionId) } }
+            .getOrThrow()
     }
 
     private fun pendingIntentFor(requestKey: String): PendingIntent {

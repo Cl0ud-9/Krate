@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.voice
 
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import dev.cl0ud9.krate.domain.model.ActivityAction
 import java.time.DayOfWeek
 import java.time.ZonedDateTime
@@ -52,9 +53,7 @@ object KrateWeek {
 
     fun dismiss(now: ZonedDateTime) {
         KrateMemory.prefs
-            ?.edit()
-            ?.putString(KEY_WEEK_SEEN, weekKey(now))
-            ?.apply()
+            ?.edit { putString(KEY_WEEK_SEEN, weekKey(now)) }
     }
 
     private fun weekStart(now: ZonedDateTime): ZonedDateTime =

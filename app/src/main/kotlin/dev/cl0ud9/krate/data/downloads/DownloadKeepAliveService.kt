@@ -40,6 +40,14 @@ class DownloadKeepAliveService : Service() {
         return START_NOT_STICKY
     }
 
+    // Android 15+ allows this kind of service 6 hours a day, and closes an app that doesn't stop when told
+    override fun onTimeout(
+        startId: Int,
+        fgsType: Int,
+    ) {
+        stop()
+    }
+
     override fun onDestroy() {
         if (running === this) running = null
         super.onDestroy()

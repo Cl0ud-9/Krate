@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- the helper only acts while a backup or restore runs, and is pointed at that one app while it does -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:accessibilityEventTypes="typeWindowStateChanged|typeNotificationStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagRetrieveInteractiveWindows|flagReportViewIds"
@@ -8,6 +9,7 @@
     android:canRetrieveWindowContent="true"
     android:description="@string/backup_service_description"
     android:isAccessibilityTool="false"
+    tools:targetApi="31"
     android:notificationTimeout="100"
     android:packageNames="dev.cl0ud9.krate"
     android:summary="@string/backup_service_summary" />

@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.data.downloads
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -18,9 +19,9 @@ import dev.cl0ud9.krate.EXTRA_APP_ID
 import dev.cl0ud9.krate.EXTRA_INSTALL_APP_ID
 import dev.cl0ud9.krate.EXTRA_NOTIFICATION_ID
 import dev.cl0ud9.krate.EXTRA_TARGET_ROUTE
-import dev.cl0ud9.krate.KrateActivity
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.AppProfile
+import dev.cl0ud9.krate.internalEntryIntent
 import dev.cl0ud9.krate.platform.notifications.NotificationIcons
 import dev.cl0ud9.krate.platform.notifications.krateAccent
 import dev.cl0ud9.krate.platform.notifications.krateContent
@@ -40,6 +41,8 @@ private const val CHANNEL_ID = "downloads_v2"
 // background), then a result in its place posted by Krate itself: one the service had shown could stay marked as the
 // service's, which Android then refuses to dismiss. Progress is posted at most once a second and only when it moves
 // TooManyFunctions: one handler per download state plus their small builders, one cohesive responsibility
+// InlinedApi: ContextCompat answers for the notification permission on Android versions older than it
+@SuppressLint("InlinedApi")
 @Suppress("TooManyFunctions")
 class AndroidDownloadProgressNotifier(
     private val context: Context,
@@ -249,7 +252,7 @@ class AndroidDownloadProgressNotifier(
         PendingIntent.getActivity(
             context,
             appId.hashCode() + if (install) 1 else 0,
-            Intent(context, KrateActivity::class.java).apply {
+            internalEntryIntent(context).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(EXTRA_TARGET_ROUTE, "apps/$appId")
                 putExtra(EXTRA_APP_ID, appId)
@@ -265,7 +268,7 @@ class AndroidDownloadProgressNotifier(
         PendingIntent.getActivity(
             context,
             UPDATE_ALL_NOTIFICATION_ID,
-            Intent(context, KrateActivity::class.java).apply {
+            internalEntryIntent(context).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(EXTRA_TARGET_ROUTE, "updates")
             },

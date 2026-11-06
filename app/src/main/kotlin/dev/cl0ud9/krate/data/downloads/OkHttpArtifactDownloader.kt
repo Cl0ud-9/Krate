@@ -11,11 +11,14 @@ import dev.cl0ud9.krate.security.hash.sha256Hex
 import dev.cl0ud9.krate.voice.KrateMemory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -23,11 +26,14 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 private const val STREAM_BUFFER_SIZE = 8192
 private const val PROGRESS_EMIT_INTERVAL_BYTES = 256 * 1024L
+private const val FOLLOW_POLL_MS = 500L
 
 // a download gets a second go only when its file was cleared underneath it
 private const val ATTEMPTS = 2
@@ -72,8 +78,8 @@ class OkHttpArtifactDownloader(
     private val httpClient: OkHttpClient = downloadHttpClient(),
     private val retryDelaysMs: List<Long> = DEFAULT_RETRY_DELAYS_MS,
 ) : ArtifactDownloader {
-    // the files a download is working on right now, so clearing the cache leaves them alone
-    private val active: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    // one writer per file, and clearing the cache leaves a locked file alone
+    private val locks = ConcurrentHashMap<String, Mutex>()
 
     override fun download(
         app: AppProfile,
@@ -89,9 +95,15 @@ class OkHttpArtifactDownloader(
             }
             downloadsDir.mkdirs()
             val fileId = fileIdFor(app, artifact)
-            active += fileId
+            val lock = locks.getOrPut(fileId) { Mutex() }
+            val followed = followRunningDownload(lock, File(downloadsDir, "$fileId.apk.part"))
             try {
-                fetch(app, artifact, token, fileId)
+                val readyFile = File(downloadsDir, "$fileId.apk")
+                if (followed && readyFile.exists()) {
+                    emit(DownloadStatus.ReadyToInstall(readyFile.absolutePath))
+                } else {
+                    fetch(app, artifact, token, fileId)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (
@@ -100,9 +112,24 @@ class OkHttpArtifactDownloader(
                 // whatever went wrong, it ends as a message on the app, never as the app closing
                 emit(DownloadStatus.Failed(unexpectedFailure(exception)))
             } finally {
-                active -= fileId
+                lock.unlock()
             }
         }.flowOn(Dispatchers.IO)
+
+    // takes the file's lock. If the background check or Update All already has this build coming, it shows that
+    // download's progress until it ends instead of writing over it; true when it had to wait
+    private suspend fun FlowCollector<DownloadStatus>.followRunningDownload(
+        lock: Mutex,
+        partFile: File,
+    ): Boolean {
+        var waited = false
+        while (!lock.tryLock()) {
+            waited = true
+            emit(DownloadStatus.Downloading(partFile.length(), null))
+            delay(FOLLOW_POLL_MS)
+        }
+        return waited
+    }
 
     // from the first byte to a verified file ready to install. If the file disappears while it's being worked on (the
     // phone's own "Clear cache", say), it starts again once, and only then gives up with a plain explanation
@@ -156,9 +183,9 @@ class OkHttpArtifactDownloader(
                 emit(DownloadStatus.Failed(rejection))
                 Outcome.SETTLED
             }
-            runCatching { partFile.copyTo(readyFile, overwrite = true) }.isFailure -> Outcome.CLEARED
+            // a move, not a copy: instant, no second copy on disk, and the ready file is never left half written
+            runCatching { Files.move(partFile.toPath(), readyFile.toPath(), ATOMIC_MOVE) }.isFailure -> Outcome.CLEARED
             else -> {
-                partFile.delete()
                 KrateMemory.noteVerified()
                 emit(DownloadStatus.ReadyToInstall(readyFile.absolutePath))
                 Outcome.SETTLED
@@ -181,7 +208,7 @@ class OkHttpArtifactDownloader(
     override fun clearCache(keep: Set<String>): Long {
         val files = downloadsDir.listFiles() ?: return 0L
         return files
-            .filterNot { file -> file.absolutePath in keep || file.name.fileId() in active }
+            .filterNot { file -> file.absolutePath in keep || locks[file.name.fileId()]?.isLocked == true }
             .sumOf { file -> file.length().also { file.delete() } }
     }
 
@@ -340,7 +367,7 @@ class OkHttpArtifactDownloader(
             if (response.code == HTTP_RANGE_NOT_SATISFIABLE && existingBytes > 0) return
             if (!response.isSuccessful) throw UserFacingIOException(downloadFailureMessage(artifact, response.code))
             val resuming = response.code == HTTP_PARTIAL_CONTENT
-            val body = response.body ?: throw UserFacingIOException("The server sent an empty file. Try again.")
+            val body = response.body
             val totalBytes = resolveTotalBytes(response, resuming, existingBytes, body.contentLength())
             val startingAt = if (resuming) existingBytes else 0L
             writeBody(body.byteStream(), partFile, append = resuming, startingAt = startingAt) { written ->
@@ -388,6 +415,8 @@ class OkHttpArtifactDownloader(
         while (true) {
             val read = input.read(buffer)
             if (read < 0) break
+            // a cancelled download stops writing now, so one started straight after doesn't wait long for the file
+            currentCoroutineContext().ensureActive()
             output.write(buffer, 0, read)
             written += read
             sinceLastEmit += read

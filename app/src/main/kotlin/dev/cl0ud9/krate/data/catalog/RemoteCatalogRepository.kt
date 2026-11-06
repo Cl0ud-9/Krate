@@ -65,6 +65,17 @@ private fun parseManifest(
     )
 }
 
+// a signed catalog this version can't read counts as a failed fetch, so the last good copy stays where it is
+private fun parseAndKeep(
+    json: Json,
+    device: DeviceProfile,
+    bytes: ByteArray,
+    cacheFile: File,
+): ParsedManifest? =
+    runCatching { parseManifest(json, device, bytes) }
+        .getOrNull()
+        ?.also { runCatching { cacheFile.writeBytes(bytes) } }
+
 // invited entries (while a GitHub token is saved) join the public ones
 private fun withPrivateApps(
     privateSource: PrivateCatalogSource?,
@@ -127,18 +138,14 @@ class RemoteCatalogRepository(
                 invite.await()
                 public
             }
-        if (bytes == null) {
+        val fresh = bytes?.let { withContext(Dispatchers.IO) { parseAndKeep(json, device, it, cacheFile) } }
+        if (fresh == null) {
             ensureLoaded()
             // what's already known, with whatever the invite-only check just found
             withContext(Dispatchers.IO) { loadCachedManifest() }?.let(::publish)
             throw IOException("Couldn't reach the catalog")
         }
-        val manifest =
-            withContext(Dispatchers.IO) {
-                cacheFile.writeBytes(bytes)
-                withPrivateApps(privateSource, json, device, parseManifest(json, device, bytes))
-            }
-        publish(manifest)
+        publish(withContext(Dispatchers.IO) { withPrivateApps(privateSource, json, device, fresh) })
     }
 
     override fun refreshInBackground() {
@@ -184,12 +191,8 @@ class RemoteCatalogRepository(
     // the manifest to show, and whether it came fresh from the network
     private suspend fun loadManifest(): Pair<ParsedManifest, Boolean> =
         withContext(Dispatchers.IO) {
-            val fromNetwork =
-                fetchVerifiedManifestBytes()?.let {
-                    cacheFile.writeBytes(it)
-                    parseManifest(json, device, it)
-                }
-            if (fromNetwork != null) privateSource?.refresh()
+            val fromNetwork = fetchVerifiedManifestBytes()?.let { parseAndKeep(json, device, it, cacheFile) }
+            if (fromNetwork != null) runCatching { privateSource?.refresh() }
             val manifest =
                 fromNetwork ?: loadCachedManifest() ?: ParsedManifest(fallback.observeApps().first(), emptyList())
             withPrivateApps(privateSource, json, device, manifest) to (fromNetwork != null)
@@ -219,6 +222,6 @@ class RemoteCatalogRepository(
 private fun OkHttpClient.bytesOrNull(url: String): ByteArray? =
     runCatching {
         newCall(Request.Builder().url(url).build()).execute().use { response ->
-            if (response.isSuccessful) response.body?.bytes() else null
+            if (response.isSuccessful) response.body.bytes() else null
         }
     }.getOrNull()

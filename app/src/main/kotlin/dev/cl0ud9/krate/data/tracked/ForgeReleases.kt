@@ -167,7 +167,7 @@ class ForgeReleases(
                 when {
                     response.code == HTTP_NOT_MODIFIED -> Answered(ForgeAnswer.Unchanged)
                     response.code == HTTP_OK ->
-                        Answered(ForgeAnswer.Found(read(response.body?.string().orEmpty()), response.header("ETag")))
+                        Answered(ForgeAnswer.Found(read(response.body.string()), response.header("ETag")))
                     response.code == HTTP_UNAUTHORIZED -> Rejected
                     response.code == HTTP_TOO_MANY || (response.code == HTTP_FORBIDDEN && outOfChecks) ->
                         Answered(ForgeAnswer.OutOfChecks(withToken != null))

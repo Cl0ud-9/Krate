@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -38,6 +37,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import dev.cl0ud9.krate.domain.model.ThemeMode
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
 import dev.cl0ud9.krate.ui.navigation.SideInsets
@@ -175,7 +175,7 @@ private fun rememberPermissionState(context: Context): PermissionState {
         notificationsAllowed = notifications,
         openInstallSettings = {
             installLauncher.launch(
-                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")),
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, "package:${context.packageName}".toUri()),
             )
         },
         requestNotifications = {

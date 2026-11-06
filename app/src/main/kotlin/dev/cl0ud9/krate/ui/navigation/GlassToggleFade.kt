@@ -3,7 +3,6 @@ package dev.cl0ud9.krate.ui.navigation
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import android.view.PixelCopy
@@ -33,6 +32,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.createBitmap
 
 // switching liquid glass on or off changes how the whole app is drawn, so instead of snapping it takes one picture of
 // the screen just before the switch and fades it out over the new look. Nothing runs until the switch is flipped
@@ -58,7 +58,7 @@ internal fun rememberGlassToggle(apply: (Boolean) -> Unit): (Boolean) -> Unit {
             if (window == null || view.width == 0 || view.height == 0) {
                 apply(enabled)
             } else {
-                val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                val bitmap = createBitmap(view.width, view.height)
                 // PixelCopy reads what's on screen, blur and all, which drawing the views again can't
                 PixelCopy.request(window, bitmap, { result ->
                     if (result == PixelCopy.SUCCESS) GlassToggleFade.snapshot = bitmap.asImageBitmap()

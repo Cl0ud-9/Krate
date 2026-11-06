@@ -24,3 +24,6 @@ __pycache__/
 # local catalog generator output (catalog/scripts/generate_manifest.py)
 /manifest.json
 /manifest-work/
+
+# one gzipped R8 map per shipped build, for reading crash reports
+/release-mappings/

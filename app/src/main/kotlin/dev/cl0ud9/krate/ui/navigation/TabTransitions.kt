@@ -10,6 +10,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.ui.unit.IntOffset
+import androidx.navigation.NavBackStackEntry
 
 // tab switches slide directionally by the tapped tab's position instead of just fading - matches how
 // an index-ordered set of top-level destinations reads as one continuous strip being panned across
@@ -22,6 +23,8 @@ private val TabFadeSpec = tween<Float>(TAB_TRANSITION_MS / 2, easing = TabTransi
 
 private fun tabIndex(route: String?): Int? =
     KrateBottomNavDestinations.indexOfFirst { it.route == route }.takeIf { it >= 0 }
+
+internal fun NavBackStackEntry.isTab(): Boolean = tabIndex(destination.route) != null
 
 // positive moving to a later tab, negative moving to an earlier one, null when either side isn't a
 // top-level tab at all (the App Details route, which has its own push/pop transitions)

@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.edit
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.util.Locale
@@ -627,7 +628,7 @@ object KrateVoice {
         enabled: Boolean,
     ) {
         playful = enabled
-        prefs(context).edit().putBoolean(KEY_PLAYFUL, enabled).apply()
+        prefs(context).edit { putBoolean(KEY_PLAYFUL, enabled) }
     }
 
     fun line(moment: Moment): String = if (playful) pick(moment) else moment.plain
@@ -676,7 +677,7 @@ object KrateVoice {
         val prefs = prefs(context)
         val lastOpen = prefs.getLong(KEY_LAST_OPEN, 0L).takeIf { it > 0L }
         val nowMillis = now.toInstant().toEpochMilli()
-        prefs.edit().putLong(KEY_LAST_OPEN, nowMillis).apply()
+        prefs.edit { putLong(KEY_LAST_OPEN, nowMillis) }
         val lastOpenDate = lastOpen?.let { Instant.ofEpochMilli(it).atZone(now.zone).toLocalDate() }
         return greetingMomentFor(
             GreetingContext(
@@ -733,7 +734,7 @@ private class PrefsLineMemory(
         key: String,
         used: List<String>,
     ) {
-        prefs.edit().putString("used_$key", used.joinToString("\n")).apply()
+        prefs.edit { putString("used_$key", used.joinToString("\n")) }
     }
 }
 

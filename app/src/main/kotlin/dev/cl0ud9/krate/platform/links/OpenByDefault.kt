@@ -1,14 +1,15 @@
 package dev.cl0ud9.krate.platform.links
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.verify.domain.DomainVerificationManager
 import android.content.pm.verify.domain.DomainVerificationUserState
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.annotation.RequiresApi
+import androidx.core.net.toUri
 import dev.cl0ud9.krate.domain.links.LinkState
 
 // Android's "Open by default" for one app: which of its web addresses open in it. Reading it and opening its page work
@@ -64,12 +65,14 @@ object OpenByDefault {
     ): String? =
         runCatching {
             context.packageManager
-                .resolveActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)), PackageManager.MATCH_DEFAULT_ONLY)
+                .resolveActivity(Intent(Intent.ACTION_VIEW, url.toUri()), PackageManager.MATCH_DEFAULT_ONLY)
                 ?.activityInfo
                 ?.packageName
         }.getOrNull()
 
+    // InlinedApi: every caller checks [supported] or handles the screen not being there
+    @SuppressLint("InlinedApi")
     fun intent(packageName: String): Intent =
-        Intent(Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS, Uri.parse("package:$packageName"))
+        Intent(Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS, "package:$packageName".toUri())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 }

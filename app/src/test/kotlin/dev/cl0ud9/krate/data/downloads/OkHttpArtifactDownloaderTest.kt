@@ -9,6 +9,10 @@ import dev.cl0ud9.krate.domain.model.SupportStatus
 import dev.cl0ud9.krate.security.apk.ApkArchiveInfo
 import dev.cl0ud9.krate.security.apk.ApkArchiveReader
 import dev.cl0ud9.krate.security.hash.sha256Hex
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.Dispatcher
@@ -25,6 +29,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 // exercises the real download/verify pipeline against a local http server, no android framework needed
 class OkHttpArtifactDownloaderTest {
@@ -285,6 +291,73 @@ class OkHttpArtifactDownloaderTest {
         }
 
     @Test
+    fun `a second download of the same build follows the first instead of writing over it`() =
+        runBlocking(Dispatchers.Default) {
+            val slowPayload = Random(1).nextBytes(SLOW_PAYLOAD_BYTES)
+            val slowApp = appWithDigest(sha256Hex(slowPayload.inputStream()))
+            var bodiesServed = 0
+            server.dispatcher =
+                object : Dispatcher() {
+                    override fun dispatch(request: RecordedRequest): MockResponse {
+                        if (request.method == "HEAD") return MockResponse()
+                        bodiesServed++
+                        return MockResponse()
+                            .setBody(Buffer().write(slowPayload))
+                            .throttleBody(THROTTLE_BYTES, THROTTLE_MS, TimeUnit.MILLISECONDS)
+                    }
+                }
+            val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256))
+            val artifact = slowApp.artifacts.single()
+
+            val first = async { downloader.download(slowApp, artifact).last() }
+            delay(STARTED_MS)
+            val second = async { downloader.download(slowApp, artifact).last() }
+
+            assertTrue(first.await() is DownloadStatus.ReadyToInstall)
+            assertTrue(second.await() is DownloadStatus.ReadyToInstall)
+            assertEquals(1, bodiesServed)
+        }
+
+    @Test
+    fun `clearing the cache leaves a running download alone`() =
+        runBlocking(Dispatchers.Default) {
+            val slowPayload = Random(2).nextBytes(SLOW_PAYLOAD_BYTES)
+            val slowApp = appWithDigest(sha256Hex(slowPayload.inputStream()))
+            server.dispatcher =
+                object : Dispatcher() {
+                    override fun dispatch(request: RecordedRequest): MockResponse {
+                        if (request.method == "HEAD") return MockResponse()
+                        return MockResponse()
+                            .setBody(Buffer().write(slowPayload))
+                            .throttleBody(THROTTLE_BYTES, THROTTLE_MS, TimeUnit.MILLISECONDS)
+                    }
+                }
+            val dir = tempFolder.newFolder()
+            val spare = File(dir, "spare.apk").apply { writeBytes(ByteArray(20)) }
+            val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256), dir)
+
+            val running = async { downloader.download(slowApp, slowApp.artifacts.single()).last() }
+            delay(STARTED_MS)
+            downloader.clearCache()
+
+            assertTrue(!spare.exists())
+            assertTrue(running.await() is DownloadStatus.ReadyToInstall)
+        }
+
+    @Test
+    fun `a finished download leaves only the ready file behind`() =
+        runBlocking {
+            enqueuePayloadTwice()
+            val dir = tempFolder.newFolder()
+            val downloader = downloaderWithReader(FakeArchiveReader(MATCHING_PACKAGE, matchingCertSha256), dir)
+            val app = appProfile()
+
+            downloader.download(app, app.artifacts.single()).toList()
+
+            assertEquals(listOf("sample-app-1.0.0.apk"), dir.list()!!.toList())
+        }
+
+    @Test
     fun `clearCache leaves alone the files it's told are in use`() {
         val dir = tempFolder.newFolder()
         val inUse = File(dir, "installing.apk").apply { writeBytes(ByteArray(10)) }
@@ -365,6 +438,9 @@ class OkHttpArtifactDownloaderTest {
     ): OkHttpArtifactDownloader =
         OkHttpArtifactDownloader(downloadsDir = dir, archiveReader = reader, credentialStore = FakeCredentialStore())
 
+    private fun appWithDigest(sha256: String): AppProfile =
+        appProfile().let { app -> app.copy(artifacts = listOf(app.artifacts.single().copy(sha256 = sha256))) }
+
     private fun appProfile(): AppProfile =
         AppProfile(
             id = "sample-app",
@@ -409,5 +485,9 @@ class OkHttpArtifactDownloaderTest {
 
     private companion object {
         const val MATCHING_PACKAGE = "dev.cl0ud9.sample"
+        const val SLOW_PAYLOAD_BYTES = 2 * 1024 * 1024
+        const val THROTTLE_BYTES = 128 * 1024L
+        const val THROTTLE_MS = 25L
+        const val STARTED_MS = 150L
     }
 }

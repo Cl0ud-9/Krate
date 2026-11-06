@@ -3,6 +3,7 @@ package dev.cl0ud9.krate.voice
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.content.edit
 import dev.cl0ud9.krate.domain.model.ActivityAction
 
 private const val PREFS = "krate_memory"
@@ -49,7 +50,7 @@ object KrateMemory {
         get() = addHint.value
         set(value) {
             addHint.value = value
-            prefs?.edit()?.putBoolean(KEY_ADD_HINT, value)?.apply()
+            prefs?.edit { putBoolean(KEY_ADD_HINT, value) }
         }
 
     fun load(context: Context) {
@@ -64,36 +65,36 @@ object KrateMemory {
         nowMillis: Long,
     ) {
         val store = prefs ?: return
-        val edit = store.edit()
-        when (action) {
-            ActivityAction.INSTALLED -> {
-                val count = store.getInt(KEY_INSTALLS, 0) + 1
-                edit.putInt(KEY_INSTALLS, count)
-                INSTALL_MILESTONES[count]?.let { edit.putString(KEY_MILESTONE, it) }
+        store.edit {
+            when (action) {
+                ActivityAction.INSTALLED -> {
+                    val count = store.getInt(KEY_INSTALLS, 0) + 1
+                    putInt(KEY_INSTALLS, count)
+                    INSTALL_MILESTONES[count]?.let { putString(KEY_MILESTONE, it) }
+                }
+                ActivityAction.UPDATED -> {
+                    val count = store.getInt(KEY_UPDATES, 0) + 1
+                    putInt(KEY_UPDATES, count)
+                    UPDATE_MILESTONES[count]?.let { putString(KEY_MILESTONE, it) }
+                    packageName?.let { putInt(UPDATES_OF + it, store.getInt(UPDATES_OF + it, 0) + 1) }
+                }
+                ActivityAction.UNINSTALLED -> Unit
+                ActivityAction.FAILED -> Unit
             }
-            ActivityAction.UPDATED -> {
-                val count = store.getInt(KEY_UPDATES, 0) + 1
-                edit.putInt(KEY_UPDATES, count)
-                UPDATE_MILESTONES[count]?.let { edit.putString(KEY_MILESTONE, it) }
-                packageName?.let { edit.putInt(UPDATES_OF + it, store.getInt(UPDATES_OF + it, 0) + 1) }
-            }
-            ActivityAction.UNINSTALLED -> Unit
-            ActivityAction.FAILED -> Unit
+            if (action != ActivityAction.UNINSTALLED) KrateWeek.note(store, this, action, nowMillis)
         }
-        if (action != ActivityAction.UNINSTALLED) KrateWeek.note(store, edit, action, nowMillis)
-        edit.apply()
     }
 
     // a download whose fingerprint matched, before it was allowed anywhere near the installer
     fun noteVerified() {
         val store = prefs ?: return
-        store.edit().putInt(KEY_VERIFIED, store.getInt(KEY_VERIFIED, 0) + 1).apply()
+        store.edit { putInt(KEY_VERIFIED, store.getInt(KEY_VERIFIED, 0) + 1) }
     }
 
     // an app found and tracked from GitHub
     fun noteFind() {
         val store = prefs ?: return
-        store.edit().putInt(KEY_FINDS, store.getInt(KEY_FINDS, 0) + 1).apply()
+        store.edit { putInt(KEY_FINDS, store.getInt(KEY_FINDS, 0) + 1) }
     }
 
     val hasNoFinds: Boolean
@@ -107,7 +108,7 @@ object KrateMemory {
     // the milestone just reached, handed out once
     fun takeMilestone(): String? {
         val milestone = prefs?.getString(KEY_MILESTONE, null)
-        if (milestone != null) prefs?.edit()?.remove(KEY_MILESTONE)?.apply()
+        if (milestone != null) prefs?.edit { remove(KEY_MILESTONE) }
         return milestone
     }
 
@@ -119,8 +120,8 @@ object KrateMemory {
         val store = prefs ?: return
         val since = store.getLong(KEY_CAUGHT_UP_SINCE, 0L)
         when {
-            count > 0 && since != 0L -> store.edit().putLong(KEY_CAUGHT_UP_SINCE, 0L).apply()
-            count == 0 && since == 0L -> store.edit().putLong(KEY_CAUGHT_UP_SINCE, nowMillis).apply()
+            count > 0 && since != 0L -> store.edit { putLong(KEY_CAUGHT_UP_SINCE, 0L) }
+            count == 0 && since == 0L -> store.edit { putLong(KEY_CAUGHT_UP_SINCE, nowMillis) }
         }
     }
 

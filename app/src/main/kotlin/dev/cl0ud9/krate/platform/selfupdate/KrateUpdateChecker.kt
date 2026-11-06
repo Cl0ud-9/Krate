@@ -51,8 +51,17 @@ private data class GithubReleaseDto(
     @SerialName("html_url") val htmlUrl: String,
     val body: String? = null,
     @SerialName("published_at") val publishedAt: String? = null,
+    val draft: Boolean = false,
+    val prerelease: Boolean = false,
     val assets: List<GithubReleaseAssetDto> = emptyList(),
 )
+
+// only a finished Krate release counts: not the catalog's own, a draft a saved token can see, or a test build
+internal fun isKrateRelease(
+    tagName: String,
+    draft: Boolean,
+    prerelease: Boolean,
+): Boolean = tagName != MANIFEST_RELEASE_TAG && !draft && !prerelease
 
 // one Krate release, for the What's new sheet
 data class KrateRelease(
@@ -126,7 +135,7 @@ class KrateUpdateChecker(
             }
         }
 
-    // GitHub returns releases newest-first; the reserved manifest release tag is not a Krate release
+    // GitHub returns releases newest-first
     private fun fetchAppReleases(
         allowStale: Boolean = false,
         revalidate: Boolean = false,
@@ -135,7 +144,7 @@ class KrateUpdateChecker(
         val releases: List<GithubReleaseDto> =
             runCatching { json.decodeFromString<List<GithubReleaseDto>>(body) }
                 .getOrElse { fail("GitHub sent an unexpected reply. Try again later.") }
-        return releases.filter { it.tagName != MANIFEST_RELEASE_TAG }
+        return releases.filter { isKrateRelease(it.tagName, it.draft, it.prerelease) }
     }
 
     private fun fail(message: String): Nothing = throw UserFacingIOException(message)

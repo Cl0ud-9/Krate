@@ -97,7 +97,7 @@ fun AnimatedContentScope.rememberDepthEffect(
     val dimAlpha = if (disableBlur) DEPTH_DIM_ALPHA_BLUR_DISABLED else DEPTH_DIM_ALPHA
 
     // NOT unwrapped with `by` here - these States get read inside a graphicsLayer draw-phase lambda
-    // instead (see depthEffectModifier and the dim Box below), so a change on any of the ~20 frames
+    // instead (see depthEffect and the dim Box below), so a change on any of the ~20 frames
     // of the 350ms tween only re-records that one layer instead of recomposing this whole composable
     // (and everything inline in TabScreen/DetailScreen's body - Scaffold, TopAppBar, Surface...).
     // Reading them with `by` right here was confirmed live via `dumpsys gfxinfo` to be the actual
@@ -126,7 +126,7 @@ fun AnimatedContentScope.rememberDepthEffect(
     // actually starts/stops, not on every intermediate frame the alpha value ticks through
     val isDimVisible by remember { derivedStateOf { dimAlphaState.value > 0f } }
 
-    val modifier = depthEffectModifier(canRound, cornerRadiusState, blurRadiusState)
+    val modifier = Modifier.depthEffect(canRound, cornerRadiusState, blurRadiusState)
     return DepthEffect(contentModifier = modifier, dimAlpha = dimAlphaState, isDimVisible = isDimVisible)
 }
 
@@ -139,13 +139,13 @@ fun AnimatedContentScope.rememberDepthEffect(
 // its height - it's still genuinely clipping the whole way down, just not visible until the curve's
 // bottom edge clears the status bar (confirmed by forcing a much larger radius and watching it
 // appear) - nothing to fix there, but worth remembering next time this looks like it "isn't working"
-private fun depthEffectModifier(
+private fun Modifier.depthEffect(
     active: Boolean,
     cornerRadiusState: State<Dp>,
     blurRadiusState: State<Dp>,
 ): Modifier {
-    if (!active) return Modifier
-    return Modifier.graphicsLayer {
+    if (!active) return this
+    return graphicsLayer {
         // both reads happen HERE, inside the layer's own draw-phase lambda, not via `by` up in
         // rememberDepthEffect - GraphicsLayerScope resets shape/clip/renderEffect/compositingStrategy
         // to their defaults on every invocation, so simply not setting them below (once the radius

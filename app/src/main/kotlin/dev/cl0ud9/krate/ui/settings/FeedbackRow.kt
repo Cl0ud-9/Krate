@@ -1,7 +1,6 @@
 package dev.cl0ud9.krate.ui.settings
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,6 +41,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.ui.components.BusyButtonContent
@@ -173,7 +173,7 @@ private fun FeedbackRowContent(
             val issue = feedbackIssue(state.feedbackText, report, footer)
             // a report too long for a link goes to the clipboard, and the issue says to paste it in
             if (issue.reportOnClipboard && report != null) clipboard.setText(AnnotatedString(report))
-            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(issue.url))) }
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, issue.url.toUri())) }
         },
         modifier = Modifier.fillMaxWidth(),
     ) {
