@@ -2,6 +2,7 @@ package dev.cl0ud9.krate.platform.autoupdate
 
 import dev.cl0ud9.krate.domain.dependency.DependencyGraph
 import dev.cl0ud9.krate.domain.model.AppProfile
+import dev.cl0ud9.krate.domain.model.InstallDelay
 import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.latestArtifact
 import dev.cl0ud9.krate.domain.repository.AutoUpdateChoices
@@ -9,8 +10,8 @@ import dev.cl0ud9.krate.domain.repository.buildKey
 import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
 import dev.cl0ud9.krate.ui.details.requiresUninstall
 
-// a release waits this long before going on by itself, so a broken build is usually caught (and withdrawn) first
-internal const val AUTO_UPDATE_DELAY_MILLIS = 24L * 60 * 60 * 1000
+// a due update still not on after this long is one the user hears about, whatever wait they chose
+internal const val OVERDUE_AFTER_MILLIS = 24L * 60 * 60 * 1000
 
 // a build that fails this often is left for the user to install
 internal const val MAX_AUTO_UPDATE_TRIES = 2
@@ -27,6 +28,8 @@ internal class AutoUpdatePolicy(
     private val catalog: List<AppProfile>,
     private val choices: AutoUpdateChoices,
     private val tries: (appId: String, buildKey: String) -> Int,
+    // how long a new release waits before going on by itself, as chosen in Settings
+    private val delayMillis: Long = InstallDelay.DEFAULT.millis,
     private val facts: (AppProfile) -> AutoUpdateFacts,
 ) {
     // true once it's this app's turn, whatever the wait still left; a rollback, a reinstall from scratch, an app
@@ -50,7 +53,7 @@ internal class AutoUpdatePolicy(
         nowMillis: Long,
     ): Boolean {
         val published = app.latestArtifact?.publishedAtMillis ?: return false
-        return willUpdate(app) && nowMillis - published >= AUTO_UPDATE_DELAY_MILLIS
+        return willUpdate(app) && nowMillis - published >= delayMillis
     }
 
     // when it goes on by itself, or null when it won't
@@ -58,7 +61,7 @@ internal class AutoUpdatePolicy(
         app.latestArtifact
             ?.publishedAtMillis
             ?.takeIf { willUpdate(app) }
-            ?.plus(AUTO_UPDATE_DELAY_MILLIS)
+            ?.plus(delayMillis)
 
     // dependencies before the apps that need them
     fun inInstallOrder(apps: List<AppProfile>): List<AppProfile> {
@@ -74,4 +77,4 @@ internal class AutoUpdatePolicy(
 internal fun isOverdue(
     dueSinceMillis: Long,
     nowMillis: Long,
-): Boolean = nowMillis - dueSinceMillis > AUTO_UPDATE_DELAY_MILLIS
+): Boolean = nowMillis - dueSinceMillis > OVERDUE_AFTER_MILLIS

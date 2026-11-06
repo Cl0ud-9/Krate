@@ -57,7 +57,7 @@ happy Diwali, or look back at your week. Prefer it quiet? Turn off **Playful mes
 | 🧭 **Set up in a tap** | After installing, each app's permissions are a tap away, ticked off as you turn them on, with the settings worth a look and how to back them up. |
 | 🔐 **Checked before it installs** | The catalog is signed with Ed25519, and every APK's SHA-256 and signing certificate are checked before Android ever sees it. If an update can use something new, like your location, Krate tells you first. |
 | 🧲 **Track any app yourself** | Paste a link to an app on GitHub, Codeberg or GitLab and Krate keeps it up to date like the rest. It only installs builds signed by the same developer as the first one, and test versions are a switch away. |
-| 🔔 **Updates find you** | A background check every few hours and a notification when something new lands. Updates can download ahead of time on Wi-Fi, and install themselves a day after release while you're not using the app. Any app can stay manual or skip a version. |
+| 🔔 **Updates find you** | A background check every few hours and a notification when something new lands. Updates can download ahead of time on Wi-Fi, and install themselves while you're not using the app: right away, or from 3 hours to a week after release. Any app can stay manual or skip a version. |
 | 🏃 **Downloads that keep going** | Leave the app's page or switch apps mid-download and it carries on, with progress in the Apps list and the notification. A dropped connection picks up where it stopped. |
 | 🕰️ **Version history** | A new build misbehaving? Pick an older one from the list and go back. |
 | 💾 **Automatic backups** | If you turn them on, Krate saves an app's settings before a reinstall from scratch and puts them back after. |
@@ -151,7 +151,8 @@ GitHub releases ──► catalog (built every 2 hours, signed) ──► Krate 
 
 Only updates, and only if you want it. Every new app needs your tap and Android's confirmation. With automatic
 updates on, updates to apps Krate installed go on by themselves a day after release, while you're not using the
-app. You can switch that off in <b>Settings > Downloads & storage</b>, or per app in its details.
+app. In <b>Settings > Downloads & storage</b> you can pick a different wait, pause them, or switch them off, and each
+app can stay manual in its details.
 </details>
 
 <details>

@@ -14,6 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
@@ -26,13 +29,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.platform.autoupdate.AutoUpdateWorker
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
+import dev.cl0ud9.krate.platform.autoupdate.isOpenEnded
 import dev.cl0ud9.krate.platform.autoupdate.pausedUntil
 import dev.cl0ud9.krate.ui.components.systemNavBarClearance
 import dev.cl0ud9.krate.ui.navigation.DetailContentTopGap
 import dev.cl0ud9.krate.ui.util.rememberDebouncedButtonState
 
-// Automatic downloads and Use mobile data, which every phone has; the rest need Android 12
+// Automatic downloads and Use mobile data, which every phone has; the install rows add three more on Android 12
 private const val UPDATE_ROWS = 2
+private const val INSTALL_ROWS = 3
 
 // a little past the end of a pause, so the run finds it over
 private const val PAUSE_RUN_SLACK_MS = 60_000L
@@ -107,11 +112,8 @@ fun DownloadsStoragePage(
     val cacheClearedMessage by viewModel.cacheClearedMessage.collectAsStateWithLifecycle()
     // idempotent in the ViewModel too - the debounce stops a double tap reaching it at all
     val clearCacheState = rememberDebouncedButtonState(onClick = viewModel::clearCache)
-    val pausedUntil by viewModel.autoUpdatePausedUntil.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    // the pause only means something while automatic updates are on
-    val pauseAvailable = automaticDownloads && autoInstall
-    val updateRows = UPDATE_ROWS + (if (autoUpdatesSupported) 2 else 0)
+    var delaySheet by rememberSaveable { mutableStateOf(false) }
+    val updateRows = UPDATE_ROWS + (if (autoUpdatesSupported) INSTALL_ROWS else 0)
     SettingsPage(scrollState, topContentPadding) {
         SettingsSectionLabel("Automatic updates", first = true)
         AutomaticDownloadsRow(
@@ -128,27 +130,7 @@ fun DownloadsStoragePage(
             shape = settingsGroupShape(1, updateRows),
         )
         if (autoUpdatesSupported) {
-            AutoInstallRow(
-                checked = autoInstall,
-                available = automaticDownloads,
-                onCheckedChange = viewModel::setAutoInstallUpdates,
-                shape = settingsGroupShape(updateRows - 2, updateRows),
-            )
-            PauseAutoUpdatesRow(
-                pausedUntil = pausedUntil,
-                available = pauseAvailable,
-                onPause = { length ->
-                    val until = pausedUntil(System.currentTimeMillis(), length)
-                    viewModel.setAutoUpdatePausedUntil(until)
-                    // a run booked for the moment it ends, so due updates go on then rather than at the next check
-                    AutoUpdateWorker.enqueueAt(context, until - System.currentTimeMillis() + PAUSE_RUN_SLACK_MS)
-                },
-                onResume = {
-                    viewModel.setAutoUpdatePausedUntil(0L)
-                    AutoUpdateWorker.enqueue(context)
-                },
-                shape = settingsGroupShape(updateRows - 1, updateRows),
-            )
+            InstallRows(viewModel, firstRow = UPDATE_ROWS, rows = updateRows) { delaySheet = true }
         }
         SettingsSectionLabel("Storage")
         StorageRow(
@@ -157,6 +139,66 @@ fun DownloadsStoragePage(
             shape = settingsGroupShape(0, 1),
         )
     }
+    if (delaySheet) InstallDelayPicker(viewModel) { delaySheet = false }
+}
+
+@Composable
+private fun InstallDelayPicker(
+    viewModel: SettingsViewModel,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    InstallDelaySheet(viewModel.installDelay.collectAsStateWithLifecycle().value, onDismiss) { delay ->
+        viewModel.setInstallDelay(delay)
+        // a shorter wait can make an update due now; a run works out the new times
+        AutoUpdateWorker.enqueue(context)
+    }
+}
+
+// installing by itself, how long to wait first, and the pause: only on Android 12 and newer
+@Composable
+private fun InstallRows(
+    viewModel: SettingsViewModel,
+    firstRow: Int,
+    rows: Int,
+    onPickDelay: () -> Unit,
+) {
+    val automaticDownloads by viewModel.automaticDownloads.collectAsStateWithLifecycle()
+    val autoInstall by viewModel.autoInstallUpdates.collectAsStateWithLifecycle()
+    val pausedUntil by viewModel.autoUpdatePausedUntil.collectAsStateWithLifecycle()
+    val installDelay by viewModel.installDelay.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    // the wait and the pause only mean something while automatic updates are on
+    val installing = automaticDownloads && autoInstall
+    AutoInstallRow(
+        checked = autoInstall,
+        available = automaticDownloads,
+        onCheckedChange = viewModel::setAutoInstallUpdates,
+        shape = settingsGroupShape(firstRow, rows),
+    )
+    InstallDelayRow(
+        delay = installDelay,
+        available = installing,
+        shape = settingsGroupShape(firstRow + 1, rows),
+        onClick = onPickDelay,
+    )
+    PauseAutoUpdatesRow(
+        pausedUntil = pausedUntil,
+        available = installing,
+        onPause = { length ->
+            val until = pausedUntil(System.currentTimeMillis(), length)
+            viewModel.setAutoUpdatePausedUntil(until)
+            // a run booked for the moment it ends, so due updates go on then rather than at the next check
+            if (!isOpenEnded(until)) {
+                AutoUpdateWorker.enqueueAt(context, until - System.currentTimeMillis() + PAUSE_RUN_SLACK_MS)
+            }
+        },
+        onResume = {
+            viewModel.setAutoUpdatePausedUntil(0L)
+            AutoUpdateWorker.enqueue(context)
+        },
+        shape = settingsGroupShape(firstRow + 2, rows),
+    )
 }
 
 @Composable

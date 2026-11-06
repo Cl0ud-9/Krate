@@ -149,7 +149,8 @@ internal fun UpdatesPage(viewModel: SettingsViewModel) {
                         subtitle =
                             if (automatic) {
                                 "Updates to apps from Krate install a day after release, while you're not using " +
-                                    "them. It never rolls an app back or erases its data."
+                                    "them. You can change the wait in Settings. It never rolls an app back or " +
+                                    "erases its data."
                             } else {
                                 "Turn on Automatic downloads first, so there's something to install."
                             },

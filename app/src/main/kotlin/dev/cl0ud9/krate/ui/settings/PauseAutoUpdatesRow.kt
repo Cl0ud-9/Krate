@@ -37,13 +37,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.platform.autoupdate.PauseLength
+import dev.cl0ud9.krate.platform.autoupdate.isOpenEnded
 import dev.cl0ud9.krate.platform.autoupdate.isPausedAt
 import dev.cl0ud9.krate.platform.autoupdate.pauseEndText
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.rememberClockUntil
 
-// holds automatic updates back for a day or a week: one row under the switch, so no per-app controls are needed. While
-// paused it says until when and offers Resume; the pause ends by itself, and the row notices when it does
+// holds automatic updates back for a day, a week or until turned back on: one row, no per-app controls. While paused
+// it says until when and offers Resume; a pause with an end ends by itself, and the row notices when it does
 @Composable
 internal fun PauseAutoUpdatesRow(
     pausedUntil: Long,
@@ -70,7 +71,7 @@ internal fun PauseAutoUpdatesRow(
                 subtitle =
                     when {
                         paused -> "New versions wait in Updates until it ends, or until you resume."
-                        available -> "Hold them back for a day or a week, say while you're travelling."
+                        available -> "Hold them back for a while, say while you're travelling."
                         else -> "Turn on Automatic downloads and Install updates automatically to use this."
                     },
                 colors = (if (paused) SettingsTint.AMBER else SettingsTint.BLUE).colors(),
@@ -95,7 +96,7 @@ internal fun PauseAutoUpdatesRow(
         // while it lasts, when it ends: dropping in under the row as the pause starts, folding away as it ends
         expandedContent =
             if (paused) {
-                { PauseEndNote(pauseEndText(pausedUntil, now)) }
+                { PauseEndNote(pauseNoteText(pausedUntil, now)) }
             } else {
                 null
             },
@@ -135,8 +136,13 @@ private fun PauseButton(
     }
 }
 
+private fun pauseNoteText(
+    pausedUntil: Long,
+    now: Long,
+): String = if (isOpenEnded(pausedUntil)) "Until you resume" else "Back on ${pauseEndText(pausedUntil, now)}"
+
 @Composable
-private fun PauseEndNote(end: String) {
+private fun PauseEndNote(text: String) {
     Surface(shape = ShapeCache.rounded12, color = MaterialTheme.colorScheme.tertiaryContainer) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -150,7 +156,7 @@ private fun PauseEndNote(end: String) {
                 modifier = Modifier.size(18.dp),
             )
             Text(
-                text = "Back on $end",
+                text = text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
             )

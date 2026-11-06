@@ -25,6 +25,18 @@ class AutoUpdatePauseTest {
     }
 
     @Test
+    fun `a pause until turned back on never runs out by itself`() {
+        val until = pausedUntil(now, PauseLength.UNTIL_RESUMED)
+        val inTenYears = now + 10 * 365L * 24 * 60 * 60 * 1000
+
+        assertTrue(isOpenEnded(until))
+        assertTrue(isPausedAt(until, inTenYears))
+        assertFalse(isOpenEnded(pausedUntil(now, PauseLength.WEEK)))
+        // the screens add a little to the end time while they wait for it; that mustn't wrap round
+        assertTrue(until + 60_000L > until)
+    }
+
+    @Test
     fun `no pause stored is never paused, and an old one has no hold`() {
         assertFalse(isPausedAt(0L, now))
         assertFalse(isPausedAt(now - 1, now))

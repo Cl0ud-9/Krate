@@ -6,6 +6,7 @@ data class SettingsSnapshot(
     val automaticDownloads: Boolean,
     val downloadOnMobileData: Boolean,
     val autoInstallUpdates: Boolean = false,
+    val installDelay: InstallDelay = InstallDelay.DEFAULT,
     val themeMode: ThemeMode,
     val navBarStyle: NavBarStyle,
     val navBarCornerRadius: Int,

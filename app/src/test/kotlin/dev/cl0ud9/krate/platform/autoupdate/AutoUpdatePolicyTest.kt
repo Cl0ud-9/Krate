@@ -3,6 +3,7 @@ package dev.cl0ud9.krate.platform.autoupdate
 import android.content.pm.PackageInstaller
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.ArtifactInfo
+import dev.cl0ud9.krate.domain.model.InstallDelay
 import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.SupportStatus
 import dev.cl0ud9.krate.domain.repository.AutoUpdateChoices
@@ -16,7 +17,8 @@ import org.junit.Test
 
 class AutoUpdatePolicyTest {
     private val released = 1_000_000_000_000L
-    private val dayLater = released + AUTO_UPDATE_DELAY_MILLIS
+    private val day = InstallDelay.ONE_DAY.millis
+    private val dayLater = released + day
     private val app = app("reader")
 
     @Test
@@ -27,6 +29,24 @@ class AutoUpdatePolicyTest {
         assertFalse(policy.isDue(app, dayLater - 1))
         assertTrue(policy.isDue(app, dayLater))
         assertEquals(dayLater, policy.dueAt(app))
+    }
+
+    @Test
+    fun `the wait picked in Settings decides when an update goes on`() {
+        val rightAway = waiting(InstallDelay.RIGHT_AWAY)
+        val week = waiting(InstallDelay.ONE_WEEK)
+
+        assertTrue(rightAway.isDue(app, released))
+        assertEquals(released, rightAway.dueAt(app))
+        assertFalse(week.isDue(app, released + 3 * day))
+        assertTrue(week.isDue(app, released + 7 * day))
+        assertEquals(released + 7 * day, week.dueAt(app))
+        // the hour waits count from release too, so a release Krate spots late is already due
+        val threeHours = waiting(InstallDelay.THREE_HOURS)
+        val hour = day / 24
+        assertFalse(threeHours.isDue(app, released + 2 * hour))
+        assertTrue(threeHours.isDue(app, released + 5 * hour))
+        assertEquals(released + 6 * hour, waiting(InstallDelay.SIX_HOURS).dueAt(app))
     }
 
     @Test
@@ -78,8 +98,8 @@ class AutoUpdatePolicyTest {
 
     @Test
     fun `an update still not on a day after Krate first found it due is overdue`() {
-        assertFalse(isOverdue(dueSinceMillis = released, nowMillis = released + AUTO_UPDATE_DELAY_MILLIS))
-        assertTrue(isOverdue(dueSinceMillis = released, nowMillis = released + AUTO_UPDATE_DELAY_MILLIS + 1))
+        assertFalse(isOverdue(dueSinceMillis = released, nowMillis = released + OVERDUE_AFTER_MILLIS))
+        assertTrue(isOverdue(dueSinceMillis = released, nowMillis = released + OVERDUE_AFTER_MILLIS + 1))
     }
 
     @Test
@@ -124,6 +144,11 @@ class AutoUpdatePolicyTest {
         AutoUpdateFacts(installed[profile.packageName], owned)
     }
 
+    private fun waiting(delay: InstallDelay) =
+        AutoUpdatePolicy(listOf(app), AutoUpdateChoices(), { _, _ -> 0 }, delay.millis) { profile ->
+            AutoUpdateFacts(installed(app)[profile.packageName], krateOwnsUpdates = true)
+        }
+
     private fun installed(vararg apps: AppProfile) = apps.associate { it.packageName to InstalledVersion("1.0", 10) }
 
     private fun app(id: String) =
@@ -154,7 +179,7 @@ class AutoUpdatePolicyTest {
                         "c",
                         versionCode = 10,
                         buildId = "b1",
-                        publishedAtMillis = released - AUTO_UPDATE_DELAY_MILLIS,
+                        publishedAtMillis = released - day,
                     ),
                 ),
         )

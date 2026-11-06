@@ -29,6 +29,11 @@ internal suspend fun autoUpdatePolicy(
         catalog = catalog,
         choices = container.autoUpdateStore.observeChoices().first(),
         tries = ledger::tries,
+        delayMillis =
+            container.settingsRepository
+                .observeInstallDelay()
+                .first()
+                .millis,
     ) { app ->
         AutoUpdateFacts(
             installed = container.installedPackageReader.installedVersion(app.packageName),

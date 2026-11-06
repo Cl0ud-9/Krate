@@ -1,5 +1,6 @@
 package dev.cl0ud9.krate.domain.repository
 
+import dev.cl0ud9.krate.domain.model.InstallDelay
 import dev.cl0ud9.krate.domain.model.LaunchTab
 import dev.cl0ud9.krate.domain.model.NavBarStyle
 import dev.cl0ud9.krate.domain.model.SettingsSnapshot
@@ -31,6 +32,11 @@ interface SettingsRepository {
     fun observeAutoUpdatePausedUntil(): Flow<Long>
 
     suspend fun setAutoUpdatePausedUntil(untilMillis: Long)
+
+    // how long a new release waits before installing by itself
+    fun observeInstallDelay(): Flow<InstallDelay>
+
+    suspend fun setInstallDelay(delay: InstallDelay)
 
     // false until the user has chosen either way: an upgrade from before the switch existed hasn't
     fun observeAutoInstallChosen(): Flow<Boolean>

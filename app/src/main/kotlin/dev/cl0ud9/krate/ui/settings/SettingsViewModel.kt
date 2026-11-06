@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.krate.data.auth.GitHubCredentialStore
 import dev.cl0ud9.krate.data.downloads.ArtifactDownloader
 import dev.cl0ud9.krate.data.settings.DEFAULT_NAV_BAR_CORNER_RADIUS
+import dev.cl0ud9.krate.domain.model.InstallDelay
 import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.InviteStatus
 import dev.cl0ud9.krate.domain.model.LaunchTab
@@ -76,6 +77,9 @@ class SettingsViewModel(
 
     val autoUpdatePausedUntil: StateFlow<Long> =
         settingsRepository.observeAutoUpdatePausedUntil().stateInPage(0L)
+
+    val installDelay: StateFlow<InstallDelay> =
+        settingsRepository.observeInstallDelay().stateInPage(saved?.installDelay ?: InstallDelay.DEFAULT)
 
     val themeMode: StateFlow<ThemeMode> =
         settingsRepository.observeThemeMode().stateInPage(saved?.themeMode ?: ThemeMode.SYSTEM)
@@ -191,6 +195,10 @@ class SettingsViewModel(
 
     fun setAutoInstallUpdates(enabled: Boolean) {
         viewModelScope.launch { settingsRepository.setAutoInstallUpdates(enabled) }
+    }
+
+    fun setInstallDelay(delay: InstallDelay) {
+        viewModelScope.launch { settingsRepository.setInstallDelay(delay) }
     }
 
     fun offerAutoInstallUpdates() {

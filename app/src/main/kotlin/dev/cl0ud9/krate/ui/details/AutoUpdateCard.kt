@@ -28,12 +28,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.ArtifactInfo
+import dev.cl0ud9.krate.domain.model.InstallDelay
 import dev.cl0ud9.krate.domain.model.InstallationMode
+import dev.cl0ud9.krate.domain.model.whenText
 import dev.cl0ud9.krate.domain.repository.AutoUpdateStore
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.domain.repository.buildKey
-import dev.cl0ud9.krate.platform.autoupdate.AUTO_UPDATE_DELAY_MILLIS
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
+import dev.cl0ud9.krate.platform.autoupdate.isOpenEnded
 import dev.cl0ud9.krate.platform.autoupdate.isPausedAt
 import dev.cl0ud9.krate.platform.autoupdate.krateOwnsUpdates
 import dev.cl0ud9.krate.platform.autoupdate.otherStoreName
@@ -65,6 +67,8 @@ internal data class AutoUpdateChoice(
     val skippedBuild: String?,
     // when a pause on automatic updates ends; 0 for none
     val pausedUntil: Long = 0L,
+    // how long a new release waits, as chosen in Settings
+    val delay: InstallDelay = InstallDelay.DEFAULT,
 )
 
 class AutoUpdateCardViewModel(
@@ -78,8 +82,9 @@ class AutoUpdateCardViewModel(
             settingsRepository.observeAutomaticDownloads(),
             autoUpdateStore.observeChoices(),
             settingsRepository.observeAutoUpdatePausedUntil(),
-        ) { autoInstall, downloads, choices, pausedUntil ->
-            AutoUpdateChoice(appId in choices.manual, choices.skipped[appId], pausedUntil)
+            settingsRepository.observeInstallDelay(),
+        ) { autoInstall, downloads, choices, pausedUntil, delay ->
+            AutoUpdateChoice(appId in choices.manual, choices.skipped[appId], pausedUntil, delay)
                 .takeIf { autoUpdatesSupported && autoInstall && downloads }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
@@ -270,8 +275,14 @@ private fun pendingLine(
 ): AutoUpdateLine {
     val info = R.drawable.ic_info_rounded
     val clock = R.drawable.ic_update_rounded
-    val dueAt = pending?.publishedAtMillis?.plus(AUTO_UPDATE_DELAY_MILLIS)
+    val dueAt = pending?.publishedAtMillis?.plus(choice.delay.millis)
     return when {
+        isOpenEnded(choice.pausedUntil) ->
+            AutoUpdateLine(
+                clock,
+                "Paused",
+                "New versions of $name wait in Updates until you resume in Settings.",
+            )
         isPausedAt(choice.pausedUntil, nowMillis) ->
             AutoUpdateLine(
                 clock,
@@ -282,7 +293,7 @@ private fun pendingLine(
             AutoUpdateLine(
                 R.drawable.ic_check_circle_rounded,
                 "On",
-                "New versions install a day after release, while you're not using $name.",
+                "New versions install ${choice.delay.whenText()}, while you're not using $name.",
             )
         // the person's own skip comes first; it's their word on this version
         choice.skippedBuild == pending.buildKey ->

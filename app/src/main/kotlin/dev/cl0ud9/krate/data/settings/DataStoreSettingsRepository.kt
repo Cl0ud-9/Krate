@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.cl0ud9.krate.domain.model.InstallDelay
 import dev.cl0ud9.krate.domain.model.LaunchTab
 import dev.cl0ud9.krate.domain.model.NavBarStyle
 import dev.cl0ud9.krate.domain.model.SettingsSnapshot
@@ -69,6 +70,13 @@ class DataStoreSettingsRepository(
 
     override suspend fun setAutoUpdatePausedUntil(untilMillis: Long) {
         context.settingsDataStore.edit { prefs -> prefs[AUTO_UPDATE_PAUSED_UNTIL] = untilMillis }
+    }
+
+    override fun observeInstallDelay(): Flow<InstallDelay> =
+        context.settingsDataStore.data.map { prefs -> prefs[INSTALL_DELAY].toEnum(InstallDelay.DEFAULT) }
+
+    override suspend fun setInstallDelay(delay: InstallDelay) {
+        context.settingsDataStore.edit { prefs -> prefs[INSTALL_DELAY] = delay.name }
     }
 
     override fun observeAutoInstallChosen(): Flow<Boolean> =
@@ -137,6 +145,7 @@ class DataStoreSettingsRepository(
             automaticDownloads = automaticDownloads(),
             downloadOnMobileData = downloadOnMobileData(),
             autoInstallUpdates = this[AUTO_INSTALL_UPDATES] ?: false,
+            installDelay = this[INSTALL_DELAY].toEnum(InstallDelay.DEFAULT),
             themeMode = toThemeMode(),
             navBarStyle = toNavBarStyle(),
             navBarCornerRadius = navBarCornerRadius(),
@@ -158,6 +167,10 @@ class DataStoreSettingsRepository(
 
     private fun Preferences.liquidGlass() = this[LIQUID_GLASS] ?: false
 
+    // a stored name this version doesn't know (written by a newer Krate, say) reads as the default
+    private inline fun <reified T : Enum<T>> String?.toEnum(default: T): T =
+        this?.let { stored -> enumValues<T>().firstOrNull { it.name == stored } } ?: default
+
     private fun Preferences.toThemeMode(): ThemeMode =
         this[THEME_MODE]?.let { stored -> runCatching { ThemeMode.valueOf(stored) }.getOrNull() } ?: ThemeMode.SYSTEM
 
@@ -175,6 +188,7 @@ class DataStoreSettingsRepository(
         val DOWNLOAD_ON_MOBILE_DATA = booleanPreferencesKey("download_on_mobile_data")
         val AUTO_INSTALL_UPDATES = booleanPreferencesKey("auto_install_updates")
         val AUTO_UPDATE_PAUSED_UNTIL = longPreferencesKey("auto_update_paused_until")
+        val INSTALL_DELAY = stringPreferencesKey("install_delay")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val NAV_BAR_STYLE = stringPreferencesKey("nav_bar_style")
