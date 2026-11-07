@@ -344,10 +344,11 @@ private fun KrateNavGraph(
                     // tab-to-tab: slide directionally by index. anything else (the App Details push, or the
                     // first frame with no "from" side yet) falls back to a plain fade+grow
                     enterTransition = {
-                        if (ArrivalFromOutside.active) {
-                            EnterTransition.None
-                        } else {
-                            tabEnterTransition(initialState.destination.route, targetState.destination.route)
+                        when {
+                            ArrivalFromOutside.active -> EnterTransition.None
+                            // back from a pushed page that Navigation took for a step forward
+                            !initialState.isTab() && isStepBack(navController) -> detailsPopEnterTransition()
+                            else -> tabEnterTransition(initialState.destination.route, targetState.destination.route)
                         }
                     },
                     exitTransition = {

@@ -1,6 +1,7 @@
 package dev.cl0ud9.krate.ui.navigation
 
 import android.os.SystemClock
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
@@ -10,6 +11,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavHostController
 
 // the public M3 emphasized-easing token, same curve regardless of who's implementing the spec.
 // internal (not private): KrateNavHost's nav bar hide/show tracks this exact spec too, so the
@@ -66,6 +69,33 @@ internal fun detailsPopExitTransition(): ExitTransition =
             targetOffsetX = { fullWidth -> fullWidth },
         ) + scaleOut(targetScale = 0.85f, animationSpec = tween(DETAIL_TRANSITION_MS, easing = M3EmphasizedEasing))
     }
+
+// a change is a step back when it heads for the page under the current one, or leaves a page that's no longer right
+// under where it lands, whatever Navigation calls it: a quick back swipe on a page still arriving ended as a plain
+// change, not a pop, and slid the page off to the left like a step forward
+internal fun AnimatedContentTransitionScope<NavBackStackEntry>.isStepBack(navController: NavHostController): Boolean =
+    isStepBack(
+        current = navController.currentBackStackEntry?.id,
+        previous = navController.previousBackStackEntry?.id,
+        from = initialState.id,
+        to = targetState.id,
+    )
+
+internal fun isStepBack(
+    current: String?,
+    previous: String?,
+    from: String,
+    to: String,
+): Boolean = (from == current && to == previous) || (to == current && from != previous)
+
+// a pushed page's own enter and exit, the back ones whenever the change is a step back
+internal fun AnimatedContentTransitionScope<NavBackStackEntry>.pushedPageEnter(
+    navController: NavHostController,
+): EnterTransition = if (isStepBack(navController)) detailsPopEnterTransition() else detailsEnterTransition()
+
+internal fun AnimatedContentTransitionScope<NavBackStackEntry>.pushedPageExit(
+    navController: NavHostController,
+): ExitTransition = if (isStepBack(navController)) detailsPopExitTransition() else detailsExitTransition()
 
 // a notification bringing Krate back from the background lands straight on its screen: the system's launch
 // animation is already the transition, so an in-app push on top of it would play a second one

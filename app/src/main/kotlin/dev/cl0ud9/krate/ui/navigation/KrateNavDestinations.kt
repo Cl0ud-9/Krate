@@ -97,8 +97,8 @@ internal fun NavGraphBuilder.tabDestinations(navController: NavHostController) {
 internal fun NavGraphBuilder.settingsDestination(navController: NavHostController) {
     composable(
         route = KrateDestination.SETTINGS.route,
-        enterTransition = { detailsEnterTransition() },
-        exitTransition = { detailsExitTransition() },
+        enterTransition = { pushedPageEnter(navController) },
+        exitTransition = { pushedPageExit(navController) },
         popEnterTransition = { detailsPopEnterTransition() },
         popExitTransition = { detailsPopExitTransition() },
     ) { entry ->
@@ -128,8 +128,8 @@ internal fun NavGraphBuilder.appearanceDestination(navController: NavHostControl
     // full screen with its own back and Done, so the live bar preview can sit where the real bar does
     composable(
         route = CORNER_RADIUS_ROUTE,
-        enterTransition = { detailsEnterTransition() },
-        exitTransition = { detailsExitTransition() },
+        enterTransition = { pushedPageEnter(navController) },
+        exitTransition = { pushedPageExit(navController) },
         popEnterTransition = { detailsPopEnterTransition() },
         popExitTransition = { detailsPopExitTransition() },
     ) {
@@ -164,8 +164,8 @@ private fun NavGraphBuilder.settingsPageDestination(
 ) {
     composable(
         route = route,
-        enterTransition = { detailsEnterTransition() },
-        exitTransition = { detailsExitTransition() },
+        enterTransition = { pushedPageEnter(navController) },
+        exitTransition = { pushedPageExit(navController) },
         popEnterTransition = { detailsPopEnterTransition() },
         popExitTransition = { detailsPopExitTransition() },
     ) { entry ->
@@ -184,8 +184,8 @@ internal fun NavGraphBuilder.appDetailsDestination(navController: NavHostControl
     composable(
         route = APP_DETAILS_ROUTE,
         arguments = listOf(navArgument(APP_ID_ARG) { type = NavType.StringType }),
-        enterTransition = { detailsEnterTransition() },
-        exitTransition = { detailsExitTransition() },
+        enterTransition = { pushedPageEnter(navController) },
+        exitTransition = { pushedPageExit(navController) },
         popEnterTransition = { detailsPopEnterTransition() },
         popExitTransition = { detailsPopExitTransition() },
     ) { entry ->
