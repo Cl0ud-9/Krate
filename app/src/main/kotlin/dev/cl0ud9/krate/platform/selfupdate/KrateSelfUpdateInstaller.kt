@@ -9,13 +9,20 @@ import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.InstallationMode
 import dev.cl0ud9.krate.domain.model.SupportStatus
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -59,35 +66,89 @@ private fun defaultHttpClient(): OkHttpClient =
 // one, so this can never succeed against a tampered or wrongly-signed download even without this
 // class doing its own signature check first. the system's own install confirmation dialog this
 // triggers IS the "prompt to update" - there's no separate custom one to build
-class KrateSelfUpdateInstaller(
-    private val context: Context,
+class KrateSelfUpdateInstaller internal constructor(
+    private val cacheDir: File,
+    private val packageName: String,
+    // called right before Android's installer takes over and closes Krate
+    private val beforeInstall: () -> Unit,
     private val installationEngine: InstallationEngine,
-    private val httpClient: OkHttpClient = defaultHttpClient(),
+    private val httpClient: OkHttpClient,
 ) {
-    fun downloadAndInstall(downloadUrl: String): Flow<SelfUpdateState> =
+    constructor(context: Context, installationEngine: InstallationEngine) : this(
+        cacheDir = context.cacheDir,
+        packageName = context.packageName,
+        beforeInstall = { KrateUpdatedReceiver.markSelfUpdatePending(context) },
+        installationEngine = installationEngine,
+        httpClient = defaultHttpClient(),
+    )
+
+    // one update for all of Krate: Home and Settings show the same one, and leaving the screen it was started from
+    // doesn't stop it
+    private val mutableState = MutableStateFlow<SelfUpdateState?>(null)
+    val state: StateFlow<SelfUpdateState?> = mutableState.asStateFlow()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var running: Job? = null
+
+    // a tap while one is under way does nothing; once it has stopped (Play Protect, a failed download) it starts again
+    @Synchronized
+    fun start(downloadUrl: String) {
+        if (running?.isActive == true) return
+        running = scope.launch { downloadAndInstall(downloadUrl).collect { mutableState.value = it } }
+    }
+
+    // Settings' Clear cache: a downloaded update nobody installed, unless it's being installed right now
+    @Synchronized
+    fun clearDownload(): Long = if (running?.isActive == true) 0L else forgetSelfUpdateDownload(cacheDir)
+
+    // waits for the update under way, if any, to stop
+    internal suspend fun join() {
+        running?.join()
+    }
+
+    private fun downloadAndInstall(downloadUrl: String): Flow<SelfUpdateState> =
         flow {
-            // an empty bar to start with; it only turns to a "size unknown" wave if the server never says how big
-            emit(SelfUpdateState.Downloading(0f))
-            val apkFile = selfUpdateApk(context)
-            val failure =
-                try {
-                    download(downloadUrl, apkFile)
-                    null
-                } catch (exception: IOException) {
-                    friendlyNetworkError(exception)
+            val apkFile = selfUpdateApk(cacheDir)
+            // a second go at the same release (after pausing Play Protect, say) installs what's already here
+            if (!isDownloaded(downloadUrl)) {
+                // an empty bar to start with; it only turns to a "size unknown" wave if the server never says how big
+                emit(SelfUpdateState.Downloading(0f))
+                val failure =
+                    try {
+                        download(downloadUrl, apkFile)
+                        null
+                    } catch (exception: IOException) {
+                        friendlyNetworkError(exception)
+                    }
+                if (failure != null) {
+                    emit(SelfUpdateState.DownloadFailed(failure))
+                    return@flow
                 }
-            if (failure != null) {
-                emit(SelfUpdateState.DownloadFailed(failure))
-                return@flow
             }
-            KrateUpdatedReceiver.markSelfUpdatePending(context)
-            emitAll(installationEngine.install(selfProfile(), apkFile).map { SelfUpdateState.Installing(it) })
+            beforeInstall()
+            emitAll(
+                installationEngine.install(selfProfile(), apkFile).map { status ->
+                    // a file Android turned down for any other reason is fetched again on the next try
+                    if (status is InstallStatus.Failed && !status.blockedByPlayProtect && !status.userCancelled) {
+                        forgetSelfUpdateDownload(cacheDir)
+                    }
+                    SelfUpdateState.Installing(status)
+                },
+            )
         }.flowOn(Dispatchers.IO)
 
+    private fun isDownloaded(url: String): Boolean {
+        val source = selfUpdateSource(cacheDir)
+        return selfUpdateApk(cacheDir).isFile && source.isFile && source.readText() == url
+    }
+
+    // downloads beside the update and moves it into place only once it's whole, so a cut-off download is never
+    // taken for a finished one
     private suspend fun FlowCollector<SelfUpdateState>.download(
         url: String,
         destination: File,
     ) {
+        forgetSelfUpdateDownload(cacheDir)
+        val partial = File(destination.parentFile, destination.name + PARTIAL_SUFFIX)
         httpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
             if (!response.isSuccessful) {
                 throw UserFacingIOException(friendlyHttpError(response.code))
@@ -95,10 +156,15 @@ class KrateSelfUpdateInstaller(
             val body = response.body
             val total = body.contentLength().takeIf { it > 0 }
             if (total == null) emit(SelfUpdateState.Downloading(null))
-            destination.outputStream().use { out ->
+            partial.outputStream().use { out ->
                 body.byteStream().use { input -> copyWithProgress(input, out, total) }
             }
         }
+        if (!partial.renameTo(destination)) {
+            partial.delete()
+            throw IOException("couldn't keep the downloaded update")
+        }
+        selfUpdateSource(cacheDir).writeText(url)
     }
 
     private suspend fun FlowCollector<SelfUpdateState>.copyWithProgress(
@@ -127,7 +193,7 @@ class KrateSelfUpdateInstaller(
         AppProfile(
             id = "krate-self-update",
             displayName = "Krate",
-            packageName = context.packageName,
+            packageName = packageName,
             supportStatus = SupportStatus.SUPPORTED,
             installationMode = InstallationMode.UPDATE,
             dependencyIds = emptyList(),
@@ -137,5 +203,19 @@ class KrateSelfUpdateInstaller(
         )
 }
 
+private const val PARTIAL_SUFFIX = ".part"
+
 // where Krate's own update is downloaded to; deleted once that update is installed (KrateUpdatedReceiver)
-internal fun selfUpdateApk(context: Context): File = File(context.cacheDir, "krate-update.apk")
+internal fun selfUpdateApk(cacheDir: File): File = File(cacheDir, "krate-update.apk")
+
+// the release the downloaded update came from, written once the download is whole
+private fun selfUpdateSource(cacheDir: File): File = File(cacheDir, "krate-update.source")
+
+// the downloaded update and anything left of a cut-off one; how many bytes that frees
+internal fun forgetSelfUpdateDownload(cacheDir: File): Long {
+    selfUpdateSource(cacheDir).delete()
+    val apk = selfUpdateApk(cacheDir)
+    return listOf(apk, File(cacheDir, apk.name + PARTIAL_SUFFIX)).sumOf { file ->
+        file.length().also { file.delete() }
+    }
+}

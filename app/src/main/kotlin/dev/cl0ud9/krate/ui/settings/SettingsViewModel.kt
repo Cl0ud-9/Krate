@@ -6,7 +6,6 @@ import dev.cl0ud9.krate.data.auth.GitHubCredentialStore
 import dev.cl0ud9.krate.data.downloads.ArtifactDownloader
 import dev.cl0ud9.krate.data.settings.DEFAULT_NAV_BAR_CORNER_RADIUS
 import dev.cl0ud9.krate.domain.model.InstallDelay
-import dev.cl0ud9.krate.domain.model.InstallStatus
 import dev.cl0ud9.krate.domain.model.InviteStatus
 import dev.cl0ud9.krate.domain.model.LaunchTab
 import dev.cl0ud9.krate.domain.model.NavBarStyle
@@ -112,8 +111,8 @@ class SettingsViewModel(
     private val mutableKrateUpdateState = MutableStateFlow<KrateUpdateUiState>(KrateUpdateUiState.Idle)
     val krateUpdateState: StateFlow<KrateUpdateUiState> = mutableKrateUpdateState.asStateFlow()
 
-    private val mutableSelfUpdateState = MutableStateFlow<SelfUpdateState?>(null)
-    val selfUpdateState: StateFlow<SelfUpdateState?> = mutableSelfUpdateState.asStateFlow()
+    // the same update Home shows, if one is under way there
+    val selfUpdateState: StateFlow<SelfUpdateState?> = krateSelfUpdateInstaller.state
 
     // checked as soon as Settings opens (a single small GitHub API call), so an available update is
     // shown straight away instead of waiting for a tap on "Check for updates"
@@ -251,21 +250,9 @@ class SettingsViewModel(
         }
     }
 
-    // downloads the release apk and hands it to PackageInstaller, which raises Android's own
-    // install-confirmation dialog - that system dialog IS the "prompt to update" this replaces
-    // opening the GitHub release page with. Guarded the same way checkForKrateUpdate() is: a
-    // second tap while one is already running is a no-op rather than starting a duplicate download
-    fun installKrateUpdate(downloadUrl: String) {
-        val current = mutableSelfUpdateState.value
-        // one already under way is left alone; one that failed (Play Protect, say) can be tried again
-        val failed = current is SelfUpdateState.Installing && current.installStatus is InstallStatus.Failed
-        if ((current is SelfUpdateState.Downloading || current is SelfUpdateState.Installing) && !failed) return
-        viewModelScope.launch {
-            krateSelfUpdateInstaller.downloadAndInstall(downloadUrl).collect { state ->
-                mutableSelfUpdateState.value = state
-            }
-        }
-    }
+    // downloads the release apk and hands it to PackageInstaller, which raises Android's own install-confirmation
+    // dialog; a second tap while one is running, here or on Home, does nothing
+    fun installKrateUpdate(downloadUrl: String) = krateSelfUpdateInstaller.start(downloadUrl)
 
     // downloaded apks are normally cleaned up right after a successful install (AppDetailsViewModel,
     // UpdateAllEngine) - this is the manual escape hatch for anything that missed that: an abandoned
@@ -275,7 +262,8 @@ class SettingsViewModel(
             val bytesFreed =
                 withContext(Dispatchers.IO) {
                     artifactDownloader.clearCache(filesInUse()) +
-                        rollbackStore.clearAll()
+                        rollbackStore.clearAll() +
+                        krateSelfUpdateInstaller.clearDownload()
                 }
             mutableCacheClearedMessage.value =
                 if (bytesFreed > 0) "Freed ${formatMb(bytesFreed)}." else "Cache is already empty."
