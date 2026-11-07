@@ -1,0 +1,53 @@
+{
+  "version": "0.6.6",
+  "date": "2026-11-07",
+  "phone": "Nothing AIN065",
+  "android": 36,
+  "benchmarks": {
+    "swipeBackFromSettings": {
+      "frame_p50_ms": 10.35,
+      "frame_p90_ms": 27.92,
+      "frame_p99_ms": 32.26,
+      "janky_percent": 49.5,
+      "overrun_p99_ms": 30.48
+    },
+    "scrollAppsList": {
+      "frame_p50_ms": 7.08,
+      "frame_p90_ms": 13.5,
+      "frame_p99_ms": 17.92,
+      "janky_percent": 6.7,
+      "overrun_p99_ms": 3.51
+    },
+    "swipeBackFromSettingsWithGlass": {
+      "frame_p50_ms": 13.68,
+      "frame_p90_ms": 29.87,
+      "frame_p99_ms": 38.56,
+      "janky_percent": 85.5,
+      "overrun_p99_ms": 41.9
+    },
+    "switchTabs": {
+      "frame_p50_ms": 7.66,
+      "frame_p90_ms": 19.58,
+      "frame_p99_ms": 32.63,
+      "janky_percent": 16.5,
+      "overrun_p99_ms": 27.06
+    },
+    "swipeBackFromAnAppPage": {
+      "frame_p50_ms": 10.52,
+      "frame_p90_ms": 27.56,
+      "frame_p99_ms": 32.62,
+      "janky_percent": 52.0,
+      "overrun_p99_ms": 32.9
+    },
+    "coldStart": {
+      "startup_ms": 545.9
+    },
+    "swipeBackFromAnAppPageWithGlass": {
+      "frame_p50_ms": 25.33,
+      "frame_p90_ms": 30.36,
+      "frame_p99_ms": 36.37,
+      "janky_percent": 95.8,
+      "overrun_p99_ms": 39.82
+    }
+  }
+}
