@@ -6,7 +6,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,6 +29,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -34,11 +40,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.cl0ud9.krate.R
+import dev.cl0ud9.krate.domain.model.InstallDelay
 import dev.cl0ud9.krate.domain.model.NavBarStyle
+import dev.cl0ud9.krate.domain.model.label
 import dev.cl0ud9.krate.platform.autoupdate.autoUpdatesSupported
 import dev.cl0ud9.krate.ui.components.KrateSwitch
 import dev.cl0ud9.krate.ui.navigation.liquidGlass
 import dev.cl0ud9.krate.ui.navigation.liquidGlassSupported
+import dev.cl0ud9.krate.ui.settings.InstallDelayPicker
 import dev.cl0ud9.krate.ui.settings.SettingsViewModel
 import dev.cl0ud9.krate.ui.settings.ThemeModeCards
 import dev.cl0ud9.krate.ui.theme.ShapeCache
@@ -148,9 +157,8 @@ internal fun UpdatesPage(viewModel: SettingsViewModel) {
                         title = "Install them automatically",
                         subtitle =
                             if (automatic) {
-                                "Updates to apps from Krate install a day after release, while you're not using " +
-                                    "them. You can change the wait in Settings. It never rolls an app back or " +
-                                    "erases its data."
+                                "Updates to apps from Krate install while you're not using them. It never rolls " +
+                                    "an app back or erases its data."
                             } else {
                                 "Turn on Automatic downloads first, so there's something to install."
                             },
@@ -158,6 +166,12 @@ internal fun UpdatesPage(viewModel: SettingsViewModel) {
                         onCheckedChange = viewModel::setAutoInstallUpdates,
                         enabled = automatic,
                     )
+                    AnimatedVisibility(
+                        visible = autoInstall && automatic,
+                        // unclipped, or the edge of its first letters is cut off
+                        enter = expandVertically(clip = false) + fadeIn(),
+                        exit = shrinkVertically(clip = false) + fadeOut(),
+                    ) { DelayLine(viewModel) }
                 }
             }
         }
@@ -199,7 +213,13 @@ private fun CustomizePageLayout(
         CustomizeTitle(title, TextAlign.Center)
         Spacer(modifier = Modifier.height(16.dp))
         CustomizeDescription(description, TextAlign.Center)
-        Column(modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center) { content() }
+        // centred when the choices fit, scrolling when big text makes them taller than the room
+        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
+                verticalArrangement = Arrangement.Center,
+            ) { content() }
+        }
         ChangeLaterNote(TextAlign.Center, Modifier.padding(bottom = 8.dp))
     }
 }
@@ -243,6 +263,32 @@ private fun ChangeLaterNote(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier.fillMaxWidth(),
     )
+}
+
+// how long updates wait first, while they install by themselves; the same sheet as in Settings
+@Composable
+private fun DelayLine(viewModel: SettingsViewModel) {
+    val delay by viewModel.installDelay.collectAsStateWithLifecycle()
+    var sheet by rememberSaveable { mutableStateOf(false) }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClickLabel = "Choose when updates install") { sheet = true },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "When to install", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = if (delay == InstallDelay.DEFAULT) "${delay.label()} (recommended)" else delay.label(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(painterResource(R.drawable.ic_chevron_right_rounded), contentDescription = null)
+    }
+    if (sheet) InstallDelayPicker(viewModel) { sheet = false }
 }
 
 @Composable

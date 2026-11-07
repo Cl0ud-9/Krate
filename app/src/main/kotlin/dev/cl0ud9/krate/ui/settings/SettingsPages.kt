@@ -142,19 +142,6 @@ fun DownloadsStoragePage(
     if (delaySheet) InstallDelayPicker(viewModel) { delaySheet = false }
 }
 
-@Composable
-private fun InstallDelayPicker(
-    viewModel: SettingsViewModel,
-    onDismiss: () -> Unit,
-) {
-    val context = LocalContext.current
-    InstallDelaySheet(viewModel.installDelay.collectAsStateWithLifecycle().value, onDismiss) { delay ->
-        viewModel.setInstallDelay(delay)
-        // a shorter wait can make an update due now; a run works out the new times
-        AutoUpdateWorker.enqueue(context)
-    }
-}
-
 // installing by itself, how long to wait first, and the pause: only on Android 12 and newer
 @Composable
 private fun InstallRows(

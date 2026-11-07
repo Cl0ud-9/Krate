@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,8 +26,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -60,16 +64,21 @@ internal fun WelcomePage() {
     }
 }
 
+// the cover's big words grow with the phone's text size only so far: any bigger and "Welcome" no longer fits on a line
+private const val MAX_HEADING_SCALE = 1.3f
+
 @Composable
 private fun WelcomeHeading() {
+    val fontScale = LocalDensity.current.fontScale
+    val shrink = minOf(fontScale, MAX_HEADING_SCALE) / fontScale
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text = "Welcome to", style = KrateWideDisplay)
+        Text(text = "Welcome to", style = KrateWideDisplay.copy(fontSize = KrateWideDisplay.fontSize * shrink))
         Text(
             text = "Krate",
             style =
                 MaterialTheme.typography.displayLarge.copy(
                     fontFamily = KrateRounded,
-                    fontSize = 46.sp,
+                    fontSize = 46.sp * shrink,
                     lineHeight = 1.1.em,
                     color = MaterialTheme.colorScheme.primary,
                 ),
@@ -115,21 +124,67 @@ internal fun StepPageLayout(
         )
         return
     }
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(modifier = Modifier.height(16.dp))
-            StepHeading(title, description, TextAlign.Center)
-        }
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            if (icons != null) OnboardingCollage(icons = icons)
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            StepControls(action, content)
-            Spacer(modifier = Modifier.height(16.dp))
+    StackedPage(
+        heading = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(modifier = Modifier.height(16.dp))
+                StepHeading(title, description, TextAlign.Center)
+            }
+        },
+        art = {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (icons != null) OnboardingCollage(icons = icons)
+            }
+        },
+        controls = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                StepControls(action, content)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        },
+    )
+}
+
+private val PAGE_PADDING = 24.dp
+
+// smaller than this, the art isn't worth showing
+private val MIN_ART_HEIGHT = 72.dp
+
+// the heading at the top, the page's choices at the bottom and the art in the room between. When the words and
+// choices alone don't fit (big text on a smaller phone) the art steps aside and the page scrolls, rather than the
+// choices being squeezed into what's left and cut off
+@Composable
+private fun StackedPage(
+    heading: @Composable () -> Unit,
+    art: @Composable () -> Unit,
+    controls: @Composable () -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val screen = constraints.maxHeight
+        Layout(
+            contents = listOf(heading, art, controls),
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(PAGE_PADDING),
+        ) { (headingPart, artPart, controlsPart), limits ->
+            val padding = PAGE_PADDING.roundToPx() * 2
+            val room = (screen - padding).coerceAtLeast(0)
+            val loose = Constraints(maxWidth = limits.maxWidth)
+            val top = headingPart.first().measure(loose)
+            val bottom = controlsPart.first().measure(loose)
+            val left = room - top.height - bottom.height
+            val picture =
+                if (left >=
+                    MIN_ART_HEIGHT.roundToPx()
+                ) {
+                    artPart.first().measure(Constraints.fixed(limits.maxWidth, left))
+                } else {
+                    null
+                }
+            val height = maxOf(room, top.height + bottom.height)
+            layout(limits.maxWidth, height) {
+                top.placeRelative((limits.maxWidth - top.width) / 2, 0)
+                picture?.placeRelative(0, top.height)
+                bottom.placeRelative((limits.maxWidth - bottom.width) / 2, height - bottom.height)
+            }
         }
     }
 }

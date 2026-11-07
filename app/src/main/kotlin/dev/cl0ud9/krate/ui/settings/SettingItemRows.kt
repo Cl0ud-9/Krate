@@ -136,7 +136,11 @@ internal class SettingOption<T>(
     val value: T,
     val icon: Painter,
     val label: String,
+    // a line under the label, such as which choice Krate recommends
+    val note: String? = null,
 )
+
+private const val NOTE_ALPHA = 0.8f
 
 // a bottom sheet of choices; the current one is filled in, picking one applies it and closes the sheet
 @OptIn(ExperimentalMaterial3Api::class)
@@ -199,7 +203,16 @@ private fun <T> OptionRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Icon(option.icon, contentDescription = null, modifier = Modifier.size(24.dp))
-            Text(text = option.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = option.label, style = MaterialTheme.typography.titleMedium)
+                option.note?.let { note ->
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = content.copy(alpha = NOTE_ALPHA),
+                    )
+                }
+            }
             SelectionMark(selected = isSelected, color = content)
         }
     }

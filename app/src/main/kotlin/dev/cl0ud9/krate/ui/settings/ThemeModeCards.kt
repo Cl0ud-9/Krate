@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.domain.model.ThemeMode
 import dev.cl0ud9.krate.ui.navigation.pressable
@@ -124,15 +126,22 @@ private fun ThemeModeCard(
     }
 }
 
+private val BADGE_MIN_TEXT = 9.sp
+
 @Composable
 private fun RecommendedBadge() {
     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+        val style = MaterialTheme.typography.labelMedium
+        // one line always: with big text in a narrow card it gets a little smaller rather than breaking the word
         Text(
             text = "Recommended",
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-            style = MaterialTheme.typography.labelMedium,
+            style = style,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onPrimary,
+            maxLines = 1,
+            softWrap = false,
+            autoSize = TextAutoSize.StepBased(minFontSize = BADGE_MIN_TEXT, maxFontSize = style.fontSize),
         )
     }
 }

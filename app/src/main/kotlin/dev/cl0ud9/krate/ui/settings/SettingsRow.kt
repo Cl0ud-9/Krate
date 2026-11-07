@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.ui.components.Reveal
@@ -153,13 +154,19 @@ private fun RowTexts(
     header: SettingsRowHeader,
     modifier: Modifier,
 ) {
+    // with the text made bigger a long word can be wider than the line; it breaks with a hyphen, not mid-letter
+    val hyphens = if (LocalDensity.current.fontScale > 1f) Hyphens.Auto else Hyphens.None
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         AnimatedContent(
             targetState = header.title,
             transitionSpec = swapTransition(),
             label = "row-title",
         ) { title ->
-            Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(hyphens = hyphens),
+                fontWeight = FontWeight.SemiBold,
+            )
         }
         AnimatedContent(
             targetState = header.subtitle,
@@ -168,7 +175,7 @@ private fun RowTexts(
         ) { line ->
             Text(
                 text = line,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall.copy(hyphens = hyphens),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
