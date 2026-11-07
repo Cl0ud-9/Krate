@@ -17,7 +17,7 @@ private const val STARTUP_ITERATIONS = 10
 internal const val SETTLE_MS = 1_000L
 
 // how smooth Krate is where people feel it: starting up, switching tabs, scrolling, and swiping back from a page,
-// with liquid glass off and on. tools/benchmark/compare.py compares a run with the last release's numbers
+// with liquid glass off and on. tools/smoothness/compare.py compares a run with the last release's numbers
 @RunWith(AndroidJUnit4::class)
 @LargeTest
 class SmoothnessBenchmark {

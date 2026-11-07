@@ -9,6 +9,7 @@ import kotlin.math.abs
 private const val SWIPES_PER_ITERATION = 3
 private const val FIND_MS = 5_000L
 private const val SCROLL_TRIES = 6
+private const val SETTINGS_TRIES = 3
 private const val SCROLL_FROM = 0.75f
 private const val SCROLL_TO = 0.35f
 private const val SCROLL_STEPS = 20
@@ -21,7 +22,12 @@ private const val BACK_SWIPE_END_FRACTION = 0.8f
 // the steps SmoothnessBenchmark's journeys are made of
 internal fun MacrobenchmarkScope.openSettings() {
     clickDescription("Home")
-    clickDescription("Settings")
+    // a tab tap right after a page has closed can be lost, so it's tried again until Settings shows
+    repeat(SETTINGS_TRIES) {
+        clickDescription("Settings")
+        if (device.wait(Until.hasObject(By.text("Appearance")), FIND_MS)) return
+    }
+    error("Settings didn't open")
 }
 
 internal fun MacrobenchmarkScope.openAndSwipeBack(open: MacrobenchmarkScope.() -> Unit) {
