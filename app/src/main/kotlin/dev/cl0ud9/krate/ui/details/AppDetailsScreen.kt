@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
@@ -41,6 +40,7 @@ import dev.cl0ud9.krate.domain.repository.isNewerThan
 import dev.cl0ud9.krate.platform.packageinfo.InstalledVersion
 import dev.cl0ud9.krate.ui.components.AfterArrival
 import dev.cl0ud9.krate.ui.components.AnnouncementCard
+import dev.cl0ud9.krate.ui.components.PatientLoadingIndicator
 import dev.cl0ud9.krate.ui.components.systemNavBarClearance
 import dev.cl0ud9.krate.ui.home.PlayProtectReminder
 import dev.cl0ud9.krate.ui.navigation.DetailContentTopGap
@@ -79,7 +79,7 @@ fun AppDetailsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         if (currentApp == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (missing) GoneApp() else LoadingIndicator()
+                if (missing) GoneApp() else PatientLoadingIndicator()
             }
         } else {
             // each is already idempotent in the ViewModel (isBusy()/status guards a second call

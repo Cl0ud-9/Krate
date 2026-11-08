@@ -3,6 +3,7 @@ package dev.cl0ud9.krate.ui.util
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
@@ -57,11 +58,14 @@ fun String.formatMarkdownLite(): AnnotatedString {
             codeText = MaterialTheme.colorScheme.onSurfaceVariant,
             codeBackground = MaterialTheme.colorScheme.surfaceContainerHighest,
         )
-    val headerStyle = SpanStyle(fontWeight = FontWeight.Bold, fontSize = HEADER_FONT_SIZE, color = headerColor)
-    return buildAnnotatedString {
-        val writer = MarkdownLineWriter(this, headerStyle, colors)
-        // "( https://... )" -> "(https://...)": release notes often space a trailing link out
-        cleanReleaseNotes(this@formatMarkdownLite).replace(SPACED_PAREN_URL, "($1)").lines().forEach(writer::write)
+    // parsed once per text and colours, not again on every recomposition of the page around it
+    return remember(this, colors, headerColor) {
+        val headerStyle = SpanStyle(fontWeight = FontWeight.Bold, fontSize = HEADER_FONT_SIZE, color = headerColor)
+        buildAnnotatedString {
+            val writer = MarkdownLineWriter(this, headerStyle, colors)
+            // "( https://... )" -> "(https://...)": release notes often space a trailing link out
+            cleanReleaseNotes(this@formatMarkdownLite).replace(SPACED_PAREN_URL, "($1)").lines().forEach(writer::write)
+        }
     }
 }
 
