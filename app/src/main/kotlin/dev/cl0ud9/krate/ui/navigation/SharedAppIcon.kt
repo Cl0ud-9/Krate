@@ -73,10 +73,17 @@ private const val ORIGIN_TTL_MS = 1_500L
 // header for a frame, so the page just slides in and out over the row instead
 private const val MIN_SIGHT = 0.9f
 
-// where a tab's list panel starts, and how much of each list icon is showing above it; read while icons fly
+// where a tab's list panel starts; read while icons fly
 internal object IconFlight {
     var panelTop = 0f
-    val sight = mutableMapOf<String, Float>()
+
+    // how much of a list icon is showing above the panel, worked out when it's tapped rather than on every frame
+    fun sight(key: String): Float {
+        val coordinates = BackFlight.rows[key]?.takeIf { it.isAttached } ?: return 1f
+        val full = coordinates.size.height
+        // window bounds come back already cut by the list panel, so their share of the full height is what shows
+        return if (full > 0) coordinates.boundsInWindow().height / full else 1f
+    }
 
     // icons that have started flying into a page, counted for the test that no icon flies in twice
     var arrivals = 0
@@ -108,7 +115,7 @@ internal object SharedIconOrigin {
     ) {
         this.appId = appId
         // partly tucked under the header: no flight either way, the page just slides in and out over it
-        this.place = place.takeIf { (IconFlight.sight[iconKey(appId, place)] ?: 1f) >= MIN_SIGHT }
+        this.place = place.takeIf { IconFlight.sight(iconKey(appId, place)) >= MIN_SIGHT }
         at = SystemClock.uptimeMillis()
     }
 
@@ -177,15 +184,11 @@ internal fun Modifier.sharedAppIcon(
             }
         }
     }
-    return onGloballyPositioned { coordinates ->
-        BackFlight.rows[key] = coordinates
-        // window bounds come back already cut by the list panel, so their share of the full height is what shows
-        val full = coordinates.size.height
-        if (full > 0) IconFlight.sight[key] = coordinates.boundsInWindow().height / full
-    }.graphicsLayer {
-        val inPage = BackFlight.armed?.key == key && trip?.entering?.value == true
-        alpha = if (inPage || BackFlight.flying?.key == key) 0f else 1f
-    }.sharedIconFor(key) { trip?.entering?.value != true }
+    return onGloballyPositioned { coordinates -> BackFlight.rows[key] = coordinates }
+        .graphicsLayer {
+            val inPage = BackFlight.armed?.key == key && trip?.entering?.value == true
+            alpha = if (inPage || BackFlight.flying?.key == key) 0f else 1f
+        }.sharedIconFor(key) { trip?.entering?.value != true }
 }
 
 // on the icon at the top of App Details; links to wherever the page was opened from, if anywhere
@@ -257,12 +260,14 @@ private fun Modifier.sharedIconFor(
 @Composable
 internal fun Modifier.hiddenWhileIconsFly(): Modifier {
     val flying = LocalSharedTransition.current?.isTransitionActive == true || BackFlight.flying != null
-    val shown by animateFloatAsState(
-        targetValue = if (flying) 0f else 1f,
-        animationSpec = if (flying) snap() else tween(BADGE_RETURN_MS),
-        label = "badgeShown",
-    )
+    val shownState =
+        animateFloatAsState(
+            targetValue = if (flying) 0f else 1f,
+            animationSpec = if (flying) snap() else tween(BADGE_RETURN_MS),
+            label = "badgeShown",
+        )
     return graphicsLayer {
+        val shown = shownState.value
         alpha = shown
         scaleX = BADGE_RETURN_SCALE + (1f - BADGE_RETURN_SCALE) * shown
         scaleY = scaleX

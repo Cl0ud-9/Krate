@@ -97,6 +97,10 @@ class CollapsingHeaderState internal constructor(
     val headerHeight: Dp
         get() = with(density) { heightPx.value.toDp() }
 
+    // the header fully open: what a page pads its top by, the page itself moving up as the header shrinks
+    val expandedHeight: Dp
+        get() = with(density) { maxHeightPx.toDp() }
+
     val collapseFraction: Float
         get() = (1f - (heightPx.value - minHeightPx) / (maxHeightPx - minHeightPx)).coerceIn(0f, 1f)
 
@@ -263,6 +267,19 @@ private fun BoxScope.HeaderSurface(
                 ),
     )
 }
+
+// a page padded for the header fully open, moved up by however much the header has shrunk. Done while placing, so a
+// collapsing header moves the page without composing it again on every frame
+internal fun Modifier.followsHeader(state: CollapsingHeaderState): Modifier =
+    layout { measurable, constraints ->
+        val shift = (state.maxHeightPx - state.currentPx).roundToInt().coerceAtLeast(0)
+        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else null
+        val placeable =
+            measurable.measure(
+                if (height == null) constraints else Constraints.fixed(constraints.maxWidth, height + shift),
+            )
+        layout(placeable.width, height ?: placeable.height) { placeable.place(0, -shift) }
+    }
 
 // lays the piece out larger by [amount] on the sides and top, centred on where it was, without moving anything else
 private fun Modifier.bleed(amount: Dp): Modifier =

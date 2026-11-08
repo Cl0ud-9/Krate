@@ -35,8 +35,19 @@ import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.ui.navigation.GlassEdge
 import dev.cl0ud9.krate.ui.navigation.liquidGlass
 import dev.cl0ud9.krate.ui.navigation.rememberGlassPress
+import dev.cl0ud9.krate.ui.navigation.rememberGlassWhile
+import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import kotlinx.coroutines.flow.Flow
+
+// a page's glass for its refresh message: the page is recorded only while the message is up, as nothing else there is
+// glass. The host is the message's own, passed on to RefreshFailureSnackbar
+@Composable
+fun rememberRefreshMessageGlass(snackbarHostState: SnackbarHostState): LayerBackdrop? {
+    val pageGlass = rememberPageGlass()
+    val showing = rememberGlassWhile(snackbarHostState.currentSnackbarData != null)
+    return pageGlass?.takeIf { showing }
+}
 
 // a short-lived message: a headline, the plain fact under it, an icon for the kind of news, and an optional action
 class KrateMessage(
@@ -57,8 +68,8 @@ fun BoxScope.RefreshFailureSnackbar(
     message: () -> KrateMessage,
     onRetry: () -> Unit,
     glass: LayerBackdrop? = null,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
     val latestMessage = rememberUpdatedState(message)
     val latestRetry = rememberUpdatedState(onRetry)
     LaunchedEffect(refreshFailed) {

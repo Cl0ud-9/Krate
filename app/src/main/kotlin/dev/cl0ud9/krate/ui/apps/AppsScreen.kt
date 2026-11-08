@@ -19,12 +19,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,10 +40,11 @@ import dev.cl0ud9.krate.ui.components.EmptyState
 import dev.cl0ud9.krate.ui.components.KrateMessage
 import dev.cl0ud9.krate.ui.components.KratePullToRefreshBox
 import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
+import dev.cl0ud9.krate.ui.components.PatientLoadingIndicator
 import dev.cl0ud9.krate.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.krate.ui.components.RefreshPillButton
+import dev.cl0ud9.krate.ui.components.rememberRefreshMessageGlass
 import dev.cl0ud9.krate.ui.navigation.glassSource
-import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
 import dev.cl0ud9.krate.ui.util.StaggeredAppear
 import dev.cl0ud9.krate.ui.util.krateViewModel
@@ -100,7 +102,8 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
         // rather than just re-checking local installed state, so every other screen sharing that cache
         // benefits too
         // the list, for the snackbar to turn to glass over
-        val pageGlass = rememberPageGlass()
+        val failures = remember { SnackbarHostState() }
+        val pageGlass = rememberRefreshMessageGlass(failures)
         KratePullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refreshFromNetwork,
@@ -121,6 +124,7 @@ fun AppsScreen(onAppClick: (String) -> Unit) {
             },
             onRetry = viewModel::refreshFromNetwork,
             glass = pageGlass,
+            snackbarHostState = failures,
         )
     }
 }
@@ -149,7 +153,7 @@ private fun AppsContent(
                     modifier = Modifier.fillMaxSize().padding(bottom = LocalNavBarClearance.current),
                     contentAlignment = Alignment.Center,
                 ) {
-                    LoadingIndicator()
+                    PatientLoadingIndicator()
                 }
             }
 

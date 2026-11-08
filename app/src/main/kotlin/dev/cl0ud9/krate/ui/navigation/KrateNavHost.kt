@@ -29,6 +29,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -178,10 +180,12 @@ fun KrateNavHost(
     // exact same duration/easing as the detail screen's own push/pop transition (DetailTransitions.kt)
     // rather than an independently-picked number - two animations racing to different finish lines
     // is what read as rushed/uncoordinated rather than one fluid motion
+    // read only while drawing the bar, so its slide never recomposes this host or the bar on each frame
     val navBarVisibility = rememberNavBarVisibility(showBottomBar)
     // stays composed for the whole slide-out, not just while showBottomBar is true, otherwise the
     // bar would be yanked out of the tree mid-animation instead of finishing its slide
-    val renderBottomBar = showBottomBar || navBarVisibility > NAV_BAR_VISIBILITY_EPSILON
+    val barStillOut by remember { derivedStateOf { navBarVisibility.value > NAV_BAR_VISIBILITY_EPSILON } }
+    val renderBottomBar = showBottomBar || barStillOut
 
     // measured by the bar itself, only to slide it off screen by its own height
     val barHeightPx = remember { mutableIntStateOf(0) }
@@ -189,7 +193,8 @@ fun KrateNavHost(
     // the shorter, icon-only bar when chosen for the pill, and always on a phone on its side
     val barCompact = isShortScreen() || (navBarCompactMode && navBarStyle == NavBarStyle.FLOATING_PILL)
     val navBarClearance = navBarFootprint(barCompact, floating = navBarStyle == NavBarStyle.FLOATING_PILL)
-    val navBar = NavBarAppearance(navBarStyle, navBarCornerRadius, barCompact, glassBackdrop.takeIf { glass })
+    val barGlass = glassBackdrop.takeIf { glass }
+    val navBar = NavBarAppearance(navBarStyle, navBarCornerRadius, barCompact, barGlass)
 
     ProvideNavLocals(navBarClearance, glass) {
         // contentWindowInsets defaults to WindowInsets.systemBars, which would reserve the status
@@ -206,7 +211,7 @@ fun KrateNavHost(
                         navController,
                         currentRoute,
                         navBar,
-                        navBarVisibility,
+                        { navBarVisibility.value },
                         barHeightPx,
                     )
                 }
@@ -219,7 +224,8 @@ fun KrateNavHost(
                 modifier =
                     Modifier
                         .padding(top = innerPadding.calculateTopPadding())
-                        .glassSource(glassBackdrop.takeIf { glass }, MaterialTheme.colorScheme.background),
+                        // recorded only while the bar is there to show it: a pushed page has no bar
+                        .glassSource(barGlass.takeIf { renderBottomBar }, MaterialTheme.colorScheme.background),
             )
         }
     }
@@ -227,8 +233,8 @@ fun KrateNavHost(
 
 // how far the bottom bar is on screen, 0 to 1, moving with the detail screens' own push and pop
 @Composable
-private fun rememberNavBarVisibility(showBottomBar: Boolean): Float {
-    val visibility by animateFloatAsState(
+private fun rememberNavBarVisibility(showBottomBar: Boolean): State<Float> =
+    animateFloatAsState(
         targetValue = if (showBottomBar) 1f else 0f,
         animationSpec =
             if (ArrivalFromOutside.active) {
@@ -241,8 +247,6 @@ private fun rememberNavBarVisibility(showBottomBar: Boolean): Float {
             },
         label = "NavBarVisibility",
     )
-    return visibility
-}
 
 // lets a notification tap reach the running nav host, and ends an arrival from outside once its screen is in place
 @Composable
@@ -443,8 +447,10 @@ internal fun AnimatedContentScope.DetailScreen(
     val scrollState = rememberScrollState()
     val headerState = rememberCollapsingHeaderState(scrollState)
     val scrollClaim = remember { ScrollClaim() }
-    // the page under its header, for the header to turn to glass over once it collapses
-    val pageGlass = rememberPageGlass()
+    // the page under its header, for the header to turn to glass over once it collapses; fully open, the header
+    // covers only the page's plain background, so neither the glass nor the recording behind it runs
+    val collapsing by remember { derivedStateOf { headerState.collapseFraction > 0f } }
+    val pageGlass = rememberPageGlass()?.takeIf { collapsing }
     Box(
         modifier =
             Modifier
@@ -464,12 +470,13 @@ internal fun AnimatedContentScope.DetailScreen(
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        .followsHeader(headerState)
                         .glassSource(
                             pageGlass,
                             MaterialTheme.colorScheme.surface,
                         ).windowInsetsPadding(SideInsets),
             ) {
-                content(scrollState, headerState.headerHeight)
+                content(scrollState, headerState.expandedHeight)
             }
         }
         CollapsingDetailHeader(

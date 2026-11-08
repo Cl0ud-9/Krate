@@ -8,7 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -39,10 +39,11 @@ fun SineWaveLine(
 ) {
     val density = LocalDensity.current
 
-    val currentPhase =
+    // read while drawing, so the moving wave redraws without composing again on every frame
+    val phaseState: State<Float>? =
         if (animate) {
             val infiniteTransition = rememberInfiniteTransition(label = "SineWaveAnimation")
-            val animatedPhase by infiniteTransition.animateFloat(
+            infiniteTransition.animateFloat(
                 initialValue = 0f,
                 targetValue = 2f * PI.toFloat(),
                 animationSpec =
@@ -52,12 +53,12 @@ fun SineWaveLine(
                     ),
                 label = "phaseAnimation",
             )
-            animatedPhase
         } else {
-            phase
+            null
         }
 
     Canvas(modifier = modifier) {
+        val currentPhase = phaseState?.value ?: phase
         val w = size.width
         val h = size.height
         val centerY = h / 2f

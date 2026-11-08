@@ -28,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -71,11 +72,11 @@ import dev.cl0ud9.krate.ui.components.LocalIntroPlaying
 import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
 import dev.cl0ud9.krate.ui.components.RefreshFailureSnackbar
 import dev.cl0ud9.krate.ui.components.WhatsNewDialog
+import dev.cl0ud9.krate.ui.components.rememberRefreshMessageGlass
 import dev.cl0ud9.krate.ui.navigation.SharedIconOrigin
 import dev.cl0ud9.krate.ui.navigation.glassRim
 import dev.cl0ud9.krate.ui.navigation.glassSource
 import dev.cl0ud9.krate.ui.navigation.hiddenWhileIconsFly
-import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.navigation.sharedAppIcon
 import dev.cl0ud9.krate.ui.theme.ShapeCache
 import dev.cl0ud9.krate.ui.util.ClearNoticesOnResume
@@ -140,7 +141,8 @@ fun HomeScreen(
     // via the catalog repository's cache, so this pull is never wasted even if the user never leaves Home
     Box(modifier = Modifier.fillMaxSize()) {
         // the list, for the snackbar to turn to glass over
-        val pageGlass = rememberPageGlass()
+        val failures = remember { SnackbarHostState() }
+        val pageGlass = rememberRefreshMessageGlass(failures)
         KratePullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refreshFromNetwork,
@@ -161,6 +163,7 @@ fun HomeScreen(
             },
             onRetry = viewModel::refreshFromNetwork,
             glass = pageGlass,
+            snackbarHostState = failures,
         )
     }
 }

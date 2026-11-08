@@ -38,7 +38,8 @@ internal fun KrateBottomBar(
     navController: NavHostController,
     currentRoute: String?,
     appearance: NavBarAppearance,
-    visibilityProgress: Float,
+    // how far the bar is on screen, read while drawing
+    visibilityProgress: () -> Float,
     barHeightPx: MutableIntState,
 ) {
     val geometry = rememberNavBarGeometry(appearance)
@@ -56,7 +57,7 @@ internal fun KrateBottomBar(
             Modifier
                 // measured with its margins, so the content above can leave room for all of it
                 .onSizeChanged { barHeightPx.intValue = it.height }
-                .graphicsLayer { translationY = barHeightPx.intValue * (1f - visibilityProgress) }
+                .graphicsLayer { translationY = barHeightPx.intValue * (1f - visibilityProgress()) }
                 .fillMaxWidth()
                 .padding(bottom = geometry.bottomMargin)
                 .height(geometry.height)

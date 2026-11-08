@@ -26,17 +26,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -73,21 +75,25 @@ fun RowScope.KrateNavigationBarItem(
     val selectedIconColor = MaterialTheme.colorScheme.primary
     val selectedTextColor = MaterialTheme.colorScheme.primary
     val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val iconColor by animateColorAsState(
-        targetValue = if (selected) selectedIconColor else unselectedColor,
-        animationSpec = tween(COLOR_FADE_MS),
-        label = "iconColor",
-    )
-    val textColor by animateColorAsState(
-        targetValue = if (selected) selectedTextColor else unselectedColor,
-        animationSpec = tween(COLOR_FADE_MS),
-        label = "textColor",
-    )
-    val iconScale by animateFloatAsState(
-        targetValue = if (selected) ICON_SCALE_SELECTED else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "iconScale",
-    )
+    // each read while drawing, so a change of tab fades and bounces the items without composing them again per frame
+    val iconColor =
+        animateColorAsState(
+            targetValue = if (selected) selectedIconColor else unselectedColor,
+            animationSpec = tween(COLOR_FADE_MS),
+            label = "iconColor",
+        )
+    val textColor =
+        animateColorAsState(
+            targetValue = if (selected) selectedTextColor else unselectedColor,
+            animationSpec = tween(COLOR_FADE_MS),
+            label = "textColor",
+        )
+    val iconScale =
+        animateFloatAsState(
+            targetValue = if (selected) ICON_SCALE_SELECTED else 1f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+            label = "iconScale",
+        )
 
     // no ripple - the pill fade+scale-in and icon bounce already carry the press/selection feedback
     val interactionSource = remember { MutableInteractionSource() }
@@ -114,13 +120,32 @@ fun RowScope.KrateNavigationBarItem(
     }
 }
 
+// the tab's icon, tinted while drawing like Icon does, so the tint can fade without composing again
+@Composable
+private fun NavGlyph(
+    icon: NavIcon,
+    color: State<Color>,
+) {
+    val painter =
+        when (icon) {
+            is NavIcon.Vector -> rememberVectorPainter(icon.imageVector)
+            is NavIcon.Drawable -> painterResource(icon.resId)
+        }
+    Box(
+        modifier =
+            Modifier.size(IconHeight).drawBehind {
+                with(painter) { draw(size, colorFilter = ColorFilter.tint(color.value)) }
+            },
+    )
+}
+
 // icon + its indicator pill, boxed to a fixed size so the pill never grows to match the label below it
 @Composable
 private fun NavItemIcon(
     selected: Boolean,
     icon: NavIcon,
-    iconColor: Color,
-    iconScale: Float,
+    iconColor: State<Color>,
+    iconScale: State<Float>,
 ) {
     Box(
         contentAlignment = Alignment.Center,
@@ -134,13 +159,11 @@ private fun NavItemIcon(
                     .size(IconWidth, IconHeight)
                     .clip(IconShape)
                     .graphicsLayer {
-                        scaleX = iconScale
-                        scaleY = iconScale
+                        scaleX = iconScale.value
+                        scaleY = iconScale.value
                     },
         ) {
-            CompositionLocalProvider(LocalContentColor provides iconColor) {
-                NavIcon(icon = icon, contentDescription = null, size = IconHeight)
-            }
+            NavGlyph(icon = icon, color = iconColor)
         }
     }
 }
@@ -179,13 +202,12 @@ private val NAV_LABEL_MIN_SIZE = 9.sp
 @Composable
 private fun NavItemLabel(
     label: String,
-    textColor: Color,
+    textColor: State<Color>,
     selected: Boolean,
 ) {
     Box(modifier = Modifier.padding(top = 4.dp)) {
         val style =
             MaterialTheme.typography.labelMedium.copy(
-                color = textColor,
                 fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             )
@@ -193,6 +215,7 @@ private fun NavItemLabel(
         BasicText(
             text = label,
             style = style,
+            color = { textColor.value },
             maxLines = 1,
             autoSize = TextAutoSize.StepBased(minFontSize = NAV_LABEL_MIN_SIZE, maxFontSize = style.fontSize),
         )

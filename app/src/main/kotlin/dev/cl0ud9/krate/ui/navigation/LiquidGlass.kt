@@ -5,6 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -31,6 +36,7 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.highlight.Highlight
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.ui.theme.krateGlow
+import kotlinx.coroutines.delay
 
 // blur needs Android 12's RenderEffect; the light-bending edge (lens) needs Android 13's runtime shaders
 val liquidGlassSupported: Boolean
@@ -67,6 +73,25 @@ fun Modifier.heroGlow(): Modifier = if (LocalLiquidGlass.current) krateGlow() el
 // a page's own scrolling content, recorded for the glass floating over it; null while glass is off
 @Composable
 fun rememberPageGlass(): LayerBackdrop? = if (LocalLiquidGlass.current) rememberLayerBackdrop() else null
+
+// how long a page keeps recording after its glass has gone, so a message fading out stays frosted to the end
+private const val GLASS_LINGER_MS = 1_000L
+
+// true while [showing] and for a moment after: recording a page costs a second draw of it every frame, so it runs
+// only while some glass is over it
+@Composable
+fun rememberGlassWhile(showing: Boolean): Boolean {
+    var lingering by remember { mutableStateOf(showing) }
+    LaunchedEffect(showing) {
+        if (showing) {
+            lingering = true
+        } else {
+            delay(GLASS_LINGER_MS)
+            lingering = false
+        }
+    }
+    return showing || lingering
+}
 
 // records this content for the glass over it, on the colour it sits on: without it, whatever sits straight on the
 // page (section titles, dates) records with nothing around it, and stays sharp through the glass

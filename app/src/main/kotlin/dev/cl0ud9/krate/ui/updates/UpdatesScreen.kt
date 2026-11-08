@@ -14,11 +14,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,9 +36,10 @@ import dev.cl0ud9.krate.ui.components.EmptyState
 import dev.cl0ud9.krate.ui.components.KrateMessage
 import dev.cl0ud9.krate.ui.components.KratePullToRefreshBox
 import dev.cl0ud9.krate.ui.components.LocalNavBarClearance
+import dev.cl0ud9.krate.ui.components.PatientLoadingIndicator
 import dev.cl0ud9.krate.ui.components.RefreshFailureSnackbar
+import dev.cl0ud9.krate.ui.components.rememberRefreshMessageGlass
 import dev.cl0ud9.krate.ui.navigation.glassSource
-import dev.cl0ud9.krate.ui.navigation.rememberPageGlass
 import dev.cl0ud9.krate.ui.util.ClearNoticesOnResume
 import dev.cl0ud9.krate.ui.util.RefreshOnResume
 import dev.cl0ud9.krate.ui.util.StaggeredAppear
@@ -114,7 +116,8 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
         // pending updates are the most time-sensitive data in the app - a stale manifest here
         // directly means a missed update, so this is the highest-value place for pull-to-refresh
         // the list, for the snackbar to turn to glass over
-        val pageGlass = rememberPageGlass()
+        val failures = remember { SnackbarHostState() }
+        val pageGlass = rememberRefreshMessageGlass(failures)
         KratePullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refreshFromNetwork,
@@ -140,6 +143,7 @@ fun UpdatesScreen(onAppClick: (String) -> Unit) {
             },
             onRetry = viewModel::refreshFromNetwork,
             glass = pageGlass,
+            snackbarHostState = failures,
         )
     }
 }
@@ -168,7 +172,7 @@ private fun UpdatesContent(
                     modifier = Modifier.fillMaxSize().padding(bottom = LocalNavBarClearance.current),
                     contentAlignment = Alignment.Center,
                 ) {
-                    LoadingIndicator()
+                    PatientLoadingIndicator()
                 }
             }
 
