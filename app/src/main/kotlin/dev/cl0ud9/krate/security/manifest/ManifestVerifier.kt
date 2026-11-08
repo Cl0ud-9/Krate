@@ -11,9 +11,11 @@ const val MANIFEST_PUBLIC_KEY_BASE64 = "ObG/z2CkousiMGFN/EFP4th0eaaVy0KAHnuL7TrU
 class ManifestVerifier(
     publicKeyBase64: String = MANIFEST_PUBLIC_KEY_BASE64,
 ) {
-    // a malformed compiled-in key must never crash app startup, degrade to "never verifies" instead
-    private val verifier: Ed25519Verify? =
+    // a malformed compiled-in key must never crash app startup, degrade to "never verifies" instead. Built on the first
+    // check, which runs off the main thread: setting up the crypto library took 120 ms of every cold start
+    private val verifier: Ed25519Verify? by lazy {
         runCatching { Ed25519Verify(Base64.getDecoder().decode(publicKeyBase64)) }.getOrNull()
+    }
 
     // an invalid signature is the expected negative outcome here, not a bug to report upstream
     @Suppress("SwallowedException")
