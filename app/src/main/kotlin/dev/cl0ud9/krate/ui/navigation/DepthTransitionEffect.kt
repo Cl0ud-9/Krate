@@ -17,16 +17,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.requireGraphicsContext
+import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import kotlin.math.ceil
 
 private const val DEPTH_TRANSITION_MS = 350
 private val DimBlurEasing = CubicBezierEasing(0.5f, 0f, 0.8f, 0.2f)
@@ -146,27 +156,88 @@ private fun Modifier.depthEffect(
 ): Modifier {
     if (!active) return this
     return graphicsLayer {
-        // both reads happen HERE, inside the layer's own draw-phase lambda, not via `by` up in
-        // rememberDepthEffect - GraphicsLayerScope resets shape/clip/renderEffect/compositingStrategy
-        // to their defaults on every invocation, so simply not setting them below (once the radius
-        // has animated back to 0) already turns them back off correctly, no explicit reset needed
+        // read inside the layer's own draw-phase lambda, not via `by` up in rememberDepthEffect -
+        // GraphicsLayerScope resets shape/clip to their defaults on every invocation, so simply not
+        // setting them (once the radius has animated back to 0) turns them back off
         val cornerRadius = cornerRadiusState.value
         if (cornerRadius > MIN_VISIBLE_RADIUS) {
             shape = RoundedCornerShape(cornerRadius)
             clip = true
         }
-        // CompositingStrategy.Offscreen forces an extra full-screen GPU render pass - genuinely
-        // needed for RenderEffect (blur) to work at all, but NOT for a plain clip(). Only ONE entry
-        // - the one directly behind the front - ever actually blurs (see shouldDim/canBlur above),
-        // so every other "just rounding" entry skips this and never pays for an offscreen layer it
-        // never uses
-        val blurRadius = blurRadiusState.value
-        if (blurRadius > 0.dp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            compositingStrategy = CompositingStrategy.Offscreen
-            renderEffect = BlurEffect(blurRadius.toPx(), blurRadius.toPx(), TileMode.Decal)
+    }.then(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) SmallBlurElement(blurRadiusState) else Modifier)
+        // the page in a layer of its own, so a blurred frame redraws only the copy, never the page's own drawing
+        .graphicsLayer()
+}
+
+// a blurred screen is drawn as a small copy blurred and scaled back up: a blur is soft enough that the copy's lower
+// resolution never shows, and blurring a quarter-size copy costs the GPU about a sixteenth of the full-size blur that
+// used to run on every frame of a push or pop
+private class SmallBlurElement(
+    val radius: State<Dp>,
+) : ModifierNodeElement<SmallBlurNode>() {
+    override fun create(): SmallBlurNode = SmallBlurNode(radius)
+
+    override fun update(node: SmallBlurNode) {
+        node.radius = radius
+    }
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "smallBlur"
+        properties["radius"] = radius.value
+    }
+
+    override fun equals(other: Any?): Boolean = other is SmallBlurElement && other.radius === radius
+
+    override fun hashCode(): Int = System.identityHashCode(radius)
+}
+
+private class SmallBlurNode(
+    var radius: State<Dp>,
+) : Modifier.Node(),
+    DrawModifierNode {
+    private var page: GraphicsLayer? = null
+    private var copy: GraphicsLayer? = null
+
+    override fun onAttach() {
+        val graphics = requireGraphicsContext()
+        page = graphics.createGraphicsLayer()
+        copy = graphics.createGraphicsLayer()
+    }
+
+    override fun onDetach() {
+        val graphics = requireGraphicsContext()
+        page?.let(graphics::releaseGraphicsLayer)
+        copy?.let(graphics::releaseGraphicsLayer)
+        page = null
+        copy = null
+    }
+
+    override fun ContentDrawScope.draw() {
+        val radiusPx = radius.value.toPx()
+        val page = page
+        val copy = copy
+        // too light to see: drawn sharp, so the copy is made only once there's a blur to show
+        val sharp = radiusPx < INVISIBLE_BLUR_PX || size.minDimension <= 0f
+        if (sharp || page == null || copy == null) {
+            drawContent()
+            return
         }
+        page.record { this@draw.drawContent() }
+        val shrink = BLUR_COPY_SHRINK
+        val width = ceil(size.width / shrink).toInt()
+        val height = ceil(size.height / shrink).toInt()
+        copy.renderEffect = BlurEffect(radiusPx / shrink, radiusPx / shrink, TileMode.Decal)
+        copy.record(size = IntSize(width, height)) {
+            scale(1f / shrink, 1f / shrink, pivot = Offset.Zero) { drawLayer(page) }
+        }
+        scale(shrink, shrink, pivot = Offset.Zero) { drawLayer(copy) }
     }
 }
+
+// one size for the whole push, so the GPU sets the copy up once rather than again at every step of the blur; a quarter
+// size is as soft as the lightest blur that shows, so the copy never looks blurrier than the page it stands for
+private const val BLUR_COPY_SHRINK = 4f
+private const val INVISIBLE_BLUR_PX = 4f
 
 // the wash over a screen that's receding. Drawn as a colour with its own alpha rather than as a layer faded to that
 // alpha: a faded layer makes the GPU render the whole screen aside and blend it back every frame of the push, which is
