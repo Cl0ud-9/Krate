@@ -28,6 +28,7 @@ import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.ui.navigation.GlassEdge
+import dev.cl0ud9.krate.ui.navigation.GlassLook
 import dev.cl0ud9.krate.ui.navigation.glassSource
 import dev.cl0ud9.krate.ui.navigation.liquidGlass
 import dev.cl0ud9.krate.ui.theme.ShapeCache
@@ -153,6 +154,7 @@ private fun BoxScope.PreviewBar(
                     shape,
                     edge = if (pill) GlassEdge.ALL else GlassEdge.TOP,
                     cornerRadius = radius.dp,
+                    look = GlassLook.Bar,
                 ),
         shape = shape,
         color = if (glass != null) Color.Transparent else color,

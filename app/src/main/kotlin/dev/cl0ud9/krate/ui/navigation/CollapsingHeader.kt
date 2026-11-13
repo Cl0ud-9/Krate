@@ -262,6 +262,7 @@ private fun BoxScope.HeaderSurface(
                                 GlassEdge.ALL,
                                 strength = { alpha },
                                 header = true,
+                                look = GlassLook.Floating,
                             )
                     },
                 ),

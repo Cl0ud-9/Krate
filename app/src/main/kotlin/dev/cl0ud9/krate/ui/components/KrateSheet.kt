@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.cl0ud9.krate.ui.navigation.LocalLiquidGlass
 import dev.cl0ud9.krate.ui.navigation.glassRim
@@ -86,6 +87,8 @@ fun KrateSheet(
 @Composable
 private fun Modifier.floating(state: SheetState): Modifier {
     val settledGap = remember { intArrayOf(NOT_SETTLED) }
+    // the sheet never rises into the status bar or the camera cut-out: the room it has ends where they begin
+    val topInset = WindowInsets.safeDrawing.getTop(LocalDensity.current)
     return layout { measurable, constraints ->
         val top = runCatching { state.requireOffset() }.getOrDefault(Float.MAX_VALUE)
         val share = (top / (constraints.maxHeight * FULL_HEIGHT_SHARE)).coerceIn(0f, 1f)
@@ -93,11 +96,18 @@ private fun Modifier.floating(state: SheetState): Modifier {
         if (settledGap[0] == NOT_SETTLED && state.currentValue == SheetValue.Expanded) settledGap[0] = following
         val gap = if (settledGap[0] == NOT_SETTLED) following else settledGap[0]
         val width = (constraints.maxWidth - gap * 2).coerceAtLeast(0)
+        val height = (constraints.maxHeight - topInset).coerceAtLeast(0)
         val placeable =
             measurable.measure(
-                constraints.copy(minWidth = minOf(constraints.minWidth, width), maxWidth = width),
+                constraints.copy(
+                    minWidth = minOf(constraints.minWidth, width),
+                    maxWidth = width,
+                    minHeight = minOf(constraints.minHeight, height),
+                    maxHeight = height,
+                ),
             )
-        layout(placeable.width + gap * 2, placeable.height) { placeable.place(gap, -gap) }
+        // lowered by the room kept at the top, so the sheet still ends at the bottom of the screen
+        layout(placeable.width + gap * 2, placeable.height) { placeable.place(gap, topInset - gap) }
     }
 }
 

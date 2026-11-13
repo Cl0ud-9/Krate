@@ -70,6 +70,7 @@ internal fun KrateBottomBar(
                     cornerRadius = geometry.topRadius,
                     layerBlock = if (glass != null) motion.barLayer else null,
                     press = { motion.highlight.progress },
+                    look = GlassLook.Bar,
                 ).then(if (glass != null) motion.highlight.modifier else Modifier),
         shape = shape,
         // Material's own navigation bar color: a tone above the surface panel behind it, plus the shadow; glass draws
@@ -87,19 +88,7 @@ internal fun KrateBottomBar(
                     .then(if (glass != null) measureTabs.then(motion.gestures) else Modifier),
         ) {
             if (glass != null) GlassTabPill(motion, glass, appearance.compactMode)
-            Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                destinations.forEach { destination ->
-                    val selected = currentRoute == destination.route
-                    KrateNavigationBarItem(
-                        selected = selected,
-                        onClick = { navController.navigateToTab(destination.route) },
-                        icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                        label = stringResource(destination.labelRes),
-                        compact = appearance.compactMode,
-                        pill = glass == null,
-                    )
-                }
-            }
+            BarItems(navController, currentRoute, compact = appearance.compactMode, pill = glass == null)
         }
     }
 }
@@ -108,6 +97,30 @@ internal fun KrateBottomBar(
 // matching corner radius lines up with the phone's own screen corners; above 3-button nav it keeps a gap of its own
 // instead of resting on the buttons. Full width runs edge to edge over the system bar
 internal val NavBarContentHeight = 90.dp
+
+// the tabs, in a row across the bar
+@Composable
+private fun BarItems(
+    navController: NavHostController,
+    currentRoute: String?,
+    compact: Boolean,
+    pill: Boolean,
+) {
+    Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        KrateBottomNavDestinations.forEach { destination ->
+            val selected = currentRoute == destination.route
+            KrateNavigationBarItem(
+                selected = selected,
+                onClick = { navController.navigateToTab(destination.route) },
+                icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                label = stringResource(destination.labelRes),
+                compact = compact,
+                pill = pill,
+            )
+        }
+    }
+}
+
 internal val NavBarCompactContentHeight = 64.dp
 private val FLOATING_GAP = 14.dp
 private val WIDE_INSET = 30.dp

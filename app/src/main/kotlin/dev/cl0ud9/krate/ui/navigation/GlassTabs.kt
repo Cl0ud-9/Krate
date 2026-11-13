@@ -106,8 +106,9 @@ internal fun rememberGlassTabsMotion(
     return motion to measure
 }
 
-// the glass pill under the selected tab: tinted like Material's indicator at rest, clear glass that magnifies what's
-// behind it while pressed or dragged
+// the glass pill under the selected tab: clear glass at rest, lightly frosted and tinted like Material's indicator so
+// what's behind it shows through, with a fine rim and a gentle bend at its edge; it magnifies more while pressed or
+// dragged
 @Composable
 internal fun GlassTabPill(
     motion: GlassTabsMotion,
@@ -116,7 +117,7 @@ internal fun GlassTabPill(
 ) {
     val drag = motion.drag
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val restColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = GlassTokens.PILL_REST_ALPHA)
+    val restColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = GlassTokens.PILL_GLASS_TINT)
     val density = LocalDensity.current
     // the same size and place as the plain indicator: around the icon, which sits above the label
     val pillWidthPx = with(density) { GlassTokens.PillWidth.toPx() }
@@ -142,7 +143,7 @@ internal fun GlassTabPill(
     )
 }
 
-// frosted like the bar at rest, so nothing behind shows through sharp; a lens with a rim and shadow while pressed,
+// see-through at rest, with a rim light and a soft bend at the edge; a stronger lens, rim and shadow while pressed,
 // stretched along the way it's sliding
 private fun Modifier.pillGlass(
     drag: DampedDragAnimation,
@@ -153,22 +154,21 @@ private fun Modifier.pillGlass(
         backdrop = backdrop,
         shape = { PillShape },
         effects = {
-            frost()
+            frost(look = GlassLook.Pill)
             val pressed = drag.pressProgress
-            if (pressed > 0f) {
-                lens(
-                    GlassTokens.PillLensHeight.toPx() * pressed,
-                    GlassTokens.PillLensAmount.toPx() * pressed,
-                    chromaticAberration = true,
-                )
-            }
+            val share = GlassTokens.PILL_REST_SHARE + (1f - GlassTokens.PILL_REST_SHARE) * pressed
+            lens(
+                GlassTokens.PillLensHeight.toPx() * share,
+                GlassTokens.PillLensAmount.toPx() * share,
+                chromaticAberration = true,
+            )
         },
-        highlight = { Highlight.Default.copy(alpha = drag.pressProgress) },
+        highlight = { Highlight.Default.copy(alpha = rimAt(drag.pressProgress)) },
         shadow = { Shadow(alpha = drag.pressProgress) },
         innerShadow = {
             InnerShadow(
-                radius = GlassTokens.PillInnerShadow * drag.pressProgress,
-                alpha = drag.pressProgress,
+                radius = GlassTokens.PillInnerShadow * rimAt(drag.pressProgress),
+                alpha = rimAt(drag.pressProgress),
             )
         },
         layerBlock = {
@@ -179,8 +179,13 @@ private fun Modifier.pillGlass(
         // stays tinted while pressed, only lighter, so the glass reads as glass over a dark page too
         onDrawSurface = {
             drawRect(restColor, alpha = lerp(1f, GlassTokens.PILL_PRESSED_TINT, drag.pressProgress))
-            drawRect(Color.White.copy(alpha = GlassTokens.PILL_PRESSED_SHINE * drag.pressProgress))
+            val rest = GlassTokens.PILL_REST_SHINE
+            val shine = rest + (GlassTokens.PILL_PRESSED_SHINE - rest) * drag.pressProgress
+            drawRect(Color.White.copy(alpha = shine))
         },
     )
 
 private fun stretch(amount: Float): Float = amount.coerceIn(-GlassTokens.STRETCH_LIMIT, GlassTokens.STRETCH_LIMIT)
+
+// how much of the pill's rim light shows: some at rest, all of it while pressed
+private fun rimAt(pressed: Float): Float = GlassTokens.PILL_REST_SHARE + (1f - GlassTokens.PILL_REST_SHARE) * pressed

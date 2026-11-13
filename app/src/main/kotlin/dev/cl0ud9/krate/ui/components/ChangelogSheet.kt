@@ -44,6 +44,7 @@ import dev.cl0ud9.krate.data.downloads.friendlyNetworkError
 import dev.cl0ud9.krate.platform.appContainer
 import dev.cl0ud9.krate.platform.selfupdate.KrateRelease
 import dev.cl0ud9.krate.ui.navigation.GlassEdge
+import dev.cl0ud9.krate.ui.navigation.GlassLook
 import dev.cl0ud9.krate.ui.navigation.glassSource
 import dev.cl0ud9.krate.ui.navigation.liquidGlass
 import dev.cl0ud9.krate.ui.navigation.rememberGlassPress
@@ -189,6 +190,7 @@ private fun ViewOnGitHubButton(
                     GlassEdge.ALL,
                     layerBlock = press.glassLayer,
                     press = { press.progress },
+                    look = GlassLook.Floating,
                 ).then(if (glass != null) press.modifier else Modifier),
     )
 }

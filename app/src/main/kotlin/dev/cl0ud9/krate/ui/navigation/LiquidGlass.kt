@@ -33,7 +33,6 @@ import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.colorControls
 import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.highlight.Highlight
 import dev.cl0ud9.krate.domain.repository.SettingsRepository
 import dev.cl0ud9.krate.ui.theme.krateGlow
 import kotlinx.coroutines.delay
@@ -117,24 +116,30 @@ fun Modifier.liquidGlass(
     press: () -> Float = { 0f },
     // a tall piece bends no more than the bar does
     header: Boolean = false,
+    look: GlassLook = GlassLook.Standard,
 ): Modifier {
     if (backdrop == null) return this
     // Krate's own theme, which can differ from the phone's
     val dark = MaterialTheme.colorScheme.surface.luminance() < HALF
+
+    @Suppress("NAME_SHADOWING")
+    val look = look.forTheme(dark)
     val shade = if (dark) Color.Black else Color.White
     val light = Color.White.copy(alpha = if (dark) GlassTokens.EDGE_DARK else GlassTokens.EDGE_LIGHT)
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
-            frost(strength(), press())
+            frost(strength(), press(), look)
             // only floating glass bends light at its sides: a full-width bar runs into the screen's edges, where
             // bending would warp what's behind into curves
-            if (lensSupported && edge == GlassEdge.ALL && shape is CornerBasedShape) bend(header, press())
+            if (lensSupported && edge == GlassEdge.ALL && shape is CornerBasedShape) bend(header, press(), look)
         },
         layerBlock = layerBlock,
-        highlight = if (edge == GlassEdge.ALL) ({ Highlight.Default.copy(alpha = strength()) }) else null,
-        onDrawSurface = { drawRect(shade, alpha = GlassTokens.SHADE * strength()) },
+        highlight = if (edge == GlassEdge.ALL) ({ look.rim(strength()) }) else null,
+        shadow = if (look.shadowAlpha > 0f) ({ look.lift(strength()) }) else null,
+        innerShadow = if (look.innerAlpha > 0f) ({ look.thickness(strength()) }) else null,
+        onDrawSurface = { with(look) { drawSurface(shade, strength()) } },
         onDrawFront =
             when (edge) {
                 GlassEdge.ALL -> null
@@ -158,26 +163,33 @@ fun Modifier.liquidGlass(
 internal fun BackdropEffectScope.frost(
     strength: Float = 1f,
     press: Float = 0f,
+    look: GlassLook = GlassLook.Standard,
 ) {
-    val saturation = lerp(1f, GlassTokens.SATURATION, strength)
+    val saturation = lerp(1f, look.saturation, strength)
     colorControls(saturation = saturation)
-    colorControls(brightness = GlassTokens.BRIGHTNESS * strength, saturation = saturation)
-    blur(GlassTokens.Blur.toPx() + GlassTokens.PressBlur.toPx() * press)
+    colorControls(brightness = look.brightness * strength, saturation = saturation)
+    blur(look.blur.toPx() + GlassTokens.PressBlur.toPx() * press)
 }
 
 // bends what's behind near the edges: a quarter of the piece's shorter side in, by half of it
 private fun BackdropEffectScope.bend(
     header: Boolean,
     press: Float,
+    look: GlassLook,
 ) {
     val shorter = size.minDimension
-    var height = shorter * GlassTokens.LENS_HEIGHT_SHARE
-    var amount = shorter * GlassTokens.LENS_AMOUNT_SHARE
+    var height = shorter * look.lensHeightShare
+    var amount = shorter * look.lensAmountShare
     if (header) {
         height = height.coerceAtMost(GlassTokens.HeaderLensHeight.toPx())
         amount = amount.coerceAtMost(GlassTokens.HeaderLensAmount.toPx())
     }
-    lens(height + GlassTokens.PressLens.toPx() * press, amount)
+    lens(
+        height + GlassTokens.PressLens.toPx() * press,
+        amount,
+        depthEffect = look.depth,
+        chromaticAberration = look.chromatic,
+    )
 }
 
 // the shape's outline, drawn only as far down as its top corners reach

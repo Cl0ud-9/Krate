@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import dev.cl0ud9.krate.R
 import dev.cl0ud9.krate.ui.navigation.GlassEdge
+import dev.cl0ud9.krate.ui.navigation.GlassLook
 import dev.cl0ud9.krate.ui.navigation.liquidGlass
 import dev.cl0ud9.krate.ui.navigation.rememberGlassPress
 import dev.cl0ud9.krate.ui.navigation.rememberGlassWhile
@@ -116,6 +117,7 @@ private fun KrateSnackbar(
                     GlassEdge.ALL,
                     layerBlock = press.glassLayer,
                     press = { press.progress },
+                    look = GlassLook.Floating,
                 ).then(if (glass != null) press.modifier else Modifier),
         shape = ShapeCache.rounded24,
         color = if (glass != null) Color.Transparent else color,
