@@ -83,9 +83,8 @@ class KrateActivity : ComponentActivity() {
         enableEdgeToEdge()
         lifecycleScope.launch {
             appContainer().settingsRepository.observeThemeMode().distinctUntilChanged().collect {
-                applyLaunchNightMode(
-                    it,
-                )
+                // the app's context: Android keeps a callback on this manager, so an Activity's would never be freed
+                applicationContext.applyLaunchNightMode(it)
             }
         }
         setContent {

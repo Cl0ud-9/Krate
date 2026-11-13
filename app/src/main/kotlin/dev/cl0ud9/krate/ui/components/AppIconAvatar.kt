@@ -1,7 +1,6 @@
 package dev.cl0ud9.krate.ui.components
 
 import android.graphics.BitmapFactory
-import android.graphics.drawable.Drawable
 import android.util.Base64
 import android.util.LruCache
 import androidx.compose.foundation.Image
@@ -23,6 +22,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -103,44 +103,66 @@ internal fun rememberAppIcon(app: AppProfile): ImageBitmap? {
     val packageName = app.packageName
     val catalogIconPng = app.iconPng
     val context = LocalContext.current
-    val cacheKey = packageName + ":" + catalogIconPng.hashCode()
     // read again when any app is installed, replaced or removed, so an updated app shows its icon at once
     val changes = PackageChanges.version.intValue
-    // the last icon seen shows at once, so a list scrolled back or a screen returned to never flashes letters first;
-    // it's still reloaded, so an app updated in the meantime shows its new icon
+    val side = with(LocalDensity.current) { ICON_DP.dp.roundToPx() }
+    // the size is part of the key, so a larger display size never reuses an icon read for a smaller one
+    val cacheKey = packageName + ":" + catalogIconPng.hashCode() + ":" + side
+    // the last icon seen shows at once, so a list scrolled back or a screen returned to never flashes letters first
     val icon by
-        produceState(initialValue = AppIconCache.get(cacheKey), packageName, catalogIconPng, changes) {
+        produceState(initialValue = AppIconCache.get(cacheKey)?.icon, packageName, catalogIconPng, changes) {
+            // one already read since the last package change is as current as a new read would be
+            AppIconCache.get(cacheKey)?.takeIf { it.changes == changes }?.let { return@produceState }
             val loaded =
                 withContext(Dispatchers.IO) {
                     val installed =
                         runCatching { context.packageManager.getApplicationIcon(packageName) }
                             .getOrNull()
-                            ?.let(Drawable::toBitmap)
+                            ?.let { it.toBitmap(side, side) }
                             ?.asImageBitmap()
                     installed ?: catalogIconPng?.let(::decodeCatalogIcon)
                 }
-            if (loaded != null) AppIconCache.put(cacheKey, loaded)
+            if (loaded != null) AppIconCache.put(cacheKey, loaded, changes)
             value = loaded
         }
     return icon
 }
 
 private const val CONTRAST_LUMINANCE_THRESHOLD = 0.5f
-private const val ICON_CACHE_SIZE = 24
 
-// icons already loaded this run, a few dozen at most (the catalog is small)
+// the largest an icon is drawn on any screen, so large launcher artwork isn't held at full size
+private const val ICON_DP = 64
+
+// about two dozen icons in memory at most, counted by their size rather than by how many
+private const val ICON_CACHE_BYTES = 6 * 1024 * 1024
+
+// icons already loaded this run, and the package-change count each was read at
 private object AppIconCache {
-    private val icons = LruCache<String, ImageBitmap>(ICON_CACHE_SIZE)
+    class Entry(
+        val icon: ImageBitmap,
+        val changes: Int,
+    )
 
-    fun get(key: String): ImageBitmap? = icons.get(key)
+    private val icons =
+        object : LruCache<String, Entry>(ICON_CACHE_BYTES) {
+            override fun sizeOf(
+                key: String,
+                value: Entry,
+            ): Int = value.icon.width * value.icon.height * BYTES_PER_PIXEL
+        }
+
+    fun get(key: String): Entry? = icons.get(key)
 
     fun put(
         key: String,
         icon: ImageBitmap,
+        changes: Int,
     ) {
-        icons.put(key, icon)
+        icons.put(key, Entry(icon, changes))
     }
 }
+
+private const val BYTES_PER_PIXEL = 4
 
 private fun decodeCatalogIcon(base64Png: String): ImageBitmap? =
     runCatching {

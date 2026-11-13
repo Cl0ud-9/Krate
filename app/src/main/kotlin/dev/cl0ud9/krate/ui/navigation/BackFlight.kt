@@ -22,6 +22,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.util.lerp
 import dev.cl0ud9.krate.domain.model.AppProfile
 import dev.cl0ud9.krate.ui.components.AppIconAvatar
 
@@ -52,6 +53,8 @@ internal object BackFlight {
         val key: String,
         val app: AppProfile,
         val from: Rect,
+        // where the clip starts at take-off: the icon's own top when partly above the panel, so it isn't cut
+        val clipFrom: Float,
     )
 
     // an icon that had scrolled up under the page's bar starts just under the tab's header instead, which clips it, so
@@ -64,14 +67,16 @@ internal object BackFlight {
     // the page is going for good: the icon leaves the card from wherever it is now
     fun launch(key: String) {
         val armed = armed?.takeIf { it.key == key } ?: return
-        val from =
+        val seen =
             armed.from
                 ?.takeIf { it.isAttached }
                 ?.boundsInWindow()
                 ?.takeIf { it.width > 0f }
-                ?.let(::startingAtMostJustUnderHeader)
+        val from = seen?.let(::startingAtMostJustUnderHeader)
+        // partly above the panel means fully on show in the page: the clip starts at its top and eases to the panel's
+        val clipFrom = if (seen != null && from === seen) minOf(seen.top, IconFlight.panelTop) else IconFlight.panelTop
         this.armed = null
-        if (from != null && flying == null) flying = Flying(key, armed.app, from)
+        if (from != null && flying == null) flying = Flying(key, armed.app, from, clipFrom)
     }
 }
 
@@ -91,7 +96,8 @@ internal fun BackFlightOverlay() {
                 .fillMaxSize()
                 .onGloballyPositioned { origin = it.positionInWindow() }
                 .drawWithContent {
-                    clipRect(top = (IconFlight.panelTop - origin.y).coerceAtLeast(0f)) {
+                    val clipTop = lerp(flying.clipFrom, IconFlight.panelTop, progress.value.coerceIn(0f, 1f))
+                    clipRect(top = (clipTop - origin.y).coerceAtLeast(0f)) {
                         this@drawWithContent.drawContent()
                     }
                 },

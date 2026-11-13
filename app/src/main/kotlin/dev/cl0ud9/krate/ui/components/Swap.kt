@@ -21,12 +21,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import dev.cl0ud9.krate.ui.navigation.LocalNavAnimation
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 private const val SWAP_MS = 320
 private const val OUT_MS = 100
@@ -112,9 +115,13 @@ fun AfterArrival(
     content: @Composable () -> Unit,
 ) {
     var arrived by rememberSaveable { mutableStateOf(false) }
+    val moving = LocalNavAnimation.current
     LaunchedEffect(Unit) {
         if (!arrived) {
-            delay(ARRIVAL_MS + step * ARRIVAL_STEP_MS)
+            delay(ARRIVAL_MS)
+            // a slow phone can still be pushing the page at that point: the reveal waits for it to stop
+            if (moving != null) snapshotFlow { moving.transition.run { currentState == targetState } }.first { it }
+            delay(step * ARRIVAL_STEP_MS)
             arrived = true
         }
     }

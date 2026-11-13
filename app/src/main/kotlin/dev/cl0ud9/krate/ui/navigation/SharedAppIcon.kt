@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Density
@@ -184,7 +185,16 @@ internal fun Modifier.sharedAppIcon(
             }
         }
     }
-    return onGloballyPositioned { coordinates -> BackFlight.rows[key] = coordinates }
+    val placed = remember(key) { arrayOfNulls<LayoutCoordinates>(1) }
+    // the map outlives every screen, so a row that leaves takes its entry with it instead of holding its whole screen
+    DisposableEffect(key) { onDispose { if (BackFlight.rows[key] === placed[0]) BackFlight.rows.remove(key) } }
+    val place =
+        Modifier.onGloballyPositioned { coordinates ->
+            placed[0] = coordinates
+            BackFlight.rows[key] = coordinates
+        }
+    return this
+        .then(place)
         .graphicsLayer {
             val inPage = BackFlight.armed?.key == key && trip?.entering?.value == true
             alpha = if (inPage || BackFlight.flying?.key == key) 0f else 1f
