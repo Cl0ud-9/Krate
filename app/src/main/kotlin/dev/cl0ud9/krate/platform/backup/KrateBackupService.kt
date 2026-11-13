@@ -88,6 +88,8 @@ private const val STOPPED = "Stopped when you left the app, so it may not have f
 // things over an app for a moment as it opens (a transition, a floating bubble, a permission question), and that must
 // not end a job that was working fine
 private const val AWAY_GRACE_MS = 1_500L
+private const val JOB_OFF_MS = 120_000L
+private const val IDLE_OFF_MS = 600_000L
 
 // the person went somewhere else (home, another app, back to Krate) while the helper was working
 private class Interrupted : Exception()
@@ -107,6 +109,22 @@ class KrateBackupService : AccessibilityService() {
     override fun onServiceConnected() {
         running = this
         listenTo(packageName)
+        // switched on and then forgotten would keep banking apps from opening, so it goes off if nothing comes
+        switchOffIn(IDLE_OFF_MS)
+    }
+
+    // the helper has no business being on while nothing is asked of it: it switches itself off this long after its
+    // last job (or after being switched on), unless the person chose to keep it on
+    private var autoOff: Job? = null
+
+    private fun switchOffIn(waitMs: Long) {
+        autoOff?.cancel()
+        if (HelperKeepOn.get(this)) return
+        autoOff =
+            scope.launch {
+                delay(waitMs)
+                if (current?.isActive != true && !HelperKeepOn.get(this@KrateBackupService)) AutoBackupRunner.turnOff()
+            }
     }
 
     // the app's short messages ("Imported 12 settings"), heard only while a job runs in that app
@@ -184,6 +202,7 @@ class KrateBackupService : AccessibilityService() {
         interrupted = false
         reachedApp = false
         away.reset()
+        autoOff?.cancel()
         current = scope.launch { runJob(job) }
     }
 
@@ -195,11 +214,14 @@ class KrateBackupService : AccessibilityService() {
         // back here
         if (interrupted) {
             AutoBackupRunner.finish(result)
+            switchOffIn(JOB_OFF_MS)
             return
         }
         withContext(NonCancellable) { leave(job.watched) }
         AutoBackupRunner.finish(result)
         returnToKrate()
+        // a few jobs follow one another (recommended settings, then the app's links), so it waits a little first
+        switchOffIn(JOB_OFF_MS)
     }
 
     // how the job ended, whatever happened: done, or why not. An interruption is not an error; it's the person leaving

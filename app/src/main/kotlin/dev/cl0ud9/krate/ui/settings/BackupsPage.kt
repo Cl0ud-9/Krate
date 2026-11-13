@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
@@ -54,6 +55,7 @@ import dev.cl0ud9.krate.platform.appContainer
 import dev.cl0ud9.krate.platform.backup.AppBackups
 import dev.cl0ud9.krate.platform.backup.AutoBackupRunner
 import dev.cl0ud9.krate.platform.backup.AutoBackupState
+import dev.cl0ud9.krate.platform.backup.HelperKeepOn
 import dev.cl0ud9.krate.platform.backup.SavedBackup
 import dev.cl0ud9.krate.platform.packageinfo.PackageChanges
 import dev.cl0ud9.krate.platform.setup.RESTRICTED_SETTINGS_HELP
@@ -93,6 +95,7 @@ fun BackupsPage(
     SettingsPage(scrollState, topContentPadding) {
         AutoBackupSwitchRow(on = on)
         if (!on) RestrictedHelpRow()
+        HelperAutoOffRow()
         SettingsSectionLabel("Apps")
         if (supported.isEmpty()) {
             Text(
@@ -139,6 +142,31 @@ private fun AutoBackupSwitchRow(on: Boolean) {
         shape = settingsGroupShape(0, 1),
         onClick = { toggle() },
         trailing = { KrateSwitch(checked = on, onCheckedChange = { toggle() }) },
+    )
+}
+
+// whether the helper switches itself off when it's idle: some banking apps won't open while it's on
+@Composable
+private fun HelperAutoOffRow() {
+    val context = LocalContext.current
+    var keepOn by remember { mutableStateOf(HelperKeepOn.get(context)) }
+    val toggle = {
+        keepOn = !keepOn
+        HelperKeepOn.set(context, keepOn)
+    }
+    SettingsRow(
+        header =
+            SettingsRowHeader(
+                icon = rememberVectorPainter(Icons.Filled.Security),
+                title = "Switch it off after use",
+                subtitle =
+                    "Some banking apps, like SBI YONO, won't open while an accessibility service is on. Krate " +
+                        "switches its helper off two minutes after a job, or ten minutes after you turn it on.",
+                colors = SettingsTint.TEAL.colors(),
+            ),
+        shape = settingsGroupShape(0, 1),
+        onClick = { toggle() },
+        trailing = { KrateSwitch(checked = !keepOn, onCheckedChange = { toggle() }) },
     )
 }
 

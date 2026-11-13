@@ -206,8 +206,7 @@ private fun HomeContent(
         }
         // once, for anyone who had Krate before it could update apps by itself
         AutoUpdateOffer()
-        // after Krate's own update, if Play Protect was paused for it
-        PlayProtectReminder(gap = HOME_SECTION_GAP)
+        HomeReminders(gap = HOME_SECTION_GAP)
         Column(verticalArrangement = Arrangement.spacedBy(HOME_SECTION_GAP)) {
             HomeAppear(order = 0) {
                 StatusHeroCard(
