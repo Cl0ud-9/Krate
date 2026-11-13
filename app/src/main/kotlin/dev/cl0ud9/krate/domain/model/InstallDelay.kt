@@ -28,7 +28,7 @@ enum class InstallDelay(
 // the label a setting shows, and the words that finish "New versions install ..."
 fun InstallDelay.label(): String =
     when (this) {
-        InstallDelay.RIGHT_AWAY -> "Right away"
+        InstallDelay.RIGHT_AWAY -> "As soon as Krate finds it"
         InstallDelay.THREE_HOURS -> "After 3 hours"
         InstallDelay.SIX_HOURS -> "After 6 hours"
         InstallDelay.ONE_DAY -> "After a day"
@@ -39,7 +39,7 @@ fun InstallDelay.label(): String =
 // Krate looks for new versions every few hours, so the short waits are "at least", never to the minute
 fun InstallDelay.whenText(): String =
     when (this) {
-        InstallDelay.RIGHT_AWAY -> "as soon as Krate sees them"
+        InstallDelay.RIGHT_AWAY -> "as soon as Krate finds them"
         InstallDelay.THREE_HOURS -> "at least 3 hours after release"
         InstallDelay.SIX_HOURS -> "at least 6 hours after release"
         InstallDelay.ONE_DAY -> "a day after release"

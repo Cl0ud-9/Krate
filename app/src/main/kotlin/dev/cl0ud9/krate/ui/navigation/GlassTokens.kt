@@ -193,16 +193,16 @@ data class GlassLook(
                 shade = GlassTokens.SHADE,
                 lensHeightShare = GlassTokens.LENS_HEIGHT_SHARE,
                 lensAmountShare = GlassTokens.LENS_AMOUNT_SHARE,
-                depth = true,
+                depth = false,
                 chromatic = false,
-                highlight = 1.5f,
+                highlight = 1.65f,
                 shadowRadius = 22.dp,
-                shadowAlpha = 0.3f,
+                shadowAlpha = 0.36f,
                 innerRadius = 3.dp,
-                innerAlpha = 0.28f,
+                innerAlpha = 0.32f,
                 rimFalloff = 2.2f,
                 innerLight = true,
-                bottomShade = 0.14f,
+                bottomShade = 0.2f,
             )
 
         // over a light page a white glass can't be lit from inside, so its edge stays dark and its shadow carries it
@@ -214,20 +214,38 @@ data class GlassLook(
                 shade = GlassTokens.SHADE,
                 lensHeightShare = GlassTokens.LENS_HEIGHT_SHARE,
                 lensAmountShare = GlassTokens.LENS_AMOUNT_SHARE,
-                depth = true,
+                depth = false,
                 chromatic = false,
-                highlight = 1.3f,
+                highlight = 1.45f,
                 shadowRadius = 22.dp,
-                shadowAlpha = 0.2f,
+                shadowAlpha = 0.25f,
                 innerRadius = 3.dp,
-                innerAlpha = 0.1f,
+                innerAlpha = 0.13f,
                 rimFalloff = 2.2f,
-                bottomShade = 0.05f,
+                bottomShade = 0.08f,
             )
 
         // everything else that floats and carries text (the scrolled header, messages, buttons): the bar's material, as
         // blurry as before so the words stay easy to read over whatever slides under them
-        val FloatingDark = BarDark.copy(blur = GlassTokens.Blur)
-        val FloatingLight = BarLight.copy(blur = GlassTokens.Blur)
+        val FloatingDark =
+            BarDark.copy(
+                blur = GlassTokens.Blur,
+                depth = true,
+                highlight = 1.5f,
+                innerRadius = 3.dp,
+                innerAlpha = 0.28f,
+                bottomShade = 0.14f,
+                shadowAlpha = 0.3f,
+            )
+        val FloatingLight =
+            BarLight.copy(
+                blur = GlassTokens.Blur,
+                depth = true,
+                highlight = 1.3f,
+                innerRadius = 3.dp,
+                innerAlpha = 0.1f,
+                bottomShade = 0.05f,
+                shadowAlpha = 0.2f,
+            )
     }
 }
